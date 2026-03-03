@@ -28,13 +28,6 @@
       <!-- Collapsible controls -->
       <div class="toolbar-controls-wrap" id="toolbarControlsWrap">
         <div class="toolbar-controls">
-
-          <!-- Subject -->
-          <div class="ctrl-group">
-            <label class="ctrl-label" for="subject">Predmet</label>
-            <select id="subject" class="select" title="Izberi predmet"></select>
-          </div>
-
           <!-- Dataset -->
           <div class="ctrl-group">
             <label class="ctrl-label" for="dataset">Nabor</label>
@@ -52,15 +45,23 @@
             </select>
           </div>
 
-          <!-- Filters -->
+          <!-- Filters: timestable numbers -->
           <div class="ctrl-group">
-            <label class="ctrl-label">Filter</label>
+            <label class="ctrl-label">Poštevanke</label>
             <div class="filter-dropdown">
-              <button class="filter-btn" id="filterToggle">⚙ Besede ▾</button>
+              <button class="filter-btn" id="filterToggle">⚙ Vse ▾</button>
               <div class="filter-panel" id="filterPanel">
-                <label class="toggle-lbl"><input type="checkbox" id="chkWords" checked> Besede</label>
-                <label class="toggle-lbl"><input type="checkbox" id="chkPhrases" checked> Besedne zveze</label>
-                <label class="toggle-lbl"><input type="checkbox" id="chkSentences" checked> Povedi</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chk1" checked> 1</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chk2" checked> 2</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chk3" checked> 3</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chk4" checked> 4</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chk5" checked> 5</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chk6" checked> 6</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chk7" checked> 7</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chk8" checked> 8</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chk9" checked> 9</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chk10" checked> 10</label>
+                
               </div>
             </div>
           </div>
@@ -85,11 +86,11 @@
             <div class="progress-bar-fill" id="progressBar"></div>
           </div>
 
-          <div class="direction-badge slo-to-eng" id="directionBadge">SLO → EN</div>
 
           <div id="cardContainer" class="card-container">
             <div class="card" id="flashcard">
               <div class="card-face card-front" id="cardFront">
+                <img id="cardImage" class="card-image" style="display:none" alt="">
                 <span class="card-text">Izberi nabor in klikni ↻</span>
                 <span class="flip-hint">klikni za obrat</span>
               </div>
@@ -171,23 +172,22 @@
     function updateSummary() {
       const datasetSel = document.getElementById('dataset');
       const modeSel    = document.getElementById('modeSelect');
-      const w = document.getElementById('chkWords').checked;
-      const p = document.getElementById('chkPhrases').checked;
-      const s = document.getElementById('chkSentences').checked;
 
       const datasetText = datasetSel.options[datasetSel.selectedIndex]?.text || '—';
-      // strip emoji from dataset name for brevity
       document.getElementById('summaryDataset').textContent = datasetText.replace(/^[^\w]*/, '');
 
       const modeMap = { flashcard: '🃏 Kartice', quiz: '🎯 Kviz', timed: '⏱️ Tekma' };
       document.getElementById('summaryMode').textContent = modeMap[modeSel.value] || modeSel.value;
 
-      const all = w && p && s;
-      const none = !w && !p && !s;
-      const parts = [];
-      if (w) parts.push('B'); if (p) parts.push('BZ'); if (s) parts.push('P');
+      const selected = [];
+      for (let i = 1; i <= 10; i++) {
+        const el = document.getElementById('chk' + i);
+        if (el && el.checked) selected.push(i);
+      }
+      const all = selected.length === 10;
+      const none = selected.length === 0;
       document.getElementById('summaryFilter').textContent =
-        all ? 'Vse' : none ? 'Nič' : parts.join('+');
+        all ? 'Vse' : none ? 'Nič' : selected.join(', ');
     }
 
     /* ── Filter dropdown toggle ── */
@@ -196,7 +196,6 @@
       const panel = document.getElementById('filterPanel');
       const isOpen = panel.classList.contains('open');
       if (!isOpen) {
-        // Position panel below the button using fixed coords
         const rect = this.getBoundingClientRect();
         panel.style.top  = (rect.bottom + 6) + 'px';
         panel.style.left = rect.left + 'px';
@@ -212,21 +211,21 @@
 
     /* ── Filter button label ── */
     function updateFilterLabel() {
-      const w = document.getElementById('chkWords').checked;
-      const p = document.getElementById('chkPhrases').checked;
-      const s = document.getElementById('chkSentences').checked;
-      const all = w && p && s;
-      const none = !w && !p && !s;
-      const parts = [];
-      if (w) parts.push('B');
-      if (p) parts.push('BZ');
-      if (s) parts.push('P');
-      document.getElementById('filterToggle').textContent = all ? '⚙ Vse ▾' : none ? '⚙ Nič ▾' : '⚙ ' + parts.join('+') + ' ▾';
+      const selected = [];
+      for (let i = 1; i <= 10; i++) {
+        const el = document.getElementById('chk' + i);
+        if (el && el.checked) selected.push(i);
+      }
+      const all = selected.length === 10;
+      const none = selected.length === 0;
+      document.getElementById('filterToggle').textContent =
+        all ? '⚙ Vse ▾' : none ? '⚙ Nič ▾' : '⚙ ' + selected.join(', ') + ' ▾';
       updateSummary();
     }
-    ['chkWords','chkPhrases','chkSentences'].forEach(id => {
-      document.getElementById(id).addEventListener('change', updateFilterLabel);
-    });
+    for (let i = 1; i <= 10; i++) {
+      const el = document.getElementById('chk' + i);
+      if (el) el.addEventListener('change', updateFilterLabel);
+    }
 
     /* ── Mode select ── */
     document.getElementById('modeSelect').addEventListener('change', function() {
@@ -237,7 +236,6 @@
 
     /* ── Dataset change updates summary ── */
     document.getElementById('dataset').addEventListener('change', updateSummary);
-    document.getElementById('subject').addEventListener('change', updateSummary);
 
     /* ── Collapse after reload ── */
     document.getElementById('reloadBtn').addEventListener('click', function() {

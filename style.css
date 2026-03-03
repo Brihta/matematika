@@ -460,13 +460,23 @@ html { height: 100%; }
   box-shadow: 0 10px 30px rgba(0,0,0,0.28);
   font-size: 1.75rem; font-weight: 700;
 }
+.card-front { background: linear-gradient(135deg, #fff, #f0f2f5); color: #222; flex-direction: column; }
 .card-back  { background: linear-gradient(135deg, #4facfe, #00c6ff); color: #fff; transform: rotateY(180deg); }
 .flip-hint {
   position: absolute; bottom: 10px; right: 14px;
   font-size: 0.62rem; opacity: 0.32; letter-spacing: 0.05em;
 }
 .card-text { display: block; width: 100%; text-align: center; }
-.card-front { background: linear-gradient(135deg, #fff, #f0f2f5); color: #222; }
+.card-image {
+  display: block;
+  max-width: 75%;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+  flex-shrink: 0;
+}
+.card-front .flip-hint { color: #555; }
 .card-back  .flip-hint { color: #fff; }
 
 .audio-controls { display: flex; justify-content: center; margin-bottom: 10px; width: 100%; }

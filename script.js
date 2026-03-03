@@ -1,24 +1,11 @@
-// 📗 Seznam predmetov
-const SUBJECTS = [
-  { id: "matematika", name: "🔢 Matematika" },
-];
-
 // 📗 Seznam naborov
 const DATASETS = [
-  { id: "all",      subject: "anglescina", name: "Vse besede",  url: "english_words.json" },
-  { id: "combined", subject: "anglescina", name: "Vse enote",   url: null, combined: ["unit1.json","unit2.json","unit3.json","unit4.json"] },
-  { id: "unit1",    subject: "anglescina", name: "Unit 1",      url: "unit1.json" },
-  { id: "unit2",    subject: "anglescina", name: "Unit 2",      url: "unit2.json" },
-  { id: "unit3",    subject: "anglescina", name: "Unit 3",      url: "unit3.json" },
-  { id: "unit4",    subject: "anglescina", name: "Unit 4",      url: "unit4.json" },
-  { id: "postevanka", subject: "matematika", name: "Poštevanka", url: "postevanka.json" },
+  { id: "postevanka", name: "Poštevanka", url: "postevanka.json" },
 ];
 const SELECT_KEY  = "anki_dataset_id";
-const SUBJECT_KEY = "anki_subject_id";
 const SCORE_KEY   = "anki_quiz_score";
-let currentSubject = localStorage.getItem(SUBJECT_KEY) || "anglescina";
 let MASTER_DATA  = [];
-let ALL_UNITS_POOL = [];   // pool of ALL items from every unit, for quiz distractors
+let ALL_UNITS_POOL = [];
 let currentMode  = "flashcard";
 
 // ── Ranks ─────────────────────────────────────────────────────────────────────
@@ -133,42 +120,21 @@ function getMedalSVG(rankName, size) {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function buildSubjectSelect() {
-  const sel = document.getElementById("subject");
-  if (!sel) return;
-  sel.innerHTML = "";
-  SUBJECTS.forEach(s => {
-    const opt = document.createElement("option");
-    opt.value = s.id; opt.textContent = s.name;
-    sel.appendChild(opt);
-  });
-  sel.value = currentSubject;
-}
-
 function buildDatasetSelect() {
   const sel = document.getElementById("dataset");
   sel.innerHTML = "";
-  const filtered = DATASETS.filter(d => d.subject === currentSubject);
-  if (filtered.length === 0) {
-    const opt = document.createElement("option");
-    opt.value = "__none__"; opt.textContent = "— ni naborov —";
-    sel.appendChild(opt);
-    return;
-  }
-  filtered.forEach(ds => {
+  DATASETS.forEach(ds => {
     const opt = document.createElement("option");
     opt.value = ds.id; opt.textContent = ds.name;
     sel.appendChild(opt);
   });
   const saved = localStorage.getItem(SELECT_KEY);
-  if (saved && filtered.find(d => d.id === saved)) sel.value = saved;
+  if (saved && DATASETS.find(d => d.id === saved)) sel.value = saved;
 }
 
 function currentDataset() {
   const id = document.getElementById("dataset").value;
-  const filtered = DATASETS.filter(d => d.subject === currentSubject);
-  return filtered.find(d => d.id === id) || filtered[0] || null;
+  return DATASETS.find(d => d.id === id) || DATASETS[0] || null;
 }
 
 function shuffle(arr) {
@@ -180,29 +146,111 @@ function shuffle(arr) {
   return a;
 }
 
+// ── Wikipedia image fetch ──────────────────────────────────────────────────
+const imageCache = {};
+
+async function fetchWikiImage(searchTerm) {
+  if (imageCache[searchTerm] !== undefined) return imageCache[searchTerm];
+  try {
+    const url = `https://en.wikipedia.org/w/api.php?action=query&generator=search`
+              + `&gsrsearch=${encodeURIComponent(searchTerm)}&gsrlimit=3`
+              + `&prop=pageimages&piprop=thumbnail&pithumbsize=400`
+              + `&format=json&origin=*`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    const pages = data?.query?.pages;
+    if (!pages) { imageCache[searchTerm] = null; return null; }
+    // Pick first page that actually has a thumbnail
+    const img = Object.values(pages)
+      .sort((a, b) => a.index - b.index)
+      .map(p => p?.thumbnail?.source)
+      .find(src => !!src) || null;
+    imageCache[searchTerm] = img;
+    return img;
+  } catch {
+    imageCache[searchTerm] = null;
+    return null;
+  }
+}
+
+async function maybeShowCardImage(card) {
+  const imgEl = document.getElementById('cardImage');
+  const faceEl = document.getElementById('cardFront');
+  if (!imgEl) return;
+  
+  // Hide image if not in druzba or no image term exists
+  if (currentSubject !== 'druzba' || !card.image) {
+    imgEl.style.display = 'none';
+    autoFitCardText(faceEl); // Make sure text fits without image
+    return;
+  }
+  
+  imgEl.style.display = 'none'; // hide while loading
+  const src = await fetchWikiImage(card.image);
+  
+  if (src) {
+    // Wait for the image to actually load its dimensions, THEN resize the text
+    imgEl.onload = () => {
+      autoFitCardText(faceEl);
+    };
+    imgEl.src = src;
+    imgEl.style.display = 'block';
+  } else {
+    autoFitCardText(faceEl);
+  }
+}
+
 function autoFitCardText(faceEl) {
   if (!faceEl) return;
   const span = faceEl.querySelector('.card-text');
   if (!span) return;
   if (faceEl.clientHeight === 0) return;
 
-  const padTop  = parseInt(getComputedStyle(faceEl).paddingTop)   || 26;
-  const padBot  = parseInt(getComputedStyle(faceEl).paddingBottom) || 26;
-  const available = faceEl.clientHeight - padTop - padBot - 30; // 30px for flip-hint
+  const imgEl   = faceEl.querySelector('.card-image');
+  const hasImage = imgEl && imgEl.style.display !== 'none' && imgEl.src;
+  const padTop   = parseInt(getComputedStyle(faceEl).paddingTop)  || 26;
+  const padBot   = parseInt(getComputedStyle(faceEl).paddingBottom) || 26;
+  const flipHint = 30; // space reserved for "klikni za obrat"
+  const available = faceEl.clientHeight - padTop - padBot - flipHint;
 
-  // Scale up or down to fill available space
-  let size = 2.5;
-  span.style.fontSize = size + 'rem';
-  // Shrink if overflowing
-  while (span.scrollHeight > available && size > 0.78) {
-    size -= 0.04;
+  if (hasImage) {
+    // Give image up to 45% of available space, text gets the rest
+    const imgMax  = Math.floor(available * 0.45);
+    const textMax = available - imgMax - 10; // 10px gap between image and text
+
+    // Scale image: grow or shrink to fill its allocation
+    imgEl.style.maxHeight = imgMax + 'px';
+    imgEl.style.maxWidth  = '75%';
+
+    // Scale text to fill its allocation — try growing first, then shrink if needed
+    let size = 2.2;
     span.style.fontSize = size + 'rem';
-  }
-  // Grow if there's room (short text like "15" should be big and bold)
-  while (span.scrollHeight < available * 0.65 && size < 2.8) {
-    size += 0.04;
+    // Shrink if overflowing text area
+    while (span.scrollHeight > textMax && size > 0.78) {
+      size -= 0.04;
+      span.style.fontSize = size + 'rem';
+    }
+    // Grow if there's room to spare
+    while (span.scrollHeight < textMax * 0.75 && size < 2.2) {
+      size += 0.04;
+      span.style.fontSize = size + 'rem';
+      if (span.scrollHeight > textMax) { size -= 0.04; span.style.fontSize = size + 'rem'; break; }
+    }
+  } else {
+    // No image — text fills everything, scale up or down freely
+    let size = 2.5;
     span.style.fontSize = size + 'rem';
-    if (span.scrollHeight > available) { size -= 0.04; span.style.fontSize = size + 'rem'; break; }
+    // Shrink if overflowing
+    while (span.scrollHeight > available && size > 0.78) {
+      size -= 0.04;
+      span.style.fontSize = size + 'rem';
+    }
+    // Grow if there's lots of room (short words should be big)
+    while (span.scrollHeight < available * 0.65 && size < 2.8) {
+      size += 0.04;
+      span.style.fontSize = size + 'rem';
+      if (span.scrollHeight > available) { size -= 0.04; span.style.fontSize = size + 'rem'; break; }
+    }
   }
 }
 
@@ -231,43 +279,37 @@ async function fetchRawData(dataset) {
   return allData;
 }
 
-function getCategory(text) {
-  if (!text) return "word";
-  const trimmed = text.trim();
-  if (/[.!?]$/.test(trimmed)) return "sentence";
-  const firstPart = trimmed.split('/')[0].trim();
-  const wordCount = firstPart.split(/\s+/).length;
-  if (wordCount === 1) return "word";
-  if (wordCount >= 5) return "sentence";
-  return "phrase";
+// Returns which timestable numbers (1-10) a card belongs to
+function getCardTables(item) {
+  const q = item.question ?? '';
+  const mult = q.match(/^(\d+)\s*×\s*(\d+)/);
+  if (mult) return [parseInt(mult[1]), parseInt(mult[2])];
+  const div = q.match(/^(\d+)\s*:\s*(\d+)/);
+  if (div) return [parseInt(div[2])]; // filter division by the divisor
+  return [];
 }
 
 function applyFilters() {
-  const showWords     = document.getElementById('chkWords').checked;
-  const showPhrases   = document.getElementById('chkPhrases').checked;
-  const showSentences = document.getElementById('chkSentences').checked;
-  let filtered = MASTER_DATA.filter(item => {
-    const eng = item.answer ?? item.english ?? "";
-    const cat = getCategory(eng);
-    if (cat === "word"     && showWords)     return true;
-    if (cat === "phrase"   && showPhrases)   return true;
-    if (cat === "sentence" && showSentences) return true;
-    return false;
+  const selected = [];
+  for (let i = 1; i <= 10; i++) {
+    const el = document.getElementById('chk' + i);
+    if (el && el.checked) selected.push(i);
+  }
+  const allSelected = selected.length === 10 || selected.length === 0;
+
+  const filtered = MASTER_DATA.filter(item => {
+    if (allSelected) return true;
+    const tables = getCardTables(item);
+    return tables.some(t => selected.includes(t));
   });
-  let finalCards = filtered.map((item, index) => {
-    const valSlo = item.question ?? item.slovenian ?? "";
-    const valEng = item.answer   ?? item.english   ?? "";
-    const isSloToEng = Math.random() < 0.5;
-    return { 
-      id: index, 
-      front: isSloToEng ? valSlo : valEng, 
-      back: isSloToEng ? valEng : valSlo, 
-      english: valEng, 
-      isSloToEng,
-      image: item.image // <-- We added this!
-    };
-  });
-  return shuffle(finalCards);
+
+  return filtered.map((item, index) => ({
+    id: index,
+    front: item.question ?? '',
+    back:  item.answer   ?? '',
+    english: item.answer ?? '',
+    isSloToEng: true,
+  }));
 }
 
 function setLoadingUI(loading) {
@@ -402,6 +444,41 @@ function updateScoreHUD(score, streak) {
 }
 
 // ── Quiz App ──────────────────────────────────────────────────────────────────
+// ── Math-aware distractor generator ──────────────────────────────────────────
+function getMathWrongAnswers(correct) {
+  const correctNum = parseInt(correct);
+  if (isNaN(correctNum)) return [];
+
+  const candidates = new Set();
+
+  // Reversed digits for 2-digit numbers (15→51, 24→42 etc)
+  const str = String(correctNum);
+  if (str.length === 2) {
+    const rev = parseInt(str[1] + str[0]);
+    if (rev !== correctNum && rev > 0) candidates.add(rev);
+  }
+
+  // Nearby plausible values
+  const deltas = [-2, 2, -1, 1, -3, 3, -5, 5, 10, -10, -4, 4];
+  for (const d of deltas) {
+    const v = correctNum + d;
+    if (v > 0 && v !== correctNum) candidates.add(v);
+  }
+
+  // Shuffle and pick 3 unique ones
+  const pool = shuffle([...candidates]);
+  const result = [];
+  for (const c of pool) {
+    if (result.length >= 3) break;
+    result.push(String(c));
+  }
+  // Fallback fill if not enough candidates
+  for (let fill = 1; result.length < 3; fill++) {
+    if (fill !== correctNum && !result.includes(String(fill))) result.push(String(fill));
+  }
+  return result;
+}
+
 class QuizApp {
   constructor(cards) {
     this.cards    = cards;
@@ -425,22 +502,8 @@ class QuizApp {
     }
   }
 
-  getWrongAnswers(correct, isSloToEng) {
-    // Determine category of the correct answer to match distractors to same type
-    const cat = getCategory(correct);
-
-    // Build distractor pool from ALL units (not just current dataset)
-    // Pick the same language side as the correct answer
-    const pool = ALL_UNITS_POOL.length > 0 ? ALL_UNITS_POOL : MASTER_DATA;
-    const candidates = [...new Set(
-      pool
-        .map(item => isSloToEng
-          ? (item.answer   ?? item.english   ?? "")
-          : (item.question ?? item.slovenian ?? ""))
-        .filter(a => a && a !== correct && getCategory(a) === cat)
-    )];
-
-    return shuffle(candidates).slice(0, 3);
+  getWrongAnswers(correct) {
+    return getMathWrongAnswers(correct);
   }
 
   render() {
@@ -455,14 +518,14 @@ class QuizApp {
 
     const card    = this.cards[this.index];
     const correct = card.back;
-    const wrongs  = this.getWrongAnswers(correct, card.isSloToEng);
+    const wrongs  = this.getWrongAnswers(correct);
     const options = shuffle([correct, ...wrongs]);
     const mult    = getMultiplier(this.streak);
 
     area.innerHTML = `
       <div class="quiz-meta">
         <div class="quiz-counter">Vprašanje ${this.index + 1} / ${this.cards.length}</div>
-        <div class="quiz-direction-badge ${card.isSloToEng ? 'slo-to-eng' : 'eng-to-slo'}">${card.isSloToEng ? 'SLO → EN' : 'EN → SLO'}</div>
+
       </div>
       <div class="quiz-progress-wrap">
         <div class="quiz-progress-fill" style="width:${((this.index+1)/this.cards.length*100)}%"></div>
@@ -664,9 +727,11 @@ class FlashcardApp {
     if (!this.cards || this.cards.length === 0) {
       setFaceText(this.cardFront, "Ni kartic za izbrane filtre 😕");
       setFaceText(this.cardBack,  "Označite vsaj eno kategorijo.");
+      const imgEl = document.getElementById('cardImage');
+      if (imgEl) imgEl.style.display = 'none';
       this.cardCounter.textContent = 'Kartica 0 od 0';
       if (this.progressBar) this.progressBar.style.width = '0%';
-      if (this.directionBadge) { this.directionBadge.textContent = 'PRAZNO'; this.directionBadge.className = 'direction-badge slo-to-eng'; }
+
       this.prevBtn.disabled = this.nextBtn.disabled = this.audioBtn.disabled = true;
       this.isFlipped = false;
       this.cardElement.classList.remove('flipped');
@@ -675,14 +740,12 @@ class FlashcardApp {
     const card = this.cards[this.currentIndex];
     setFaceText(this.cardFront, card.front);
     setFaceText(this.cardBack,  card.back);
+    maybeShowCardImage(card);
     this.isFlipped = false;
     this.cardElement.classList.remove('flipped');
     this.cardCounter.textContent = `Kartica ${this.currentIndex + 1} od ${this.cards.length}`;
     if (this.progressBar) this.progressBar.style.width = ((this.currentIndex+1)/this.cards.length*100)+'%';
-    if (this.directionBadge) {
-      this.directionBadge.textContent = card.isSloToEng ? 'SLO → EN' : 'EN → SLO';
-      this.directionBadge.className   = 'direction-badge ' + (card.isSloToEng ? 'slo-to-eng' : 'eng-to-slo');
-    }
+
     this.prevBtn.disabled = this.nextBtn.disabled = this.audioBtn.disabled = false;
   }
 }
@@ -786,16 +849,8 @@ class TimedApp {
     }
   }
 
-  getWrongAnswers(correct, isSloToEng) {
-    const cat = getCategory(correct);
-    const pool = ALL_UNITS_POOL.length > 0 ? ALL_UNITS_POOL : MASTER_DATA;
-    const candidates = [...new Set(
-      pool.map(item => isSloToEng
-        ? (item.answer   ?? item.english   ?? "")
-        : (item.question ?? item.slovenian ?? ""))
-        .filter(a => a && a !== correct && getCategory(a) === cat)
-    )];
-    return shuffle(candidates).slice(0, 3);
+  getWrongAnswers(correct) {
+    return getMathWrongAnswers(correct);
   }
 
   render() {
@@ -808,7 +863,7 @@ class TimedApp {
 
     const card    = this.cards[this.index % this.cards.length];
     const correct = card.back;
-    const wrongs  = this.getWrongAnswers(correct, card.isSloToEng);
+    const wrongs  = this.getWrongAnswers(correct);
     const options = shuffle([correct, ...wrongs]);
     const mult    = getMultiplier(this.streak);
     const timeM   = Math.floor(this.timeLeft / 60);
@@ -858,13 +913,8 @@ class TimedApp {
       <div class="timed-progress-label" id="timedProgressLabel">
         ${Math.max(0, this.level.target - this.score) > 0 ? `Manjka še ${this.level.target - this.score} točk` : '🎯 Cilj dosežen!'}
       </div>
-
-      <!-- DIRECTION -->
       <div class="quiz-meta">
         <div class="quiz-counter">Vprašanje ${(this.index % this.cards.length) + 1} / ${this.cards.length}</div>
-        <div class="quiz-direction-badge ${card.isSloToEng ? 'slo-to-eng' : 'eng-to-slo'}">
-          ${card.isSloToEng ? 'SLO → EN' : 'EN → SLO'}
-        </div>
       </div>
 
       <!-- QUESTION -->
@@ -1153,30 +1203,8 @@ async function loadAllUnitsPool() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-buildSubjectSelect();
 buildDatasetSelect();
 const reloadBtn = document.getElementById("reloadBtn");
-
-// Subject change
-document.getElementById("subject").addEventListener("change", function() {
-  currentSubject = this.value;
-  localStorage.setItem(SUBJECT_KEY, currentSubject);
-  buildDatasetSelect();
-  // Reset cards
-  MASTER_DATA = [];
-  ALL_UNITS_POOL = [];
-  if (window.app)     { window.app.destroy();    window.app     = null; }
-  if (window.quizApp) { window.quizApp.destroy(); window.quizApp = null; }
-  clearDomListeners();
-  const ds = currentDataset();
-  if (!ds) {
-    setFaceText(document.getElementById('cardFront'), "Ta predmet še nima naborov 📚");
-    setFaceText(document.getElementById('cardBack'),  "Kmalu prihaja!");
-    ['prevBtn','nextBtn','audioBtn'].forEach(id => { const b = document.getElementById(id); if(b) b.disabled = true; });
-    return;
-  }
-  loadAllUnitsPool().then(() => reloadBtn.click());
-});
 
 function clearDomListeners() {
   ['prevBtn','nextBtn','audioBtn','flashcard'].forEach(id => {
@@ -1193,11 +1221,13 @@ function reinitApp() {
   else if (currentMode === 'timed') reinitTimedApp();
 }
 
-['chkWords','chkPhrases','chkSentences'].forEach(id => {
-  document.getElementById(id).addEventListener('change', () => {
+// Timestable filter change listeners (1–10)
+for (let i = 1; i <= 10; i++) {
+  const el = document.getElementById('chk' + i);
+  if (el) el.addEventListener('change', () => {
     if (MASTER_DATA.length > 0) reinitApp();
   });
-});
+}
 
 reloadBtn.addEventListener("click", async () => {
   const ds = currentDataset();
