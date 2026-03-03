@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Učko</title>
+  <link rel="stylesheet" href="style.css?v=6.0">
+</head>
+<body>
+  <div class="container">
+
+    <!-- ═══ TOOLBAR ═══ -->
+    <div class="toolbar" id="toolbar">
+
+      <!-- Always-visible top row -->
+      <div class="toolbar-top">
+        <div class="brand">🦉 <span>Učko</span></div>
+        <div class="toolbar-summary" id="toolbarSummary">
+          <span id="summaryDataset">—</span>
+          <span class="summary-sep">·</span>
+          <span id="summaryMode">—</span>
+          <span class="summary-sep">·</span>
+          <span id="summaryFilter">—</span>
+        </div>
+        <button class="toolbar-toggle-btn" id="toolbarToggle" title="Nastavitve">⚙️</button>
+      </div>
+
+      <!-- Collapsible controls -->
+      <div class="toolbar-controls-wrap" id="toolbarControlsWrap">
+        <div class="toolbar-controls">
+
+          <!-- Subject -->
+          <div class="ctrl-group">
+            <label class="ctrl-label" for="subject">Predmet</label>
+            <select id="subject" class="select" title="Izberi predmet"></select>
+          </div>
+
+          <!-- Dataset -->
+          <div class="ctrl-group">
+            <label class="ctrl-label" for="dataset">Nabor</label>
+            <select id="dataset" class="select" title="Izberi nabor kartic"></select>
+            <button id="reloadBtn" class="reload-btn" title="Naloži">↻</button>
+          </div>
+
+          <!-- Mode -->
+          <div class="ctrl-group">
+            <label class="ctrl-label" for="modeSelect">Način</label>
+            <select id="modeSelect" class="select">
+              <option value="flashcard">🃏 Kartice</option>
+              <option value="quiz">🎯 Kviz</option>
+              <option value="timed">⏱️ Tekma s časom</option>
+            </select>
+          </div>
+
+          <!-- Filters -->
+          <div class="ctrl-group">
+            <label class="ctrl-label">Filter</label>
+            <div class="filter-dropdown">
+              <button class="filter-btn" id="filterToggle">⚙ Besede ▾</button>
+              <div class="filter-panel" id="filterPanel">
+                <label class="toggle-lbl"><input type="checkbox" id="chkWords" checked> Besede</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chkPhrases" checked> Besedne zveze</label>
+                <label class="toggle-lbl"><input type="checkbox" id="chkSentences" checked> Povedi</label>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SCORE HUD (quiz only) — includes rank legend as tooltip ═══ -->
+    <div id="scoreHUD" class="score-hud" style="display:none"></div>
+
+    <!-- ═══ MAIN CONTENT ═══ -->
+    <div class="main-content">
+      <div class="card-section">
+
+        <!-- FLASHCARD PANEL -->
+        <div id="flashcardPanel" class="card-panel">
+
+          <div class="card-counter" id="cardCounter">Kartica 0 od 0</div>
+
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="progressBar"></div>
+          </div>
+
+          <div class="direction-badge slo-to-eng" id="directionBadge">SLO → EN</div>
+
+          <div id="cardContainer" class="card-container">
+            <div class="card" id="flashcard">
+              <div class="card-face card-front" id="cardFront">
+                <span class="card-text">Izberi nabor in klikni ↻</span>
+                <span class="flip-hint">klikni za obrat</span>
+              </div>
+              <div class="card-face card-back" id="cardBack">
+                <span class="card-text">🙂</span>
+                <span class="flip-hint">klikni za obrat</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="audio-controls">
+            <button class="btn-audio" id="audioBtn" title="Poslušaj izgovorjavo" disabled>
+              🔊 Poslušaj
+            </button>
+          </div>
+
+          <div class="controls">
+            <button class="btn" id="prevBtn" disabled>⬅️ Prejšnja</button>
+            <button class="btn" id="nextBtn" disabled>Naslednja ➡️</button>
+          </div>
+
+          <div class="keyboard-hint">
+            💡 Puščice za navigacijo, presledek za obračanje &nbsp;·&nbsp; 👆 Povleci levo/desno na mobilnih napravah
+          </div>
+
+        </div>
+
+        <!-- QUIZ PANEL -->
+        <div id="quizPanel" class="quiz-panel" style="display:none">
+          <div id="quizArea" class="quiz-area">
+            <div class="quiz-empty">Naloži nabor kartic in začni kviz! 🎯</div>
+          </div>
+        </div>
+
+        <!-- TIMED PANEL -->
+        <div id="timedPanel" class="timed-panel" style="display:none">
+          <div id="timedArea" class="timed-area">
+            <div class="quiz-empty">Naloži nabor kartic in začni tekmo! ⏱️</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js?v=11"></script>
+
+  <script>
+    /* ── Toolbar collapse ── */
+    const toolbar     = document.getElementById('toolbar');
+    const toggleBtn   = document.getElementById('toolbarToggle');
+    const controlsWrap = document.getElementById('toolbarControlsWrap');
+
+    function collapseToolbar() {
+      toolbar.classList.add('collapsed');
+      toggleBtn.textContent = '⚙️';
+    }
+    function expandToolbar() {
+      toolbar.classList.remove('collapsed');
+      toggleBtn.textContent = '✕';
+    }
+    function isCollapsed() { return toolbar.classList.contains('collapsed'); }
+
+    toggleBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      isCollapsed() ? expandToolbar() : collapseToolbar();
+      // also close filter panel
+      document.getElementById('filterPanel').classList.remove('open');
+    });
+
+    // Tap anywhere outside toolbar to collapse
+    document.addEventListener('click', function(e) {
+      if (!toolbar.contains(e.target) && !isCollapsed()) {
+        collapseToolbar();
+      }
+    });
+
+    /* ── Summary text updater ── */
+    function updateSummary() {
+      const datasetSel = document.getElementById('dataset');
+      const modeSel    = document.getElementById('modeSelect');
+      const w = document.getElementById('chkWords').checked;
+      const p = document.getElementById('chkPhrases').checked;
+      const s = document.getElementById('chkSentences').checked;
+
+      const datasetText = datasetSel.options[datasetSel.selectedIndex]?.text || '—';
+      // strip emoji from dataset name for brevity
+      document.getElementById('summaryDataset').textContent = datasetText.replace(/^[^\w]*/, '');
+
+      const modeMap = { flashcard: '🃏 Kartice', quiz: '🎯 Kviz', timed: '⏱️ Tekma' };
+      document.getElementById('summaryMode').textContent = modeMap[modeSel.value] || modeSel.value;
+
+      const all = w && p && s;
+      const none = !w && !p && !s;
+      const parts = [];
+      if (w) parts.push('B'); if (p) parts.push('BZ'); if (s) parts.push('P');
+      document.getElementById('summaryFilter').textContent =
+        all ? 'Vse' : none ? 'Nič' : parts.join('+');
+    }
+
+    /* ── Filter dropdown toggle ── */
+    document.getElementById('filterToggle').addEventListener('click', function(e) {
+      e.stopPropagation();
+      const panel = document.getElementById('filterPanel');
+      const isOpen = panel.classList.contains('open');
+      if (!isOpen) {
+        // Position panel below the button using fixed coords
+        const rect = this.getBoundingClientRect();
+        panel.style.top  = (rect.bottom + 6) + 'px';
+        panel.style.left = rect.left + 'px';
+      }
+      panel.classList.toggle('open');
+    });
+    document.addEventListener('click', function() {
+      document.getElementById('filterPanel').classList.remove('open');
+    });
+    document.getElementById('filterPanel').addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+
+    /* ── Filter button label ── */
+    function updateFilterLabel() {
+      const w = document.getElementById('chkWords').checked;
+      const p = document.getElementById('chkPhrases').checked;
+      const s = document.getElementById('chkSentences').checked;
+      const all = w && p && s;
+      const none = !w && !p && !s;
+      const parts = [];
+      if (w) parts.push('B');
+      if (p) parts.push('BZ');
+      if (s) parts.push('P');
+      document.getElementById('filterToggle').textContent = all ? '⚙ Vse ▾' : none ? '⚙ Nič ▾' : '⚙ ' + parts.join('+') + ' ▾';
+      updateSummary();
+    }
+    ['chkWords','chkPhrases','chkSentences'].forEach(id => {
+      document.getElementById(id).addEventListener('change', updateFilterLabel);
+    });
+
+    /* ── Mode select ── */
+    document.getElementById('modeSelect').addEventListener('change', function() {
+      switchMode(this.value);
+      updateSummary();
+      setTimeout(collapseToolbar, 200);
+    });
+
+    /* ── Dataset change updates summary ── */
+    document.getElementById('dataset').addEventListener('change', updateSummary);
+    document.getElementById('subject').addEventListener('change', updateSummary);
+
+    /* ── Collapse after reload ── */
+    document.getElementById('reloadBtn').addEventListener('click', function() {
+      updateSummary();
+      setTimeout(collapseToolbar, 600);
+    }, true); // capture so it fires before reloadBtn's own listener
+
+    // Initial summary
+    updateSummary();
+  </script>
+</body>
+</html>
