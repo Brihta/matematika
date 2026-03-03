@@ -1,6 +1,5 @@
 // 📗 Seznam predmetov
 const SUBJECTS = [
-  { id: "anglescina", name: "🇬🇧 Angleščina" },
   { id: "matematika", name: "🔢 Matematika" },
 ];
 
@@ -12,7 +11,7 @@ const DATASETS = [
   { id: "unit2",    subject: "anglescina", name: "Unit 2",      url: "unit2.json" },
   { id: "unit3",    subject: "anglescina", name: "Unit 3",      url: "unit3.json" },
   { id: "unit4",    subject: "anglescina", name: "Unit 4",      url: "unit4.json" },
-  { id: "postevanka", subject: "matematika", name: "Poštevalnica", url: "postevanka.json" },
+  { id: "postevanka", subject: "matematika", name: "Poštevanka", url: "postevanka.json" },
 ];
 const SELECT_KEY  = "anki_dataset_id";
 const SUBJECT_KEY = "anki_subject_id";
