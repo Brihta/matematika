@@ -987,11 +987,13 @@ class TimedApp {
     }
     this.updateScoreDisplay();
 
-    // Check if target hit mid-question
-    if (this.score >= this.level.target && this.timer) {
-      // Let timer naturally expire OR advance immediately after brief pause
-      // We just keep going and let the timer check handle it
-    }
+    // End round immediately once target is reached
+if (this.score >= this.level.target && this.timer) {
+  clearInterval(this.timer); this.timer = null;
+  if (this._autoTimer) { clearTimeout(this._autoTimer); this._autoTimer = null; }
+  setTimeout(() => this.advanceLevel(), isCorrect ? 600 : 1800);
+  return;
+}
 
     this._autoTimer = setTimeout(() => this.nextQuestion(), isCorrect ? 500 : 1600);
   }
