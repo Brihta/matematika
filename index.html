@@ -4,75 +4,155 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Brihta</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:system-ui,sans-serif;background:#1a1a2e;color:#eee;min-height:100vh}
-    .container{max-width:700px;margin:0 auto;padding:0 12px 40px}
-    .toolbar{background:#16213e;border-radius:0 0 16px 16px;padding:10px 14px;box-shadow:0 2px 12px rgba(0,0,0,.4);position:sticky;top:0;z-index:100}
-    .toolbar-top{display:flex;align-items:center;gap:10px}
-    .brand{font-size:1.2rem;font-weight:700;color:#f0a500;display:flex;align-items:center;gap:6px;white-space:nowrap}
-    .brand-icon{width:1.5em;height:1.5em;object-fit:contain;border-radius:50%}
-    .brand-emoji{font-size:1.3em;line-height:1}
-    .toolbar-summary{flex:1;font-size:.75rem;color:#aaa;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .summary-sep{opacity:.4;margin:0 4px}
-    .toolbar-toggle-btn{background:none;border:none;font-size:1.2rem;cursor:pointer;padding:4px;border-radius:6px}
-    .toolbar-toggle-btn:hover{background:rgba(255,255,255,.1)}
-    .toolbar-controls-wrap{overflow:hidden;max-height:300px;transition:max-height .3s ease}
-    .toolbar.collapsed .toolbar-controls-wrap{max-height:0}
-    .toolbar-controls{display:flex;flex-wrap:wrap;gap:10px;padding-top:12px;align-items:center}
-    .ctrl-group{display:flex;align-items:center;gap:6px}
-    .ctrl-label{font-size:.75rem;color:#aaa;white-space:nowrap}
-    .select{background:#0f3460;color:#eee;border:1px solid #444;border-radius:8px;padding:5px 8px;font-size:.85rem;cursor:pointer}
-    .reload-btn{background:#f0a500;color:#000;border:none;border-radius:8px;padding:5px 12px;font-size:.95rem;cursor:pointer;font-weight:700}
-    .reload-btn:hover{background:#ffc300}
-    .filter-dropdown{position:relative}
-    .filter-btn{background:#0f3460;color:#eee;border:1px solid #444;border-radius:8px;padding:5px 10px;font-size:.82rem;cursor:pointer;white-space:nowrap}
-    .filter-panel{position:fixed;background:#16213e;border:1px solid #555;border-radius:10px;padding:10px;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,.6);flex-wrap:wrap;gap:6px;width:210px;display:none}
-    .filter-panel.open{display:flex}
-    .toggle-lbl{display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer;background:#0f3460;border-radius:6px;padding:4px 8px}
-    .toggle-lbl input{cursor:pointer}
-    .op-btn-group{display:flex;gap:4px}
-    .op-btn{background:#0f3460;color:#aaa;border:1px solid #444;border-radius:8px;padding:5px 11px;font-size:.85rem;cursor:pointer;transition:all .18s}
-    .op-btn.active{background:#f0a500;color:#000;border-color:#f0a500;font-weight:700}
-    .score-hud{background:#16213e;border-radius:12px;padding:10px 16px;margin:12px 0 0;display:flex;justify-content:center;align-items:center;gap:20px}
-    .score-item{display:flex;flex-direction:column;align-items:center}
-    .score-val{font-size:1.5rem;font-weight:700}
-    .score-lbl{font-size:.68rem;color:#888}
-    .score-correct .score-val{color:#4caf50}
-    .score-wrong .score-val{color:#f44336}
-    .score-pct .score-val{color:#f0a500}
-    .score-sep{width:1px;height:40px;background:rgba(255,255,255,.1)}
-    .medal-display{display:flex;flex-direction:column;align-items:center;gap:2px}
-    .medal-emoji{font-size:2rem;line-height:1}
-    .medal-lbl{font-size:.65rem;color:#888}
-    .medal-title{font-size:.75rem;font-weight:700;color:#f0a500;text-align:center}
-    .medal-legend-wrap{position:relative;cursor:help}
-    .medal-legend{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#0f3460;border:1px solid #444;border-radius:10px;padding:10px 14px;white-space:nowrap;z-index:300;box-shadow:0 4px 20px rgba(0,0,0,.7);display:none;min-width:180px}
-    .medal-legend-wrap:hover .medal-legend,.medal-legend-wrap:focus .medal-legend{display:block}
-    .medal-legend-row{display:flex;align-items:center;gap:8px;font-size:.82rem;padding:2px 0}
-    .card-counter{text-align:center;font-size:.8rem;color:#888;margin:14px 0 6px}
-    .progress-bar-wrap{height:6px;background:#0f3460;border-radius:3px;margin-bottom:16px;overflow:hidden}
-    .progress-bar-fill{height:100%;background:linear-gradient(90deg,#f0a500,#ffc300);border-radius:3px;transition:width .3s}
-    .card-container{perspective:1000px;width:100%;max-width:480px;height:220px;margin:0 auto;cursor:pointer}
-    .card{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .45s cubic-bezier(.4,2,.6,1);border-radius:20px}
-    .card.flipped{transform:rotateY(180deg)}
-    .card-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
-    .card-front{background:linear-gradient(135deg,#0f3460,#16213e);border:2px solid #f0a500}
-    .card-back{background:linear-gradient(135deg,#1a472a,#0f3460);border:2px solid #4caf50;transform:rotateY(180deg)}
-    .card-text{font-size:2.4rem;font-weight:700;color:#fff;text-align:center}
-    .flip-hint{font-size:.7rem;color:rgba(255,255,255,.25);margin-top:10px}
-    .controls{display:flex;justify-content:center;gap:12px;margin-top:14px}
-    .btn{background:#0f3460;color:#eee;border:1px solid #444;border-radius:10px;padding:10px 22px;font-size:.95rem;cursor:pointer;transition:background .18s}
-    .btn:hover:not(:disabled){background:#1a4a8a}
-    .btn:disabled{opacity:.35;cursor:not-allowed}
-    .keyboard-hint{text-align:center;font-size:.7rem;color:#555;margin-top:12px}
-    .quiz-area{display:flex;flex-direction:column;align-items:center;gap:16px;padding-top:14px}
-    .quiz-question{font-size:2.4rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#0f3460,#16213e);border:2px solid #f0a500;border-radius:20px;padding:24px 48px;text-align:center;min-width:220px}
-    .quiz-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:360px}
-    .quiz-opt-btn{background:#0f3460;color:#fff;border:2px solid #334;border-radius:12px;padding:14px;font-size:1.4rem;font-weight:700;cursor:pointer;transition:background .18s,border-color .18s;text-align:center}
-    .quiz-opt-btn:hover:not(:disabled){background:#1a4a8a;border-color:#f0a500}
-    .quiz-opt-btn.correct{background:#1a472a!important;border-color:#4caf50!important;color:#7dff7d}
-    .quiz-opt-btn.wrong{background:#4a1a1a!important;border-color:#f44336!important;color:#ff7d7d}
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+  <!-- TOOLBAR -->
+  <div class="toolbar" id="toolbar">
+    <div class="toolbar-top">
+      <div class="brand">
+        <img class="brand-icon" id="brandImg" src="Brihta.png" alt="">
+        <span>Brihta</span>
+      </div>
+      <div class="toolbar-summary">
+        <span id="summaryMode">🃏 Kartice</span>
+        <span class="summary-sep">·</span>
+        <span id="summaryOp">× ÷</span>
+        <span class="summary-sep">·</span>
+        <span id="summaryFilter">Vse</span>
+      </div>
+      <button class="toolbar-toggle-btn" id="toolbarToggle">⚙️</button>
+    </div>
+
+    <div class="toolbar-controls-wrap" id="toolbarControlsWrap">
+      <div class="toolbar-controls">
+
+        <div class="ctrl-group">
+          <label class="ctrl-label">Način</label>
+          <select id="modeSelect" class="select">
+            <option value="flashcard">🃏 Kartice</option>
+            <option value="quiz">🎯 Kviz</option>
+            <option value="timed">⏱️ Tekma s časom</option>
+          </select>
+        </div>
+
+        <div class="ctrl-group">
+          <label class="ctrl-label">Vrsta</label>
+          <div class="op-btn-group">
+            <button class="op-btn active" data-op="both">× ÷</button>
+            <button class="op-btn" data-op="multiply">×</button>
+            <button class="op-btn" data-op="divide">÷</button>
+          </div>
+        </div>
+
+        <div class="ctrl-group">
+          <label class="ctrl-label">Poštevanke</label>
+          <div class="filter-dropdown">
+            <button class="filter-btn" id="filterToggle">⚙ Vse ▾</button>
+            <div class="filter-panel" id="filterPanel">
+              <label class="toggle-lbl"><input type="checkbox" id="chk1"  checked> 1</label>
+              <label class="toggle-lbl"><input type="checkbox" id="chk2"  checked> 2</label>
+              <label class="toggle-lbl"><input type="checkbox" id="chk3"  checked> 3</label>
+              <label class="toggle-lbl"><input type="checkbox" id="chk4"  checked> 4</label>
+              <label class="toggle-lbl"><input type="checkbox" id="chk5"  checked> 5</label>
+              <label class="toggle-lbl"><input type="checkbox" id="chk6"  checked> 6</label>
+              <label class="toggle-lbl"><input type="checkbox" id="chk7"  checked> 7</label>
+              <label class="toggle-lbl"><input type="checkbox" id="chk8"  checked> 8</label>
+              <label class="toggle-lbl"><input type="checkbox" id="chk9"  checked> 9</label>
+              <label class="toggle-lbl"><input type="checkbox" id="chk10" checked> 10</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="ctrl-group">
+          <button class="reload-btn" id="reloadBtn">↻ Začni</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- SCORE HUD -->
+  <div id="scoreHUD" class="score-hud" style="display:none">
+    <div class="score-item score-correct">
+      <span class="score-val" id="scoreCorrect">0</span>
+      <span class="score-lbl">✅ Pravilno</span>
+    </div>
+    <div class="score-sep"></div>
+    <div class="score-item score-wrong">
+      <span class="score-val" id="scoreWrong">0</span>
+      <span class="score-lbl">❌ Napačno</span>
+    </div>
+    <div class="score-sep"></div>
+    <div class="score-item score-pct">
+      <span class="score-val" id="scorePct">—</span>
+      <span class="score-lbl">🎯 Točnost</span>
+    </div>
+    <div class="score-sep"></div>
+    <div class="medal-legend-wrap" tabindex="0">
+      <div class="medal-display">
+        <span class="medal-emoji" id="medalEmoji">🏅</span>
+        <span class="medal-title" id="medalTitle">—</span>
+        <span class="medal-lbl">Rang</span>
+      </div>
+      <div class="medal-legend">
+        <div class="medal-legend-row"><span>🏆</span><span>Šampion — 100%</span></div>
+        <div class="medal-legend-row"><span>🥇</span><span>Zlato — 90%+</span></div>
+        <div class="medal-legend-row"><span>🥈</span><span>Srebro — 75%+</span></div>
+        <div class="medal-legend-row"><span>🥉</span><span>Bron — 60%+</span></div>
+        <div class="medal-legend-row"><span>⭐</span><span>Zvezda — 40%+</span></div>
+        <div class="medal-legend-row"><span>🌱</span><span>Začetnik — pod 40%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLASHCARD PANEL -->
+  <div id="flashcardPanel" class="card-panel">
+    <div class="card-counter" id="cardCounter">Kartica 0 od 0</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+    </div>
+    <div id="cardContainer" class="card-container">
+      <div class="card" id="flashcard">
+        <div class="card-face card-front">
+          <span class="card-text" id="cardFrontText">Pritisni ↻ Začni</span>
+          <span class="flip-hint">klikni za obrat</span>
+        </div>
+        <div class="card-face card-back">
+          <span class="card-text" id="cardBackText">🙂</span>
+          <span class="flip-hint">klikni za obrat</span>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="prevBtn" disabled>⬅️ Prejšnja</button>
+      <button class="btn" id="nextBtn" disabled>Naslednja ➡️</button>
+    </div>
+    <div class="keyboard-hint">
+      💡 Puščice za navigacijo · presledek za obrat · 👆 povleci levo/desno
+    </div>
+  </div>
+
+  <!-- QUIZ PANEL -->
+  <div id="quizPanel" class="quiz-panel" style="display:none">
+    <div id="quizArea" class="quiz-area">
+      <div class="quiz-empty">Pritisni ↻ Začni! 🎯</div>
+    </div>
+  </div>
+
+  <!-- TIMED PANEL -->
+  <div id="timedPanel" class="timed-panel" style="display:none">
+    <div id="timedArea" class="timed-area">
+      <div class="quiz-empty">Pritisni ↻ Začni! ⏱️</div>
+    </div>
+  </div>
+
+</div>
+<script src="script.js"></script>
+</body>
+</html>    .quiz-opt-btn.wrong{background:#4a1a1a!important;border-color:#f44336!important;color:#ff7d7d}
     .quiz-opt-btn:disabled{cursor:not-allowed}
     .quiz-advance-bar-wrap{width:100%;max-width:360px;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;display:none}
     .quiz-advance-bar{height:100%;background:#f0a500;border-radius:3px;width:100%}
