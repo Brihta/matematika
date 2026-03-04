@@ -42,13 +42,27 @@
     .op-btn.active{background:#f0a500;color:#000;border-color:#f0a500;font-weight:700}
 
     /* ── SCORE HUD ── */
-    .score-hud{background:#16213e;border-radius:12px;padding:10px 16px;margin:12px 0 0;display:flex;justify-content:center;gap:24px}
+    .score-hud{background:#16213e;border-radius:12px;padding:10px 16px;margin:12px 0 0;display:flex;justify-content:center;align-items:center;gap:20px}
     .score-item{display:flex;flex-direction:column;align-items:center}
     .score-val{font-size:1.5rem;font-weight:700}
     .score-lbl{font-size:.68rem;color:#888}
     .score-correct .score-val{color:#4caf50}
     .score-wrong .score-val{color:#f44336}
     .score-pct .score-val{color:#f0a500}
+    .score-sep{width:1px;height:40px;background:rgba(255,255,255,.1)}
+
+    /* medals */
+    .medal-display{display:flex;flex-direction:column;align-items:center;gap:2px}
+    .medal-emoji{font-size:2rem;line-height:1;transition:all .4s}
+    .medal-lbl{font-size:.65rem;color:#888}
+    .medal-title{font-size:.75rem;font-weight:700;color:#f0a500;text-align:center}
+
+    /* medal legend tooltip */
+    .medal-legend-wrap{position:relative;cursor:help}
+    .medal-legend{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#0f3460;border:1px solid #444;border-radius:10px;padding:10px 14px;white-space:nowrap;z-index:300;box-shadow:0 4px 20px rgba(0,0,0,.7);display:none;min-width:180px}
+    .medal-legend-wrap:hover .medal-legend{display:block}
+    .medal-legend-row{display:flex;align-items:center;gap:8px;font-size:.82rem;padding:2px 0}
+    .medal-legend-row span:first-child{font-size:1.1rem}
 
     /* ── FLASHCARD ── */
     .card-counter{text-align:center;font-size:.8rem;color:#888;margin:14px 0 6px}
@@ -77,11 +91,14 @@
     .quiz-opt-btn.correct{background:#1a472a;border-color:#4caf50;color:#7dff7d}
     .quiz-opt-btn.wrong{background:#4a1a1a;border-color:#f44336;color:#ff7d7d}
     .quiz-opt-btn:disabled{cursor:not-allowed}
-    .quiz-next-btn{background:#f0a500;color:#000;border:none;border-radius:10px;padding:10px 28px;font-size:1rem;font-weight:700;cursor:pointer}
-    .quiz-next-btn:hover{background:#ffc300}
+    /* auto-advance progress bar */
+    .quiz-advance-bar-wrap{width:100%;max-width:360px;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;display:none}
+    .quiz-advance-bar{height:100%;background:#f0a500;border-radius:3px;width:100%;transition:none}
+    .quiz-advance-bar.running{transition:width 1s linear;width:0%}
     .quiz-empty{color:#888;text-align:center;padding:40px}
     .end-card{text-align:center;padding:30px;background:#16213e;border-radius:20px;border:2px solid #f0a500}
-    .end-card h2{font-size:2rem;margin-bottom:16px;color:#f0a500}
+    .end-card h2{font-size:2rem;margin-bottom:16px}
+    .end-card .end-medal{font-size:4rem;margin-bottom:8px}
     .end-card p{font-size:1.1rem;margin:6px 0;color:#ccc}
     .restart-btn{background:#f0a500;color:#000;border:none;border-radius:10px;padding:11px 30px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:18px}
     .restart-btn:hover{background:#ffc300}
@@ -95,10 +112,8 @@
     .timed-input{font-size:1.8rem;padding:10px 20px;border-radius:10px;border:2px solid #444;background:#0f3460;color:#fff;text-align:center;width:150px;outline:none;-moz-appearance:textfield}
     .timed-input::-webkit-inner-spin-button,.timed-input::-webkit-outer-spin-button{-webkit-appearance:none}
     .timed-input:focus{border-color:#f0a500}
-    .timed-input.correct{border-color:#4caf50;background:#1a472a;transition:background .15s}
-    .timed-input.wrong{border-color:#f44336;background:#4a1a1a;transition:background .15s}
-    .timed-start-btn{background:#f0a500;color:#000;border:none;border-radius:10px;padding:13px 36px;font-size:1.1rem;font-weight:700;cursor:pointer}
-    .timed-start-btn:hover{background:#ffc300}
+    .timed-input.correct{border-color:#4caf50;background:#1a472a}
+    .timed-input.wrong{border-color:#f44336;background:#4a1a1a}
   </style>
 </head>
 <body>
@@ -123,8 +138,6 @@
 
     <div class="toolbar-controls-wrap" id="toolbarControlsWrap">
       <div class="toolbar-controls">
-
-        <!-- Mode -->
         <div class="ctrl-group">
           <label class="ctrl-label">Način</label>
           <select id="modeSelect" class="select">
@@ -133,8 +146,6 @@
             <option value="timed">⏱️ Tekma s časom</option>
           </select>
         </div>
-
-        <!-- Operation type -->
         <div class="ctrl-group">
           <label class="ctrl-label">Vrsta</label>
           <div class="op-btn-group">
@@ -143,8 +154,6 @@
             <button class="op-btn" data-op="divide">÷</button>
           </div>
         </div>
-
-        <!-- Table filter -->
         <div class="ctrl-group">
           <label class="ctrl-label">Poštevanke</label>
           <div class="filter-dropdown">
@@ -152,12 +161,9 @@
             <div class="filter-panel" id="filterPanel"></div>
           </div>
         </div>
-
-        <!-- Start -->
         <div class="ctrl-group">
           <button class="reload-btn" id="reloadBtn">↻ Začni</button>
         </div>
-
       </div>
     </div>
   </div>
@@ -166,22 +172,41 @@
   <div id="scoreHUD" class="score-hud" style="display:none">
     <div class="score-item score-correct">
       <span class="score-val" id="scoreCorrect">0</span>
-      <span class="score-lbl">Pravilno</span>
+      <span class="score-lbl">✅ Pravilno</span>
     </div>
+    <div class="score-sep"></div>
     <div class="score-item score-wrong">
       <span class="score-val" id="scoreWrong">0</span>
-      <span class="score-lbl">Napačno</span>
+      <span class="score-lbl">❌ Napačno</span>
     </div>
+    <div class="score-sep"></div>
     <div class="score-item score-pct">
       <span class="score-val" id="scorePct">—</span>
-      <span class="score-lbl">Točnost</span>
+      <span class="score-lbl">🎯 Točnost</span>
+    </div>
+    <div class="score-sep"></div>
+    <!-- MEDAL -->
+    <div class="medal-legend-wrap">
+      <div class="medal-display">
+        <span class="medal-emoji" id="medalEmoji">🏅</span>
+        <span class="medal-title" id="medalTitle">—</span>
+        <span class="medal-lbl">Rang</span>
+      </div>
+      <div class="medal-legend">
+        <div class="medal-legend-row"><span>🏆</span><span>Šampion — 100%</span></div>
+        <div class="medal-legend-row"><span>🥇</span><span>Zlato — 90 %+</span></div>
+        <div class="medal-legend-row"><span>🥈</span><span>Srebro — 75 %+</span></div>
+        <div class="medal-legend-row"><span>🥉</span><span>Bron — 60 %+</span></div>
+        <div class="medal-legend-row"><span>⭐</span><span>Zvezda — 40 %+</span></div>
+        <div class="medal-legend-row"><span>🌱</span><span>Začetnik — pod 40 %</span></div>
+      </div>
     </div>
   </div>
 
   <!-- ═══ MAIN CONTENT ═══ -->
   <div class="main-content">
 
-    <!-- FLASHCARD PANEL -->
+    <!-- FLASHCARD -->
     <div id="flashcardPanel">
       <div class="card-counter" id="cardCounter">Kartica 0 od 0</div>
       <div class="progress-bar-wrap">
@@ -206,14 +231,14 @@
       <div class="keyboard-hint">💡 Puščice za navigacijo · presledek za obrat · 👆 povleci levo/desno</div>
     </div>
 
-    <!-- QUIZ PANEL -->
+    <!-- QUIZ -->
     <div id="quizPanel" style="display:none">
       <div class="quiz-area" id="quizArea">
         <div class="quiz-empty">Klikni ↻ Začni za kviz! 🎯</div>
       </div>
     </div>
 
-    <!-- TIMED PANEL -->
+    <!-- TIMED -->
     <div id="timedPanel" style="display:none">
       <div class="timed-area" id="timedArea">
         <div class="quiz-empty">Klikni ↻ Začni za tekmo! ⏱️</div>
@@ -225,9 +250,41 @@
 
 <script>
 // ══════════════════════════════════════════
-//  EMBEDDED DATA
+//  DATA
 // ══════════════════════════════════════════
 const ALL_CARDS = [{"question":"1 × 1 =","answer":"1"},{"question":"1 × 2 =","answer":"2"},{"question":"1 × 3 =","answer":"3"},{"question":"1 × 4 =","answer":"4"},{"question":"1 × 5 =","answer":"5"},{"question":"1 × 6 =","answer":"6"},{"question":"1 × 7 =","answer":"7"},{"question":"1 × 8 =","answer":"8"},{"question":"1 × 9 =","answer":"9"},{"question":"1 × 10 =","answer":"10"},{"question":"2 × 1 =","answer":"2"},{"question":"2 × 2 =","answer":"4"},{"question":"2 × 3 =","answer":"6"},{"question":"2 × 4 =","answer":"8"},{"question":"2 × 5 =","answer":"10"},{"question":"2 × 6 =","answer":"12"},{"question":"2 × 7 =","answer":"14"},{"question":"2 × 8 =","answer":"16"},{"question":"2 × 9 =","answer":"18"},{"question":"2 × 10 =","answer":"20"},{"question":"3 × 1 =","answer":"3"},{"question":"3 × 2 =","answer":"6"},{"question":"3 × 3 =","answer":"9"},{"question":"3 × 4 =","answer":"12"},{"question":"3 × 5 =","answer":"15"},{"question":"3 × 6 =","answer":"18"},{"question":"3 × 7 =","answer":"21"},{"question":"3 × 8 =","answer":"24"},{"question":"3 × 9 =","answer":"27"},{"question":"3 × 10 =","answer":"30"},{"question":"4 × 1 =","answer":"4"},{"question":"4 × 2 =","answer":"8"},{"question":"4 × 3 =","answer":"12"},{"question":"4 × 4 =","answer":"16"},{"question":"4 × 5 =","answer":"20"},{"question":"4 × 6 =","answer":"24"},{"question":"4 × 7 =","answer":"28"},{"question":"4 × 8 =","answer":"32"},{"question":"4 × 9 =","answer":"36"},{"question":"4 × 10 =","answer":"40"},{"question":"5 × 1 =","answer":"5"},{"question":"5 × 2 =","answer":"10"},{"question":"5 × 3 =","answer":"15"},{"question":"5 × 4 =","answer":"20"},{"question":"5 × 5 =","answer":"25"},{"question":"5 × 6 =","answer":"30"},{"question":"5 × 7 =","answer":"35"},{"question":"5 × 8 =","answer":"40"},{"question":"5 × 9 =","answer":"45"},{"question":"5 × 10 =","answer":"50"},{"question":"6 × 1 =","answer":"6"},{"question":"6 × 2 =","answer":"12"},{"question":"6 × 3 =","answer":"18"},{"question":"6 × 4 =","answer":"24"},{"question":"6 × 5 =","answer":"30"},{"question":"6 × 6 =","answer":"36"},{"question":"6 × 7 =","answer":"42"},{"question":"6 × 8 =","answer":"48"},{"question":"6 × 9 =","answer":"54"},{"question":"6 × 10 =","answer":"60"},{"question":"7 × 1 =","answer":"7"},{"question":"7 × 2 =","answer":"14"},{"question":"7 × 3 =","answer":"21"},{"question":"7 × 4 =","answer":"28"},{"question":"7 × 5 =","answer":"35"},{"question":"7 × 6 =","answer":"42"},{"question":"7 × 7 =","answer":"49"},{"question":"7 × 8 =","answer":"56"},{"question":"7 × 9 =","answer":"63"},{"question":"7 × 10 =","answer":"70"},{"question":"8 × 1 =","answer":"8"},{"question":"8 × 2 =","answer":"16"},{"question":"8 × 3 =","answer":"24"},{"question":"8 × 4 =","answer":"32"},{"question":"8 × 5 =","answer":"40"},{"question":"8 × 6 =","answer":"48"},{"question":"8 × 7 =","answer":"56"},{"question":"8 × 8 =","answer":"64"},{"question":"8 × 9 =","answer":"72"},{"question":"8 × 10 =","answer":"80"},{"question":"9 × 1 =","answer":"9"},{"question":"9 × 2 =","answer":"18"},{"question":"9 × 3 =","answer":"27"},{"question":"9 × 4 =","answer":"36"},{"question":"9 × 5 =","answer":"45"},{"question":"9 × 6 =","answer":"54"},{"question":"9 × 7 =","answer":"63"},{"question":"9 × 8 =","answer":"72"},{"question":"9 × 9 =","answer":"81"},{"question":"9 × 10 =","answer":"90"},{"question":"10 × 1 =","answer":"10"},{"question":"10 × 2 =","answer":"20"},{"question":"10 × 3 =","answer":"30"},{"question":"10 × 4 =","answer":"40"},{"question":"10 × 5 =","answer":"50"},{"question":"10 × 6 =","answer":"60"},{"question":"10 × 7 =","answer":"70"},{"question":"10 × 8 =","answer":"80"},{"question":"10 × 9 =","answer":"90"},{"question":"10 × 10 =","answer":"100"},{"question":"1 : 1 =","answer":"1"},{"question":"2 : 1 =","answer":"2"},{"question":"2 : 2 =","answer":"1"},{"question":"3 : 1 =","answer":"3"},{"question":"3 : 3 =","answer":"1"},{"question":"4 : 1 =","answer":"4"},{"question":"4 : 4 =","answer":"1"},{"question":"5 : 1 =","answer":"5"},{"question":"5 : 5 =","answer":"1"},{"question":"6 : 1 =","answer":"6"},{"question":"6 : 6 =","answer":"1"},{"question":"7 : 1 =","answer":"7"},{"question":"7 : 7 =","answer":"1"},{"question":"8 : 1 =","answer":"8"},{"question":"8 : 8 =","answer":"1"},{"question":"9 : 1 =","answer":"9"},{"question":"9 : 9 =","answer":"1"},{"question":"10 : 1 =","answer":"10"},{"question":"10 : 10 =","answer":"1"},{"question":"4 : 2 =","answer":"2"},{"question":"6 : 2 =","answer":"3"},{"question":"6 : 3 =","answer":"2"},{"question":"8 : 2 =","answer":"4"},{"question":"8 : 4 =","answer":"2"},{"question":"10 : 2 =","answer":"5"},{"question":"10 : 5 =","answer":"2"},{"question":"12 : 2 =","answer":"6"},{"question":"12 : 6 =","answer":"2"},{"question":"14 : 2 =","answer":"7"},{"question":"14 : 7 =","answer":"2"},{"question":"16 : 2 =","answer":"8"},{"question":"16 : 8 =","answer":"2"},{"question":"18 : 2 =","answer":"9"},{"question":"18 : 9 =","answer":"2"},{"question":"20 : 2 =","answer":"10"},{"question":"20 : 10 =","answer":"2"},{"question":"9 : 3 =","answer":"3"},{"question":"12 : 3 =","answer":"4"},{"question":"12 : 4 =","answer":"3"},{"question":"15 : 3 =","answer":"5"},{"question":"15 : 5 =","answer":"3"},{"question":"18 : 3 =","answer":"6"},{"question":"18 : 6 =","answer":"3"},{"question":"21 : 3 =","answer":"7"},{"question":"21 : 7 =","answer":"3"},{"question":"24 : 3 =","answer":"8"},{"question":"24 : 8 =","answer":"3"},{"question":"27 : 3 =","answer":"9"},{"question":"27 : 9 =","answer":"3"},{"question":"30 : 3 =","answer":"10"},{"question":"30 : 10 =","answer":"3"},{"question":"16 : 4 =","answer":"4"},{"question":"20 : 4 =","answer":"5"},{"question":"20 : 5 =","answer":"4"},{"question":"24 : 4 =","answer":"6"},{"question":"24 : 6 =","answer":"4"},{"question":"28 : 4 =","answer":"7"},{"question":"28 : 7 =","answer":"4"},{"question":"32 : 4 =","answer":"8"},{"question":"32 : 8 =","answer":"4"},{"question":"36 : 4 =","answer":"9"},{"question":"36 : 9 =","answer":"4"},{"question":"40 : 4 =","answer":"10"},{"question":"40 : 10 =","answer":"4"},{"question":"25 : 5 =","answer":"5"},{"question":"30 : 5 =","answer":"6"},{"question":"30 : 6 =","answer":"5"},{"question":"35 : 5 =","answer":"7"},{"question":"35 : 7 =","answer":"5"},{"question":"40 : 5 =","answer":"8"},{"question":"40 : 8 =","answer":"5"},{"question":"45 : 5 =","answer":"9"},{"question":"45 : 9 =","answer":"5"},{"question":"50 : 5 =","answer":"10"},{"question":"50 : 10 =","answer":"5"},{"question":"36 : 6 =","answer":"6"},{"question":"42 : 6 =","answer":"7"},{"question":"42 : 7 =","answer":"6"},{"question":"48 : 6 =","answer":"8"},{"question":"48 : 8 =","answer":"6"},{"question":"54 : 6 =","answer":"9"},{"question":"54 : 9 =","answer":"6"},{"question":"60 : 6 =","answer":"10"},{"question":"60 : 10 =","answer":"6"},{"question":"49 : 7 =","answer":"7"},{"question":"56 : 7 =","answer":"8"},{"question":"56 : 8 =","answer":"7"},{"question":"63 : 7 =","answer":"9"},{"question":"63 : 9 =","answer":"7"},{"question":"70 : 7 =","answer":"10"},{"question":"70 : 10 =","answer":"7"},{"question":"64 : 8 =","answer":"8"},{"question":"72 : 8 =","answer":"9"},{"question":"72 : 9 =","answer":"8"},{"question":"80 : 8 =","answer":"10"},{"question":"80 : 10 =","answer":"8"},{"question":"81 : 9 =","answer":"9"},{"question":"90 : 9 =","answer":"10"},{"question":"90 : 10 =","answer":"9"},{"question":"100 : 10 =","answer":"10"}];
+
+// ══════════════════════════════════════════
+//  MEDALS
+// ══════════════════════════════════════════
+const MEDALS = [
+  { min: 100, emoji: '🏆', title: 'Šampion' },
+  { min: 90,  emoji: '🥇', title: 'Zlato'   },
+  { min: 75,  emoji: '🥈', title: 'Srebro'  },
+  { min: 60,  emoji: '🥉', title: 'Bron'    },
+  { min: 40,  emoji: '⭐', title: 'Zvezda'  },
+  { min: 0,   emoji: '🌱', title: 'Začetnik'},
+];
+
+function getMedal(pct) {
+  return MEDALS.find(m => pct >= m.min) || MEDALS[MEDALS.length - 1];
+}
+
+function updateScoreHUD(correct, wrong) {
+  document.getElementById('scoreCorrect').textContent = correct;
+  document.getElementById('scoreWrong').textContent   = wrong;
+  const total = correct + wrong;
+  const pct = total ? Math.round(correct / total * 100) : null;
+  document.getElementById('scorePct').textContent = pct !== null ? pct + '%' : '—';
+  if (pct !== null) {
+    const m = getMedal(pct);
+    document.getElementById('medalEmoji').textContent = m.emoji;
+    document.getElementById('medalTitle').textContent = m.title;
+  } else {
+    document.getElementById('medalEmoji').textContent = '🏅';
+    document.getElementById('medalTitle').textContent = '—';
+  }
+}
 
 // ══════════════════════════════════════════
 //  STATE
@@ -237,10 +294,10 @@ let operationType = 'both';
 let selectedTables = new Set([1,2,3,4,5,6,7,8,9,10]);
 let cards = [];
 let currentIndex = 0;
-// quiz
-let quizQueue = [], quizIdx = 0, quizCorrect = 0, quizWrong = 0, quizAnswered = false;
-// timed
-let timedQueue = [], timedIdx = 0, timedCorrect = 0, timedWrong = 0, timedInterval = null, timedSecs = 60;
+let quizQueue = [], quizIdx = 0, quizCorrect = 0, quizWrong = 0;
+let timedQueue = [], timedIdx = 0, timedCorrect = 0, timedWrong = 0;
+let timedInterval = null, timedSecs = 60;
+let quizAdvanceTimer = null;
 
 // ══════════════════════════════════════════
 //  UTILITIES
@@ -256,12 +313,12 @@ function shuffle(arr) {
 
 function parseQ(q) {
   if (q.includes('×')) {
-    const parts = q.replace(/\s*=\s*$/, '').split('×').map(s => parseInt(s.trim()));
-    return { op: 'multiply', a: parts[0], b: parts[1] };
+    const p = q.replace(/\s*=\s*$/, '').split('×').map(s => parseInt(s.trim()));
+    return { op: 'multiply', a: p[0], b: p[1] };
   }
   if (q.includes(':')) {
-    const parts = q.replace(/\s*=\s*$/, '').split(':').map(s => parseInt(s.trim()));
-    return { op: 'divide', a: parts[0], b: parts[1] };
+    const p = q.replace(/\s*=\s*$/, '').split(':').map(s => parseInt(s.trim()));
+    return { op: 'divide', a: p[0], b: p[1] };
   }
   return null;
 }
@@ -272,7 +329,6 @@ function getFilteredCards() {
     if (!p) return false;
     if (operationType === 'multiply' && p.op !== 'multiply') return false;
     if (operationType === 'divide'   && p.op !== 'divide')   return false;
-    // table filter: × → first number; ÷ → divisor (b)
     const tbl = p.op === 'multiply' ? p.a : p.b;
     return selectedTables.has(tbl);
   });
@@ -284,13 +340,12 @@ function getFilteredCards() {
 document.getElementById('brandImg').onerror = function() {
   this.style.display = 'none';
   const em = document.createElement('span');
-  em.className = 'brand-emoji';
-  em.textContent = '🦉';
+  em.className = 'brand-emoji'; em.textContent = '🦉';
   this.parentNode.insertBefore(em, this);
 };
 
 // ══════════════════════════════════════════
-//  CHECKBOXES (build dynamically)
+//  CHECKBOXES
 // ══════════════════════════════════════════
 const filterPanel = document.getElementById('filterPanel');
 for (let i = 1; i <= 10; i++) {
@@ -303,28 +358,24 @@ for (let i = 1; i <= 10; i++) {
   filterPanel.appendChild(lbl);
   chk.addEventListener('change', () => {
     if (chk.checked) selectedTables.add(i); else selectedTables.delete(i);
-    updateFilterLabel();
-    updateSummary();
+    updateFilterLabel(); updateSummary();
   });
 }
 
 function updateFilterLabel() {
   const sel = [...selectedTables].sort((a,b) => a-b);
-  const all = sel.length === 10, none = sel.length === 0;
   document.getElementById('filterToggle').textContent =
-    all ? '⚙ Vse ▾' : none ? '⚙ Nič ▾' : '⚙ ' + sel.join(', ') + ' ▾';
+    sel.length === 10 ? '⚙ Vse ▾' : sel.length === 0 ? '⚙ Nič ▾' : '⚙ ' + sel.join(', ') + ' ▾';
 }
 
-// filter dropdown toggle
 document.getElementById('filterToggle').addEventListener('click', function(e) {
   e.stopPropagation();
-  const panel = document.getElementById('filterPanel');
-  if (!panel.classList.contains('open')) {
-    const rect = this.getBoundingClientRect();
-    panel.style.top  = (rect.bottom + 6) + 'px';
-    panel.style.left = rect.left + 'px';
+  if (!filterPanel.classList.contains('open')) {
+    const r = this.getBoundingClientRect();
+    filterPanel.style.top = (r.bottom + 6) + 'px';
+    filterPanel.style.left = r.left + 'px';
   }
-  panel.classList.toggle('open');
+  filterPanel.classList.toggle('open');
 });
 document.addEventListener('click', () => filterPanel.classList.remove('open'));
 filterPanel.addEventListener('click', e => e.stopPropagation());
@@ -353,252 +404,4 @@ document.getElementById('modeSelect').addEventListener('change', function() {
 
 function showPanel(mode) {
   document.getElementById('flashcardPanel').style.display = mode === 'flashcard' ? '' : 'none';
-  document.getElementById('quizPanel').style.display      = mode === 'quiz'      ? '' : 'none';
-  document.getElementById('timedPanel').style.display     = mode === 'timed'     ? '' : 'none';
-  document.getElementById('scoreHUD').style.display = (mode === 'quiz' || mode === 'timed') ? 'flex' : 'none';
-}
-
-// ══════════════════════════════════════════
-//  TOOLBAR COLLAPSE
-// ══════════════════════════════════════════
-const toolbar = document.getElementById('toolbar');
-const toggleBtn = document.getElementById('toolbarToggle');
-function collapseToolbar() { toolbar.classList.add('collapsed'); toggleBtn.textContent = '⚙️'; }
-function expandToolbar()   { toolbar.classList.remove('collapsed'); toggleBtn.textContent = '✕'; }
-function isCollapsed()     { return toolbar.classList.contains('collapsed'); }
-
-toggleBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  isCollapsed() ? expandToolbar() : collapseToolbar();
-  filterPanel.classList.remove('open');
-});
-document.addEventListener('click', e => {
-  if (!toolbar.contains(e.target) && !isCollapsed()) collapseToolbar();
-});
-
-// ══════════════════════════════════════════
-//  SUMMARY
-// ══════════════════════════════════════════
-function updateSummary() {
-  const modeMap = { flashcard: '🃏 Kartice', quiz: '🎯 Kviz', timed: '⏱️ Tekma' };
-  const opMap   = { both: '× ÷', multiply: '×', divide: '÷' };
-  document.getElementById('summaryMode').textContent = modeMap[currentMode] || currentMode;
-  document.getElementById('summaryOp').textContent   = opMap[operationType];
-  const sel = [...selectedTables].sort((a,b) => a-b);
-  document.getElementById('summaryFilter').textContent = sel.length === 10 ? 'Vse' : sel.length === 0 ? 'Nič' : sel.join(', ');
-}
-
-// ══════════════════════════════════════════
-//  RELOAD / START
-// ══════════════════════════════════════════
-document.getElementById('reloadBtn').addEventListener('click', () => {
-  updateSummary();
-  cards = shuffle(getFilteredCards());
-  clearInterval(timedInterval);
-  if (currentMode === 'flashcard') startFlashcard();
-  else if (currentMode === 'quiz')  startQuiz();
-  else if (currentMode === 'timed') startTimed();
-  setTimeout(collapseToolbar, 300);
-});
-
-// ══════════════════════════════════════════
-//  FLASHCARD MODE
-// ══════════════════════════════════════════
-function startFlashcard() {
-  currentIndex = 0;
-  document.getElementById('flashcard').classList.remove('flipped');
-  updateCard();
-}
-
-function updateCard() {
-  document.getElementById('flashcard').classList.remove('flipped');
-  if (cards.length === 0) {
-    document.getElementById('cardFrontText').textContent = 'Ni kartic za prikaz';
-    document.getElementById('cardBackText').textContent  = '—';
-    document.getElementById('cardCounter').textContent   = 'Ni kartic';
-    document.getElementById('progressBar').style.width  = '0%';
-    document.getElementById('prevBtn').disabled = true;
-    document.getElementById('nextBtn').disabled = true;
-    return;
-  }
-  const c = cards[currentIndex];
-  document.getElementById('cardFrontText').textContent = c.question;
-  document.getElementById('cardBackText').textContent  = c.answer;
-  document.getElementById('cardCounter').textContent   = `Kartica ${currentIndex + 1} od ${cards.length}`;
-  document.getElementById('progressBar').style.width   = ((currentIndex + 1) / cards.length * 100) + '%';
-  document.getElementById('prevBtn').disabled = currentIndex === 0;
-  document.getElementById('nextBtn').disabled = currentIndex === cards.length - 1;
-}
-
-document.getElementById('flashcard').addEventListener('click', function() {
-  if (!cards.length) return;
-  this.classList.toggle('flipped');
-});
-document.getElementById('prevBtn').addEventListener('click', () => { if (currentIndex > 0) { currentIndex--; updateCard(); } });
-document.getElementById('nextBtn').addEventListener('click', () => { if (currentIndex < cards.length - 1) { currentIndex++; updateCard(); } });
-
-// keyboard
-document.addEventListener('keydown', e => {
-  if (currentMode !== 'flashcard') return;
-  if (e.key === 'ArrowRight') document.getElementById('nextBtn').click();
-  else if (e.key === 'ArrowLeft') document.getElementById('prevBtn').click();
-  else if (e.key === ' ') { e.preventDefault(); document.getElementById('flashcard').click(); }
-});
-
-// swipe
-let touchX = 0;
-document.getElementById('cardContainer').addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, {passive:true});
-document.getElementById('cardContainer').addEventListener('touchend', e => {
-  const dx = e.changedTouches[0].clientX - touchX;
-  if (Math.abs(dx) > 40) { dx < 0 ? document.getElementById('nextBtn').click() : document.getElementById('prevBtn').click(); }
-});
-
-// ══════════════════════════════════════════
-//  QUIZ MODE
-// ══════════════════════════════════════════
-function startQuiz() {
-  quizQueue = shuffle(cards);
-  quizIdx = 0; quizCorrect = 0; quizWrong = 0; quizAnswered = false;
-  updateScoreHUD(quizCorrect, quizWrong);
-  renderQuizQ();
-}
-
-function updateScoreHUD(correct, wrong) {
-  document.getElementById('scoreCorrect').textContent = correct;
-  document.getElementById('scoreWrong').textContent   = wrong;
-  const total = correct + wrong;
-  document.getElementById('scorePct').textContent = total ? Math.round(correct / total * 100) + '%' : '—';
-}
-
-function renderQuizQ() {
-  const area = document.getElementById('quizArea');
-  if (!quizQueue.length) { area.innerHTML = '<div class="quiz-empty">Ni kartic. Nastavi filtre in klikni ↻ Začni.</div>'; return; }
-  if (quizIdx >= quizQueue.length) {
-    area.innerHTML = `<div class="end-card">
-      <h2>🎉 Konec kviza!</h2>
-      <p>Pravilno: <strong>${quizCorrect}</strong> / ${quizQueue.length}</p>
-      <p>Točnost: <strong>${Math.round(quizCorrect / quizQueue.length * 100)}%</strong></p>
-      <button class="restart-btn" onclick="startQuiz()">Znova ↻</button>
-    </div>`;
-    return;
-  }
-
-  const cur = quizQueue[quizIdx];
-  const correctVal = parseInt(cur.answer);
-  const pool = [...new Set(ALL_CARDS.map(c => parseInt(c.answer)))].filter(n => n !== correctVal);
-  const opts = shuffle([correctVal, ...shuffle(pool).slice(0, 3)]);
-
-  area.innerHTML = `
-    <div class="quiz-question">${cur.question}</div>
-    <div class="quiz-options">
-      ${opts.map(o => `<button class="quiz-opt-btn" data-val="${o}">${o}</button>`).join('')}
-    </div>
-    <div id="quizNextWrap" style="display:none;margin-top:6px">
-      <button class="quiz-next-btn" onclick="advanceQuiz()">Naprej ➡️</button>
-    </div>
-  `;
-
-  quizAnswered = false;
-  area.querySelectorAll('.quiz-opt-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      if (quizAnswered) return;
-      quizAnswered = true;
-      const val = parseInt(this.dataset.val);
-      if (val === correctVal) { this.classList.add('correct'); quizCorrect++; }
-      else {
-        this.classList.add('wrong'); quizWrong++;
-        area.querySelectorAll('.quiz-opt-btn').forEach(b => { if (parseInt(b.dataset.val) === correctVal) b.classList.add('correct'); });
-      }
-      area.querySelectorAll('.quiz-opt-btn').forEach(b => b.disabled = true);
-      document.getElementById('quizNextWrap').style.display = '';
-      updateScoreHUD(quizCorrect, quizWrong);
-    });
-  });
-}
-
-function advanceQuiz() { quizIdx++; renderQuizQ(); }
-
-// ══════════════════════════════════════════
-//  TIMED MODE
-// ══════════════════════════════════════════
-function startTimed() {
-  clearInterval(timedInterval);
-  timedQueue = shuffle(cards);
-  timedIdx = 0; timedCorrect = 0; timedWrong = 0; timedSecs = 60;
-  updateScoreHUD(0, 0);
-  renderTimedGame();
-}
-
-function renderTimedGame() {
-  const area = document.getElementById('timedArea');
-  if (!timedQueue.length) { area.innerHTML = '<div class="quiz-empty">Ni kartic. Nastavi filtre in klikni ↻ Začni.</div>'; return; }
-
-  area.innerHTML = `
-    <div class="timed-timer" id="timedTimerEl">60s</div>
-    <div class="timed-question" id="timedQEl">—</div>
-    <input class="timed-input" id="timedInputEl" type="number" inputmode="numeric" placeholder="?" autocomplete="off">
-  `;
-
-  showNextTimedQ();
-  document.getElementById('timedInputEl').focus();
-  document.getElementById('timedInputEl').addEventListener('input', checkTimedAns);
-
-  timedInterval = setInterval(() => {
-    timedSecs--;
-    const el = document.getElementById('timedTimerEl');
-    if (el) { el.textContent = timedSecs + 's'; if (timedSecs <= 10) el.classList.add('urgent'); }
-    if (timedSecs <= 0) { clearInterval(timedInterval); endTimed(); }
-  }, 1000);
-}
-
-function showNextTimedQ() {
-  if (timedIdx >= timedQueue.length) { timedIdx = 0; timedQueue = shuffle(timedQueue); }
-  const q = timedQueue[timedIdx];
-  const el = document.getElementById('timedQEl');
-  if (el) el.textContent = q ? q.question : '—';
-  const inp = document.getElementById('timedInputEl');
-  if (inp) { inp.value = ''; inp.className = 'timed-input'; setTimeout(() => inp.focus(), 50); }
-}
-
-function checkTimedAns() {
-  const inp = document.getElementById('timedInputEl');
-  if (!inp) return;
-  const val = inp.value.trim();
-  if (!val) return;
-  const correctAns = timedQueue[timedIdx % timedQueue.length]?.answer || '';
-  if (val === correctAns) {
-    inp.classList.add('correct');
-    timedCorrect++; timedIdx++;
-    updateScoreHUD(timedCorrect, timedWrong);
-    setTimeout(showNextTimedQ, 160);
-  } else if (val.length >= correctAns.length) {
-    inp.classList.add('wrong');
-    timedWrong++;
-    updateScoreHUD(timedCorrect, timedWrong);
-    setTimeout(() => { const i = document.getElementById('timedInputEl'); if (i) { i.value = ''; i.className = 'timed-input'; i.focus(); } }, 350);
-  }
-}
-
-function endTimed() {
-  const area = document.getElementById('timedArea');
-  const total = timedCorrect + timedWrong;
-  area.innerHTML = `<div class="end-card">
-    <h2>⏱️ Čas potekel!</h2>
-    <p>Pravilno: <strong>${timedCorrect}</strong></p>
-    <p>Napačno: <strong>${timedWrong}</strong></p>
-    <p>Skupaj odgovorov: <strong>${total}</strong></p>
-    ${total ? `<p>Točnost: <strong>${Math.round(timedCorrect/total*100)}%</strong></p>` : ''}
-    <button class="restart-btn" onclick="startTimed()">Znova ↻</button>
-  </div>`;
-}
-
-// ══════════════════════════════════════════
-//  INIT — auto-load on page open
-// ══════════════════════════════════════════
-updateSummary();
-cards = shuffle(getFilteredCards());
-startFlashcard();
-collapseToolbar();
-</script>
-</body>
-</html>
+  document.g
