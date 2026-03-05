@@ -74,7 +74,7 @@
     </div>
   </div>
 
-  <!-- SCORE HUD -->
+  <!-- SCORE HUD (quiz mode) -->
   <div id="scoreHUD" class="score-hud" style="display:none">
     <div class="score-item score-correct">
       <span class="score-val" id="scoreCorrect">0</span>
@@ -91,20 +91,14 @@
       <span class="score-lbl">🎯 Točnost</span>
     </div>
     <div class="score-sep"></div>
-    <div class="medal-legend-wrap" tabindex="0">
-      <div class="medal-display">
-        <span class="medal-emoji" id="medalEmoji">🏅</span>
-        <span class="medal-title" id="medalTitle">—</span>
-        <span class="medal-lbl">Rang</span>
-      </div>
-      <div class="medal-legend">
-        <div class="medal-legend-row"><span>🏆</span><span>Šampion — 100%</span></div>
-        <div class="medal-legend-row"><span>🥇</span><span>Zlato — 90%+</span></div>
-        <div class="medal-legend-row"><span>🥈</span><span>Srebro — 75%+</span></div>
-        <div class="medal-legend-row"><span>🥉</span><span>Bron — 60%+</span></div>
-        <div class="medal-legend-row"><span>⭐</span><span>Zvezda — 40%+</span></div>
-        <div class="medal-legend-row"><span>🌱</span><span>Začetnik — pod 40%</span></div>
-      </div>
+    <div class="score-item">
+      <div id="hudMedalSVG"></div>
+      <span class="hud-medal-name" id="hudMedalName">—</span>
+      <span class="score-lbl">Rang</span>
+    </div>
+    <div class="score-sep"></div>
+    <div class="score-item">
+      <span class="streak-hud" id="hudStreak" style="display:none"></span>
     </div>
   </div>
 
