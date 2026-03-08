@@ -1,59 +1,28 @@
-/* ═══════════════════════════════════════════
-   BRIHTA — script.js
-   ═══════════════════════════════════════════ */
+// 📗 Seznam predmetov
+const SUBJECTS = [
+  { id: "anglescina", name: "🇬🇧 Angleščina" },
+  { id: "matematika", name: "🔢 Matematika" },
+];
 
-/* ══════════════════════════
-   SOUND ENGINE (Web Audio)
-   Duolingo-style
-══════════════════════════ */
-const SFX = (() => {
-  let ctx = null;
-  function getCtx() {
-    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    return ctx;
-  }
-  function tone(freq, type, dur, vol, freqEnd) {
-    try {
-      const c = getCtx(), o = c.createOscillator(), g = c.createGain();
-      o.connect(g); g.connect(c.destination);
-      o.type = type || 'sine';
-      o.frequency.setValueAtTime(freq, c.currentTime);
-      if (freqEnd) o.frequency.linearRampToValueAtTime(freqEnd, c.currentTime + dur);
-      g.gain.setValueAtTime(vol || 0.3, c.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
-      o.start(c.currentTime); o.stop(c.currentTime + dur);
-    } catch(e) {}
-  }
-  return {
-    correct() {
-      // Bright ascending triple ping
-      tone(523, 'sine', 0.09, 0.32);
-      setTimeout(() => tone(784,  'sine', 0.10, 0.26), 80);
-      setTimeout(() => tone(1047, 'sine', 0.18, 0.20), 170);
-    },
-    wrong() {
-      // Short low descending buzz
-      tone(280, 'sawtooth', 0.14, 0.22, 160);
-      setTimeout(() => tone(200, 'square', 0.18, 0.16, 140), 150);
-    },
-    levelUp() {
-      [523, 659, 784, 1047, 1319].forEach((f, i) =>
-        setTimeout(() => tone(f, 'sine', 0.22, 0.26, f * 1.02), i * 75)
-      );
-    },
-    victory() {
-      [523, 659, 784, 1047, 1319, 1568].forEach((f, i) =>
-        setTimeout(() => tone(f, 'sine', 0.28, 0.28, f * 1.015), i * 65)
-      );
-      setTimeout(() => tone(1047, 'sine', 0.5, 0.3), 480);
-    }
-  };
-})();
+// 📗 Seznam naborov
+const DATASETS = [
+  { id: "all",      subject: "anglescina", name: "Vse besede",  url: "english_words.json" },
+  { id: "combined", subject: "anglescina", name: "Vse enote",   url: null, combined: ["unit1.json","unit2.json","unit3.json","unit4.json"] },
+  { id: "unit1",    subject: "anglescina", name: "Unit 1",      url: "unit1.json" },
+  { id: "unit2",    subject: "anglescina", name: "Unit 2",      url: "unit2.json" },
+  { id: "unit3",    subject: "anglescina", name: "Unit 3",      url: "unit3.json" },
+  { id: "unit4",    subject: "anglescina", name: "Unit 4",      url: "unit4.json" },
+  { id: "postevanka", subject: "matematika", name: "Poštevalnica", url: "postevanka.json" },
+];
+const SELECT_KEY  = "anki_dataset_id";
+const SUBJECT_KEY = "anki_subject_id";
+const SCORE_KEY   = "anki_quiz_score";
+let currentSubject = localStorage.getItem(SUBJECT_KEY) || "anglescina";
+let MASTER_DATA  = [];
+let ALL_UNITS_POOL = [];   // pool of ALL items from every unit, for quiz distractors
+let currentMode  = "flashcard";
 
-/* ══════════════════════════
-   RANKS & SVG MEDALS
-   (your exact definitions)
-══════════════════════════ */
+// ── Ranks ─────────────────────────────────────────────────────────────────────
 const RANKS = [
   { name: "Lesena medalja",   minScore: 0,   color: "#a07850", glow: "#d4a96a" },
   { name: "Železna medalja",  minScore: 30,  color: "#909090", glow: "#c8c8c8" },
@@ -62,6 +31,7 @@ const RANKS = [
   { name: "Zlata medalja",    minScore: 350, color: "#c0392b", glow: "#ff6b6b" },
 ];
 
+// ── Timed Mode Levels ─────────────────────────────────────────────────────────
 const TIMED_LEVELS = [
   { medal: "Lesena medalja",   timeLimit: 90,  target: 30,  color: "#a07850", glow: "#d4a96a",
     hint: "Pridobi 30 točk v 1:30" },
@@ -83,11 +53,6 @@ function getRank(score) {
 function getNextRank(score) {
   for (const r of RANKS) { if (score < r.minScore) return r; }
   return null;
-}
-// For quiz end-screen: map correct-answer count → score equivalent
-function getRankByPct(pct, total) {
-  const score = Math.round((pct / 100) * (total || 10));
-  return getRank(score);
 }
 function getMultiplier(streak) {
   if (streak >= 10) return 3;
@@ -165,488 +130,1118 @@ function getMedalSVG(rankName, size) {
         <circle cx="9"  cy="32" r="2" fill="#ffcdd2"/>
         <circle cx="55" cy="32" r="2" fill="#ffcdd2"/>
       </svg>`;
-    default: return `<span style="font-size:${Math.round(s*0.6)}px">🏅</span>`;
+    default: return "";
   }
 }
 
-/* ══════════════════════════
-   STATE
-══════════════════════════ */
-let allCards = [];
-let mode     = 'flashcard';
-let opType   = 'both';
-let tables   = new Set([1,2,3,4,5,6,7,8,9,10]);
-let cards    = [], cardIdx = 0;
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function buildSubjectSelect() {
+  const sel = document.getElementById("subject");
+  if (!sel) return;
+  sel.innerHTML = "";
+  SUBJECTS.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id; opt.textContent = s.name;
+    sel.appendChild(opt);
+  });
+  sel.value = currentSubject;
+}
 
-// Quiz state
-let qQueue = [], qIdx = 0, qOk = 0, qNo = 0, qStreak = 0, qTimer = null;
+function buildDatasetSelect() {
+  const sel = document.getElementById("dataset");
+  sel.innerHTML = "";
+  const filtered = DATASETS.filter(d => d.subject === currentSubject);
+  if (filtered.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = "__none__"; opt.textContent = "— ni naborov —";
+    sel.appendChild(opt);
+    return;
+  }
+  filtered.forEach(ds => {
+    const opt = document.createElement("option");
+    opt.value = ds.id; opt.textContent = ds.name;
+    sel.appendChild(opt);
+  });
+  const saved = localStorage.getItem(SELECT_KEY);
+  if (saved && filtered.find(d => d.id === saved)) sel.value = saved;
+}
 
-// Timed state
-let tLevelIdx = 0, tScore = 0, tStreak = 0, tTimeLeft = 0;
-let tQueue = [], tIdx = 0, tTimer = null, tTimerStarted = false;
-let tOverlay = null, tAnswered = false;
+function currentDataset() {
+  const id = document.getElementById("dataset").value;
+  const filtered = DATASETS.filter(d => d.subject === currentSubject);
+  return filtered.find(d => d.id === id) || filtered[0] || null;
+}
 
-/* ══════════════════════════
-   UTILS
-══════════════════════════ */
 function shuffle(arr) {
   const a = [...arr];
-  for (let i = a.length-1; i>0; i--) {
-    const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
-function parseQuestion(q) {
-  if (q.includes('×')) {
-    const p = q.replace(/\s*=\s*$/, '').split('×').map(s => parseInt(s.trim()));
-    return { op:'multiply', a:p[0], b:p[1] };
+
+function autoFitCardText(faceEl) {
+  if (!faceEl) return;
+  const span = faceEl.querySelector('.card-text');
+  if (!span) return;
+  if (faceEl.clientHeight === 0) return;
+
+  const padTop  = parseInt(getComputedStyle(faceEl).paddingTop)   || 26;
+  const padBot  = parseInt(getComputedStyle(faceEl).paddingBottom) || 26;
+  const available = faceEl.clientHeight - padTop - padBot - 30; // 30px for flip-hint
+
+  // Scale up or down to fill available space
+  let size = 2.5;
+  span.style.fontSize = size + 'rem';
+  // Shrink if overflowing
+  while (span.scrollHeight > available && size > 0.78) {
+    size -= 0.04;
+    span.style.fontSize = size + 'rem';
   }
-  if (q.includes(':')) {
-    const p = q.replace(/\s*=\s*$/, '').split(':').map(s => parseInt(s.trim()));
-    return { op:'divide', a:p[0], b:p[1] };
+  // Grow if there's room (short text like "15" should be big and bold)
+  while (span.scrollHeight < available * 0.65 && size < 2.8) {
+    size += 0.04;
+    span.style.fontSize = size + 'rem';
+    if (span.scrollHeight > available) { size -= 0.04; span.style.fontSize = size + 'rem'; break; }
   }
-  return null;
 }
-function getFilteredCards() {
-  return allCards.filter(card => {
-    const p = parseQuestion(card.question);
-    if (!p) return false;
-    if (opType==='multiply' && p.op!=='multiply') return false;
-    if (opType==='divide'   && p.op!=='divide')   return false;
-    return tables.has(p.op==='multiply' ? p.a : p.b);
+
+function setFaceText(faceEl, text) {
+  if (!faceEl) return;
+  const span = faceEl.querySelector('.card-text');
+  if (span) span.textContent = text;
+  else faceEl.textContent = text;
+  autoFitCardText(faceEl);
+}
+
+async function fetchRawData(dataset) {
+  let allData = [];
+  const t = Date.now();
+  if (dataset.combined) {
+    for (const url of dataset.combined) {
+      const resp = await fetch(url + '?t=' + t);
+      if (!resp.ok) throw new Error("Napaka pri prenosu " + url);
+      allData = allData.concat(await resp.json());
+    }
+  } else {
+    const resp = await fetch(dataset.url + '?t=' + t);
+    if (!resp.ok) throw new Error("Napaka pri prenosu");
+    allData = await resp.json();
+  }
+  return allData;
+}
+
+function getCategory(text) {
+  if (!text) return "word";
+  const trimmed = text.trim();
+  if (/[.!?]$/.test(trimmed)) return "sentence";
+  const firstPart = trimmed.split('/')[0].trim();
+  const wordCount = firstPart.split(/\s+/).length;
+  if (wordCount === 1) return "word";
+  if (wordCount >= 5) return "sentence";
+  return "phrase";
+}
+
+function applyFilters() {
+  const showWords     = document.getElementById('chkWords').checked;
+  const showPhrases   = document.getElementById('chkPhrases').checked;
+  const showSentences = document.getElementById('chkSentences').checked;
+  let filtered = MASTER_DATA.filter(item => {
+    const eng = item.answer ?? item.english ?? "";
+    const cat = getCategory(eng);
+    if (cat === "word"     && showWords)     return true;
+    if (cat === "phrase"   && showPhrases)   return true;
+    if (cat === "sentence" && showSentences) return true;
+    return false;
   });
-}
-function getWrongAnswers(correct) {
-  const n = parseInt(correct);
-  const cands = new Set();
-  [-2,-1,1,2,-3,3,-5,5,10,-10,-4,4].forEach(d => { const v=n+d; if(v>0&&v!==n) cands.add(v); });
-  if (String(n).length===2) {
-    const rev = parseInt(String(n)[1]+String(n)[0]);
-    if (rev!==n && rev>0) cands.add(rev);
-  }
-  const pool = shuffle([...cands]), res = [];
-  for (const c of pool) { if (res.length>=3) break; res.push(String(c)); }
-  for (let f=1; res.length<3; f++) { if(f!==n && !res.includes(String(f))) res.push(String(f)); }
-  return res;
-}
-
-/* ── LOAD JSON ── */
-function loadData(cb) {
-  fetch('postevanka.json').then(r=>r.json()).then(d=>{allCards=d; if(cb) cb();})
-    .catch(e=>console.error('Napaka pri nalaganju JSON:', e));
+  let finalCards = filtered.map((item, index) => {
+    const valSlo = item.question ?? item.slovenian ?? "";
+    const valEng = item.answer   ?? item.english   ?? "";
+    const isSloToEng = Math.random() < 0.5;
+    return { 
+      id: index, 
+      front: isSloToEng ? valSlo : valEng, 
+      back: isSloToEng ? valEng : valSlo, 
+      english: valEng, 
+      isSloToEng,
+      image: item.image // <-- We added this!
+    };
+  });
+  return shuffle(finalCards);
 }
 
-/* ── BRAND FALLBACK ── */
-document.getElementById('brandImg').onerror = function() {
-  this.style.display='none';
-  const em=document.createElement('span'); em.className='brand-emoji'; em.textContent='🦉';
-  this.parentNode.insertBefore(em, this);
-};
-
-/* ══════════════════════════
-   TOOLBAR
-══════════════════════════ */
-const toolbar   = document.getElementById('toolbar');
-const toggleBtn = document.getElementById('toolbarToggle');
-function collapseToolbar() { toolbar.classList.add('collapsed');    toggleBtn.textContent='⚙️'; }
-function expandToolbar()   { toolbar.classList.remove('collapsed'); toggleBtn.textContent='✕'; }
-toggleBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  toolbar.classList.contains('collapsed') ? expandToolbar() : collapseToolbar();
-  document.getElementById('filterPanel').classList.remove('open');
-});
-document.addEventListener('click', e => {
-  if (!toolbar.contains(e.target) && !toolbar.classList.contains('collapsed')) collapseToolbar();
-});
-
-const filterPanel = document.getElementById('filterPanel');
-document.getElementById('filterToggle').addEventListener('click', function(e) {
-  e.stopPropagation();
-  if (!filterPanel.classList.contains('open')) {
-    const r = this.getBoundingClientRect();
-    filterPanel.style.top=(r.bottom+6)+'px'; filterPanel.style.left=r.left+'px';
-  }
-  filterPanel.classList.toggle('open');
-});
-document.addEventListener('click', () => filterPanel.classList.remove('open'));
-filterPanel.addEventListener('click', e => e.stopPropagation());
-
-function updateFilterLabel() {
-  const sel=[...tables].sort((a,b)=>a-b);
-  document.getElementById('filterToggle').textContent =
-    sel.length===10?'⚙ Vse ▾':sel.length===0?'⚙ Nič ▾':'⚙ '+sel.join(', ')+'▾';
-  updateSummary();
-}
-for (let i=1; i<=10; i++) {
-  const el=document.getElementById('chk'+i);
-  if (el) el.addEventListener('change', ()=>{ el.checked?tables.add(i):tables.delete(i); updateFilterLabel(); });
-}
-document.querySelectorAll('.op-btn').forEach(btn=>btn.addEventListener('click', function() {
-  document.querySelectorAll('.op-btn').forEach(b=>b.classList.remove('active'));
-  this.classList.add('active'); opType=this.dataset.op; updateSummary();
-}));
-document.getElementById('modeSelect').addEventListener('change', function() {
-  mode=this.value; showPanel(mode); updateSummary(); setTimeout(collapseToolbar,200);
-});
-function showPanel(m) {
-  document.getElementById('flashcardPanel').style.display = m==='flashcard'?'':'none';
-  document.getElementById('quizPanel').style.display      = m==='quiz'?'':'none';
-  document.getElementById('timedPanel').style.display     = m==='timed'?'':'none';
-  document.getElementById('scoreHUD').style.display = (m==='quiz'||m==='timed')?'flex':'none';
-}
-function updateSummary() {
-  const mm={flashcard:'🃏 Kartice',quiz:'🎯 Kviz',timed:'⏱️ Tekma'};
-  const om={both:'× ÷',multiply:'×',divide:'÷'};
-  document.getElementById('summaryMode').textContent=mm[mode]||mode;
-  document.getElementById('summaryOp').textContent=om[opType];
-  const sel=[...tables].sort((a,b)=>a-b);
-  document.getElementById('summaryFilter').textContent=sel.length===10?'Vse':sel.length===0?'Nič':sel.join(', ');
-}
-
-/* ── SCORE HUD ── */
-function updateScoreHUD(ok, no, streak) {
-  document.getElementById('scoreCorrect').textContent = ok;
-  document.getElementById('scoreWrong').textContent   = no;
-  const total=ok+no, pct=total?Math.round(ok/total*100):null;
-  document.getElementById('scorePct').textContent = pct!==null?pct+'%':'—';
-  const rank = ok>0 ? getRank(ok) : RANKS[0];
-  document.getElementById('hudMedalSVG').innerHTML  = getMedalSVG(rank.name, 38);
-  document.getElementById('hudMedalName').textContent = rank.name;
-  const se = document.getElementById('hudStreak');
-  if (se) {
-    const mult=getMultiplier(streak||0);
-    se.textContent=(streak>=2)?`🔥 ${streak}×${mult>1?' ×'+mult:''}`:' ';
-    se.style.display=(streak>=2)?'inline-block':'none';
+function setLoadingUI(loading) {
+  const buttons = ["prevBtn","nextBtn","audioBtn"].map(id => document.getElementById(id)).filter(Boolean);
+  buttons.forEach(b => b.disabled = loading);
+  if (loading) {
+    setFaceText(document.getElementById("cardFront"), "Nalagam kartice…");
+    setFaceText(document.getElementById("cardBack"),  "Prosim počakaj 🙂");
   }
 }
 
-/* ── START BUTTON ── */
-document.getElementById('reloadBtn').addEventListener('click', () => {
-  if (tTimer) clearInterval(tTimer);
-  if (qTimer) clearTimeout(qTimer);
-  removeTimedOverlay();
-  tLevelIdx=0;
-  cards=shuffle(getFilteredCards());
-  if (mode==='flashcard')  startFlashcard();
-  else if (mode==='quiz')  startQuiz();
-  else                     startTimedLevel();
-  updateSummary();
-  setTimeout(collapseToolbar,300);
-});
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
 
-/* ══════════════════════════
-   FLASHCARD MODE
-══════════════════════════ */
-function startFlashcard() {
-  cardIdx=0;
-  document.getElementById('flashcard').classList.remove('flipped');
-  updateFlashcard();
-}
-function updateFlashcard() {
-  document.getElementById('flashcard').classList.remove('flipped');
-  if (!cards.length) {
-    document.getElementById('cardFrontText').textContent='Ni kartic za prikaz';
-    document.getElementById('cardBackText').textContent='—';
-    document.getElementById('cardCounter').textContent='Ni kartic';
-    document.getElementById('progressBar').style.width='0%';
-    document.getElementById('prevBtn').disabled=true;
-    document.getElementById('nextBtn').disabled=true;
-    return;
+// ── Sound Engine (Web Audio API – no external files) ─────────────────────────
+const SoundFX = (() => {
+  let ctx = null;
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    return ctx;
   }
-  const c=cards[cardIdx];
-  document.getElementById('cardFrontText').textContent=c.question;
-  document.getElementById('cardBackText').textContent=c.answer;
-  document.getElementById('cardCounter').textContent='Kartica '+(cardIdx+1)+' od '+cards.length;
-  document.getElementById('progressBar').style.width=((cardIdx+1)/cards.length*100)+'%';
-  document.getElementById('prevBtn').disabled=cardIdx===0;
-  document.getElementById('nextBtn').disabled=cardIdx===cards.length-1;
-}
-document.getElementById('flashcard').addEventListener('click', function(){ if(cards.length) this.classList.toggle('flipped'); });
-document.getElementById('prevBtn').addEventListener('click', ()=>{ if(cardIdx>0){cardIdx--;updateFlashcard();} });
-document.getElementById('nextBtn').addEventListener('click', ()=>{ if(cardIdx<cards.length-1){cardIdx++;updateFlashcard();} });
-document.addEventListener('keydown', e=>{
-  if (mode!=='flashcard') return;
-  if      (e.key==='ArrowRight') document.getElementById('nextBtn').click();
-  else if (e.key==='ArrowLeft')  document.getElementById('prevBtn').click();
-  else if (e.key===' ')          { e.preventDefault(); document.getElementById('flashcard').click(); }
-});
-let touchStartX=0;
-document.getElementById('cardContainer').addEventListener('touchstart', e=>{ touchStartX=e.touches[0].clientX; },{passive:true});
-document.getElementById('cardContainer').addEventListener('touchend', e=>{
-  const dx=e.changedTouches[0].clientX-touchStartX;
-  if (Math.abs(dx)>40){ dx<0?document.getElementById('nextBtn').click():document.getElementById('prevBtn').click(); }
-});
 
-/* ══════════════════════════
-   QUIZ MODE
-   Sounds · 400ms/700ms advance
-══════════════════════════ */
-function startQuiz() {
-  qQueue=shuffle(cards); qIdx=0; qOk=0; qNo=0; qStreak=0;
-  updateScoreHUD(0,0,0);
-  renderQuizQ();
-}
-function renderQuizQ() {
-  const area=document.getElementById('quizArea');
-  if (!qQueue.length) {
-    area.innerHTML='<div class="quiz-empty">Ni kartic. Nastavi filtre in klikni ↻ Začni.</div>';
-    return;
+  function playTone(opts) {
+    try {
+      const ac  = getCtx();
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.type = opts.type || 'sine';
+      osc.frequency.setValueAtTime(opts.freq, ac.currentTime);
+      if (opts.freqEnd !== undefined)
+        osc.frequency.linearRampToValueAtTime(opts.freqEnd, ac.currentTime + opts.dur);
+      gain.gain.setValueAtTime(opts.vol || 0.35, ac.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + opts.dur);
+      osc.start(ac.currentTime);
+      osc.stop(ac.currentTime + opts.dur);
+    } catch(e) {}
   }
-  if (qIdx>=qQueue.length) {
-    const pct=Math.round(qOk/qQueue.length*100);
-    const rank=getRank(qOk);
-    const next=getNextRank(qOk);
-    area.innerHTML=`
-      <div class="end-card">
-        <div class="end-medal-svg">${getMedalSVG(rank.name,80)}</div>
-        <h2 style="color:${rank.glow}">${rank.name}!</h2>
-        <p>Pravilno: <strong>${qOk}</strong> / ${qQueue.length}</p>
-        <p>Točnost: <strong>${pct}%</strong></p>
-        ${next ? `<p style="font-size:.8rem;color:rgba(255,255,255,.4);margin-top:6px">Naslednja: <strong style="color:${next.glow}">${next.name}</strong> pri ${next.minScore} točkah</p>` : '<p style="font-size:.85rem;color:#ffe033;margin-top:6px">🏆 Najvišji rang dosežen!</p>'}
-        <button class="restart-btn" onclick="startQuiz()">Znova ↻</button>
-      </div>`;
-    return;
+
+  function correct() {
+    // Soft, modern, quick ascending bubble/ding
+    playTone({ freq: 800, freqEnd: 1000, type: 'sine', dur: 0.1, vol: 0.3 });
+    setTimeout(() => playTone({ freq: 1200, freqEnd: 1600, type: 'sine', dur: 0.2, vol: 0.2 }), 80);
   }
-  const cur=qQueue[qIdx];
-  const correctAns=cur.answer;
-  const opts=shuffle([correctAns,...getWrongAnswers(correctAns)]);
-  const mult=getMultiplier(qStreak);
-  area.innerHTML=`
-    <div class="quiz-question">${cur.question}</div>
-    ${mult>1?`<div class="streak-badge">🔥 Množilnik ×${mult} aktiven!</div>`:''}
-    <div class="quiz-options" id="quizOpts">
-      ${opts.map(o=>`<button class="quiz-opt-btn" data-val="${o}">${o}</button>`).join('')}
-    </div>
-    <div class="quiz-advance-bar-wrap" id="advWrap">
-      <div class="quiz-advance-bar" id="advBar"></div>
-    </div>`;
-  area.querySelectorAll('.quiz-opt-btn').forEach(btn=>{
-    btn.addEventListener('click', function(){
-      area.querySelectorAll('.quiz-opt-btn').forEach(b=>b.disabled=true);
-      const isCorrect=this.dataset.val===correctAns;
-      if (isCorrect){ SFX.correct(); this.classList.add('correct'); qOk++; qStreak++; }
-      else {
-        SFX.wrong(); this.classList.add('wrong'); qStreak=0; qNo++;
-        area.querySelectorAll('.quiz-opt-btn').forEach(b=>{ if(b.dataset.val===correctAns) b.classList.add('correct'); });
-      }
-      updateScoreHUD(qOk,qNo,qStreak);
-      // Shrink bar to match advance delay
-      const wrap=document.getElementById('advWrap'), bar=document.getElementById('advBar');
-      if (wrap&&bar){
-        wrap.style.display='block';
-        bar.style.transition=`width ${isCorrect?'0.4s':'0.7s'} linear`;
-        requestAnimationFrame(()=>requestAnimationFrame(()=>{ bar.style.width='0%'; }));
-      }
-      qTimer=setTimeout(()=>{ qIdx++; renderQuizQ(); }, isCorrect?400:700);
+
+  function wrong() {
+    // Low descending buzz: two-tone drop
+    playTone({ freq: 320, freqEnd: 180, type: 'sawtooth', dur: 0.18, vol: 0.22 });
+    setTimeout(() => playTone({ freq: 200, freqEnd: 140, type: 'square', dur: 0.22, vol: 0.15 }), 180);
+  }
+
+  function rankUp() {
+    // Fanfare: quick ascending arpeggio
+    const ac = getCtx();
+    const notes = [523, 659, 784, 1047, 1319];
+    notes.forEach((freq, i) => {
+      setTimeout(() => playTone({ freq, freqEnd: freq * 1.02, type: 'sine', dur: 0.28, vol: 0.3 }), i * 90);
     });
+  }
+
+  return { correct, wrong, rankUp };
+})();
+
+// ── Score HUD ─────────────────────────────────────────────────────────────────
+function updateScoreHUD(score, streak) {
+  const hud = document.getElementById('scoreHUD');
+  if (!hud) return;
+  const rank     = getRank(score);
+  const nextRank = getNextRank(score);
+  const mult     = getMultiplier(streak);
+  let progress   = 100, progressLabel = "MAX RANG 🏆";
+  if (nextRank) {
+    const range = nextRank.minScore - rank.minScore;
+    progress = Math.min(100, Math.round(((score - rank.minScore) / range) * 100));
+    progressLabel = `${nextRank.minScore - score} točk do ${nextRank.name}`;
+  }
+
+  // Build ranks popup items with progress info
+  const popupItems = RANKS.map((r, i) => {
+    const isCurrent = r.name === rank.name;
+    const isAchieved = score >= r.minScore;
+    const nextR = RANKS[i + 1];
+    let progressInfo = '';
+    if (isCurrent && nextR) {
+      progressInfo = `<small class="rank-popup-progress">${nextR.minScore - score} do naslednje</small>`;
+    } else if (isCurrent && !nextR) {
+      progressInfo = `<small class="rank-popup-progress rank-popup-max">MAX 🏆</small>`;
+    }
+    return `<div class="rank-popup-item${isCurrent ? ' current-rank' : ''}${isAchieved && !isCurrent ? ' achieved-rank' : ''}">
+      ${getMedalSVG(r.name, isCurrent ? 48 : 36)}
+      <span class="rank-popup-name">${r.name}</span>
+      <small class="rank-popup-pts">${r.minScore}+ točk</small>
+      ${progressInfo}
+    </div>`;
+  }).join('');
+
+  hud.innerHTML = `
+    <div class="hud-top-row">
+      <div class="hud-medal" id="hudMedalBtn" title="Prikaži vse range">
+        ${getMedalSVG(rank.name, 48)}
+      </div>
+      <div class="hud-rank-name" style="color:${rank.glow}">${rank.name}</div>
+      <button id="resetScoreBtn" class="reset-score-btn" title="Ponastavi rezultat">↺</button>
+    </div>
+    <div class="hud-bottom-row">
+      <div class="hud-score-row">
+        <span class="hud-score">${score}<span class="hud-pts-label"> točk</span></span>
+        ${streak >= 2 ? `<span class="hud-streak">🔥 ${streak}× ${mult > 1 ? `<span class="hud-mult-badge">×${mult}</span>` : ''}</span>` : ''}
+      </div>
+      <div class="hud-bar-wrap"><div class="hud-bar-fill" style="width:${progress}%;background:linear-gradient(90deg,${rank.color},${rank.glow})"></div></div>
+      <div class="hud-bar-label">${progressLabel}</div>
+    </div>
+    <div class="hud-ranks-popup" id="ranksPopup">
+      <div class="ranks-popup-title">🏅 Lestvica rangov</div>
+      <div class="ranks-popup-items">${popupItems}</div>
+      <div class="mult-info">
+        <span>🔥 5× niz = <strong>×2</strong></span>
+        <span>🔥🔥 10× niz = <strong>×3</strong></span>
+      </div>
+    </div>
+  `;
+
+  // Medal click toggles popup
+  document.getElementById('hudMedalBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    document.getElementById('ranksPopup').classList.toggle('open');
+  });
+  document.addEventListener('click', function closePopup() {
+    const p = document.getElementById('ranksPopup');
+    if (p) p.classList.remove('open');
+  }, { once: false });
+  document.getElementById('ranksPopup').addEventListener('click', e => e.stopPropagation());
+
+  document.getElementById('resetScoreBtn').addEventListener('click', () => {
+    if (confirm('Res želiš ponastaviti rezultat na nič?')) {
+      localStorage.setItem(SCORE_KEY, '0');
+      if (window.quizApp) { window.quizApp.score = 0; window.quizApp.streak = 0; window.quizApp.render(); }
+      updateScoreHUD(0, 0);
+    }
   });
 }
 
-/* ══════════════════════════════════════════
-   TIMED MODE — 5-LEVEL MEDAL PROGRESSION
-   Multiple choice · score target in time
-══════════════════════════════════════════ */
-function startTimedLevel() {
-  if (tTimer) { clearInterval(tTimer); tTimer=null; }
-  removeTimedOverlay();
-  const lv=TIMED_LEVELS[tLevelIdx];
-  tScore=0; tStreak=0; tTimeLeft=lv.timeLimit;
-  tQueue=shuffle([...cards]); tIdx=0;
-  tTimerStarted=false; tAnswered=false;
-  renderTimedLevel();
+// ── Quiz App ──────────────────────────────────────────────────────────────────
+class QuizApp {
+  constructor(cards) {
+    this.cards    = cards;
+    this.index    = 0;
+    this.score    = parseInt(localStorage.getItem(SCORE_KEY) || '0');
+    this.streak   = 0;
+    this.answered = false;
+    this.handleKey = this.handleKey.bind(this);
+    document.addEventListener('keydown', this.handleKey);
+    this.render();
+  }
+
+  destroy() {
+    document.removeEventListener('keydown', this.handleKey);
+    if (this._autoTimer) clearTimeout(this._autoTimer);
+  }
+
+  handleKey(e) {
+    if (this.answered && (e.code === 'Space' || e.code === 'ArrowRight')) {
+      e.preventDefault(); this.nextQuestion();
+    }
+  }
+
+  getWrongAnswers(correct, isSloToEng) {
+    // Determine category of the correct answer to match distractors to same type
+    const cat = getCategory(correct);
+
+    // Build distractor pool from ALL units (not just current dataset)
+    // Pick the same language side as the correct answer
+    const pool = ALL_UNITS_POOL.length > 0 ? ALL_UNITS_POOL : MASTER_DATA;
+    const candidates = [...new Set(
+      pool
+        .map(item => isSloToEng
+          ? (item.answer   ?? item.english   ?? "")
+          : (item.question ?? item.slovenian ?? ""))
+        .filter(a => a && a !== correct && getCategory(a) === cat)
+    )];
+
+    return shuffle(candidates).slice(0, 3);
+  }
+
+  render() {
+    updateScoreHUD(this.score, this.streak);
+    const area = document.getElementById('quizArea');
+    if (!area) return;
+
+    if (!this.cards || this.cards.length === 0) {
+      area.innerHTML = `<div class="quiz-empty">Ni kartic za izbrane filtre 😕<br><small>Označite vsaj eno kategorijo.</small></div>`;
+      return;
+    }
+
+    const card    = this.cards[this.index];
+    const correct = card.back;
+    const wrongs  = this.getWrongAnswers(correct, card.isSloToEng);
+    const options = shuffle([correct, ...wrongs]);
+    const mult    = getMultiplier(this.streak);
+
+    area.innerHTML = `
+      <div class="quiz-meta">
+        <div class="quiz-counter">Vprašanje ${this.index + 1} / ${this.cards.length}</div>
+        <div class="quiz-direction-badge ${card.isSloToEng ? 'slo-to-eng' : 'eng-to-slo'}">${card.isSloToEng ? 'SLO → EN' : 'EN → SLO'}</div>
+      </div>
+      <div class="quiz-progress-wrap">
+        <div class="quiz-progress-fill" style="width:${((this.index+1)/this.cards.length*100)}%"></div>
+      </div>
+      <div class="quiz-question-card">
+        <div class="quiz-question-text">${escapeHtml(card.front)}</div>
+      </div>
+      ${mult > 1 ? `<div class="quiz-mult-notify">🔥 Množilnik <strong>×${mult}</strong> aktiven!</div>` : ''}
+      <div class="quiz-options" id="quizOptions">
+        ${options.map((opt, i) => `
+          <button class="quiz-option" data-answer="${escapeHtml(opt)}" data-correct="${escapeHtml(correct)}">
+            <span class="opt-letter">${['A','B','C','D'][i]}</span>
+            <span class="opt-text">${escapeHtml(opt)}</span>
+          </button>
+        `).join('')}
+      </div>
+      <div class="quiz-feedback" id="quizFeedback"></div>
+      <button class="quiz-next-btn" id="quizNextBtn" style="display:none">
+        ${this.index + 1 < this.cards.length ? 'Naslednje vprašanje ➡️' : '🏁 Končaj krog'}
+      </button>
+    `;
+
+    document.querySelectorAll('.quiz-option').forEach(btn => {
+      btn.addEventListener('click', () => this.checkAnswer(btn));
+    });
+    document.getElementById('quizNextBtn').addEventListener('click', () => this.nextQuestion());
+  }
+
+  checkAnswer(btn) {
+    if (this.answered) return;
+    this.answered = true;
+
+    const selected = btn.dataset.answer;
+    const correct  = btn.dataset.correct;
+    const isCorrect = selected === correct;
+    const mult = getMultiplier(this.streak);
+
+    document.querySelectorAll('.quiz-option').forEach(b => {
+      b.disabled = true;
+      if (b.dataset.answer === correct) b.classList.add('correct');
+      else if (b === btn && !isCorrect) b.classList.add('wrong');
+    });
+
+    const prevRank = getRank(this.score);
+    const feedback = document.getElementById('quizFeedback');
+
+    if (isCorrect) {
+      SoundFX.correct();
+      const pts = mult; // use the multiplier that was SHOWN to the user before answering
+      this.streak++;
+      this.score += pts;
+      localStorage.setItem(SCORE_KEY, this.score);
+      const newMult = getMultiplier(this.streak);
+      feedback.className = 'quiz-feedback feedback-correct';
+      feedback.innerHTML = `✅ Pravilno! <strong>+${pts} točk${pts > 1 ? ` (×${pts})` : ''}</strong>${newMult > mult ? `<br>🔥 Množilnik ×${newMult} aktiviran!` : this.streak >= 2 ? `<br>🔥 Niz: ${this.streak} zapored!` : ''}`;
+    } else {
+      SoundFX.wrong();
+      this.streak = 0;
+      this.score = Math.max(0, this.score - 1);
+      localStorage.setItem(SCORE_KEY, this.score);
+      feedback.className = 'quiz-feedback feedback-wrong';
+      feedback.innerHTML = `❌ Narobe! <strong>-1 točka</strong> · Pravilen odgovor: <strong>${escapeHtml(correct)}</strong>`;
+    }
+
+    updateScoreHUD(this.score, this.streak);
+
+    // Rank-up check
+    const newRank = getRank(this.score);
+    if (isCorrect && newRank.name !== prevRank.name) this.showRankUp(newRank);
+
+    const nextBtn = document.getElementById('quizNextBtn');
+    if (nextBtn) nextBtn.style.display = 'inline-flex';
+
+    // Correct = instant advance; wrong = brief pause to see correct answer
+    const delay = isCorrect ? 600 : 1800;
+    this._autoTimer = setTimeout(() => this.nextQuestion(), delay);
+  }
+
+  showRankUp(rank) {
+    SoundFX.rankUp();
+    const banner = document.createElement('div');
+    banner.className = 'rank-up-banner';
+    banner.innerHTML = `
+      <div class="rank-up-inner">
+        ${getMedalSVG(rank.name, 80)}
+        <div class="rank-up-text">
+          <div class="rank-up-title">🎖️ Napredovanje!</div>
+          <div class="rank-up-name" style="color:${rank.glow}">${rank.name}</div>
+          <div class="rank-up-sub">Čestitke!</div>
+        </div>
+      </div>`;
+    document.body.appendChild(banner);
+    setTimeout(() => { banner.classList.add('rank-up-hide'); setTimeout(() => banner.remove(), 600); }, 3500);
+  }
+
+  nextQuestion() {
+    if (this._autoTimer) clearTimeout(this._autoTimer);
+    this.answered = false;
+    this.index = (this.index + 1) % this.cards.length;
+    this.render();
+  }
 }
 
-function renderTimedLevel() {
-  const area=document.getElementById('timedArea');
-  if (!cards.length){
-    area.innerHTML='<div class="quiz-empty">Ni kartic. Nastavi filtre in klikni ↻ Začni.</div>';
-    return;
+// ── Flashcard App ─────────────────────────────────────────────────────────────
+class FlashcardApp {
+  constructor(cards) {
+    this.cards        = cards;
+    this.currentIndex = 0;
+    this.isFlipped    = false;
+    this.touchStartX  = 0;
+    this.touchEndX    = 0;
+    this.handleKey    = this.handleKey.bind(this);
+    this.initializeElements();
+    this.setupEventListeners();
+    this.setupAudio();
+    this.updateDisplay();
   }
-  const lv=TIMED_LEVELS[tLevelIdx];
-  const card=tQueue[tIdx%tQueue.length];
-  const correctAns=card.answer;
-  const opts=shuffle([correctAns,...getWrongAnswers(correctAns)]);
-  const mult=getMultiplier(tStreak);
-  const pct=Math.min(100,Math.round((tScore/lv.target)*100));
-  const m=Math.floor(tTimeLeft/60), s=tTimeLeft%60;
-  const urg=tTimeLeft<=10?'danger':tTimeLeft<=25?'warn':'';
 
-  area.innerHTML=`
-    <div class="timed-header">
-      <div class="timed-level-badge">
-        ${getMedalSVG(lv.medal,36)}
-        <div>
-          <div class="timed-level-name" style="color:${lv.glow}">${lv.medal}</div>
-          <div class="timed-hint">${lv.hint}</div>
+  initializeElements() {
+    this.cardElement    = document.getElementById('flashcard');
+    this.cardFront      = document.getElementById('cardFront');
+    this.cardBack       = document.getElementById('cardBack');
+    this.cardCounter    = document.getElementById('cardCounter');
+    this.progressBar    = document.getElementById('progressBar');
+    this.directionBadge = document.getElementById('directionBadge');
+    this.prevBtn        = document.getElementById('prevBtn');
+    this.nextBtn        = document.getElementById('nextBtn');
+    this.audioBtn       = document.getElementById('audioBtn');
+  }
+
+  setupAudio() {
+    if ('speechSynthesis' in window) {
+      this.audioBtn.style.display = 'inline-block';
+      this.audioBtn.onclick = () => this.playAudio();
+    } else {
+      this.audioBtn.style.display = 'none';
+    }
+  }
+
+  playAudio() {
+    if (!this.cards || this.cards.length === 0) return;
+    const text = this.cards[this.currentIndex].english;
+    if (text && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = 'en-US'; utt.rate = 0.9;
+      window.speechSynthesis.speak(utt);
+    }
+  }
+
+  setupEventListeners() {
+    this.cardElement.onclick      = () => this.flipCard();
+    this.prevBtn.onclick          = () => this.previousCard();
+    this.nextBtn.onclick          = () => this.nextCard();
+    document.addEventListener('keydown', this.handleKey);
+    this.cardElement.ontouchstart = e => { this.touchStartX = e.changedTouches[0].screenX; };
+    this.cardElement.ontouchend   = e => { this.touchEndX = e.changedTouches[0].screenX; this.handleSwipe(); };
+  }
+
+  destroy() { document.removeEventListener('keydown', this.handleKey); }
+
+  handleKey(e) {
+    if (!this.cards || this.cards.length === 0) return;
+    switch (e.code) {
+      case 'ArrowLeft':  e.preventDefault(); this.previousCard(); break;
+      case 'ArrowRight': e.preventDefault(); this.nextCard();     break;
+      case 'Space':      e.preventDefault(); this.flipCard();     break;
+    }
+  }
+
+  handleSwipe() {
+    if (!this.cards || this.cards.length === 0) return;
+    const diff = this.touchStartX - this.touchEndX;
+    if (Math.abs(diff) > 50) { diff > 0 ? this.nextCard() : this.previousCard(); }
+  }
+
+  flipCard() {
+    if (!this.cards || this.cards.length === 0) return;
+    this.isFlipped = !this.isFlipped;
+    this.cardElement.classList.toggle('flipped', this.isFlipped);
+    // Re-fit the now-visible face (hidden faces have no layout dimensions)
+    const visibleFace = this.isFlipped ? this.cardBack : this.cardFront;
+    setTimeout(() => autoFitCardText(visibleFace), 50);
+  }
+
+  previousCard() {
+    if (!this.cards || this.cards.length === 0) return;
+    this.currentIndex = (this.currentIndex - 1 + this.cards.length) % this.cards.length;
+    this.updateDisplay();
+  }
+
+  nextCard() {
+    if (!this.cards || this.cards.length === 0) return;
+    this.currentIndex = (this.currentIndex + 1) % this.cards.length;
+    this.updateDisplay();
+  }
+
+  updateDisplay() {
+    if (!this.cards || this.cards.length === 0) {
+      setFaceText(this.cardFront, "Ni kartic za izbrane filtre 😕");
+      setFaceText(this.cardBack,  "Označite vsaj eno kategorijo.");
+      this.cardCounter.textContent = 'Kartica 0 od 0';
+      if (this.progressBar) this.progressBar.style.width = '0%';
+      if (this.directionBadge) { this.directionBadge.textContent = 'PRAZNO'; this.directionBadge.className = 'direction-badge slo-to-eng'; }
+      this.prevBtn.disabled = this.nextBtn.disabled = this.audioBtn.disabled = true;
+      this.isFlipped = false;
+      this.cardElement.classList.remove('flipped');
+      return;
+    }
+    const card = this.cards[this.currentIndex];
+    setFaceText(this.cardFront, card.front);
+    setFaceText(this.cardBack,  card.back);
+    this.isFlipped = false;
+    this.cardElement.classList.remove('flipped');
+    this.cardCounter.textContent = `Kartica ${this.currentIndex + 1} od ${this.cards.length}`;
+    if (this.progressBar) this.progressBar.style.width = ((this.currentIndex+1)/this.cards.length*100)+'%';
+    if (this.directionBadge) {
+      this.directionBadge.textContent = card.isSloToEng ? 'SLO → EN' : 'EN → SLO';
+      this.directionBadge.className   = 'direction-badge ' + (card.isSloToEng ? 'slo-to-eng' : 'eng-to-slo');
+    }
+    this.prevBtn.disabled = this.nextBtn.disabled = this.audioBtn.disabled = false;
+  }
+}
+
+// ── Timed App ─────────────────────────────────────────────────────────────────
+class TimedApp {
+  constructor(cards) {
+    this.allCards   = shuffle([...cards]);
+    this.levelIndex = 0;
+    this.answered   = false;
+    this.timer      = null;
+    this._autoTimer = null;
+    this.overlay    = null;
+    this.handleKey  = this.handleKey.bind(this);
+    document.addEventListener('keydown', this.handleKey);
+    this.startLevel();
+  }
+
+  destroy() {
+    if (this.timer)      clearInterval(this.timer);
+    if (this._autoTimer) clearTimeout(this._autoTimer);
+    document.removeEventListener('keydown', this.handleKey);
+    this.removeOverlay();
+  }
+
+  handleKey(e) {
+    if (this.answered && (e.code === 'Space' || e.code === 'ArrowRight')) {
+      e.preventDefault(); this.nextQuestion();
+    }
+  }
+
+  get level() { return TIMED_LEVELS[this.levelIndex]; }
+
+  startLevel() {
+    if (this.timer) clearInterval(this.timer);
+    if (this._autoTimer) clearTimeout(this._autoTimer);
+    this.removeOverlay();
+    this.timeLeft     = this.level.timeLimit;
+    this.score        = 0;
+    this.streak       = 0;
+    this.index        = 0;
+    this.timerStarted = false;
+    this.cards        = shuffle([...this.allCards]);
+    this.answered     = false;
+    this.timer        = null;
+    this.render();
+  }
+
+  tick() {
+    this.timeLeft--;
+    this.updateTimerDisplay();
+    if (this.timeLeft <= 0) {
+      clearInterval(this.timer); this.timer = null;
+      if (this._autoTimer) { clearTimeout(this._autoTimer); this._autoTimer = null; }
+      if (this.score >= this.level.target) {
+        this.advanceLevel();
+      } else {
+        this.showGameOver();
+      }
+    }
+  }
+
+  updateTimerDisplay() {
+    const el = document.getElementById('timedClock');
+    const tm = document.getElementById('timedClockTime');
+    if (!el || !tm) return;
+    const m = Math.floor(this.timeLeft / 60);
+    const s = this.timeLeft % 60;
+    tm.textContent = `${m}:${String(s).padStart(2,'0')}`;
+    el.className = 'timed-clock';
+    if (this.timeLeft <= 10) el.classList.add('danger');
+    else if (this.timeLeft <= 25) el.classList.add('warn');
+    this.updateScoreDisplay();
+  }
+
+  updateScoreDisplay() {
+    const sd = document.getElementById('timedScoreDisplay');
+    const pf = document.getElementById('timedProgressFill');
+    const pl = document.getElementById('timedProgressLabel');
+    const st = document.getElementById('timedStreakDisplay');
+    if (sd) sd.innerHTML = `<strong>${this.score}</strong> <span>/ ${this.level.target} točk</span>`;
+    if (pf) {
+      const pct = Math.min(100, Math.round((this.score / this.level.target) * 100));
+      pf.style.width = pct + '%';
+      pf.style.background = pct >= 100
+        ? 'linear-gradient(90deg, #28a745, #ffe066)'
+        : `linear-gradient(90deg, ${this.level.color}, ${this.level.glow})`;
+    }
+    if (pl) {
+      const remaining = Math.max(0, this.level.target - this.score);
+      pl.textContent = remaining > 0 ? `Manjka še ${remaining} točk` : '🎯 Cilj dosežen!';
+    }
+    if (st) {
+      if (this.streak >= 2) {
+        const mult = getMultiplier(this.streak);
+        st.innerHTML = `🔥 ${this.streak}× ${mult > 1 ? `<strong>×${mult}</strong>` : ''}`;
+        st.style.display = 'inline-flex';
+      } else {
+        st.style.display = 'none';
+      }
+    }
+  }
+
+  getWrongAnswers(correct, isSloToEng) {
+    const cat = getCategory(correct);
+    const pool = ALL_UNITS_POOL.length > 0 ? ALL_UNITS_POOL : MASTER_DATA;
+    const candidates = [...new Set(
+      pool.map(item => isSloToEng
+        ? (item.answer   ?? item.english   ?? "")
+        : (item.question ?? item.slovenian ?? ""))
+        .filter(a => a && a !== correct && getCategory(a) === cat)
+    )];
+    return shuffle(candidates).slice(0, 3);
+  }
+
+  render() {
+    const area = document.getElementById('timedArea');
+    if (!area) return;
+    if (!this.cards || this.cards.length === 0) {
+      area.innerHTML = `<div class="quiz-empty">Ni kartic za izbrane filtre 😕</div>`;
+      return;
+    }
+
+    const card    = this.cards[this.index % this.cards.length];
+    const correct = card.back;
+    const wrongs  = this.getWrongAnswers(correct, card.isSloToEng);
+    const options = shuffle([correct, ...wrongs]);
+    const mult    = getMultiplier(this.streak);
+    const timeM   = Math.floor(this.timeLeft / 60);
+    const timeS   = this.timeLeft % 60;
+    const clockCls = this.timeLeft <= 10 ? 'timed-clock danger' : this.timeLeft <= 25 ? 'timed-clock warn' : 'timed-clock';
+    const clockContent = this.timerStarted
+      ? `<div class="timed-clock-label">Čas</div>
+         <div class="timed-clock-time" id="timedClockTime">${timeM}:${String(timeS).padStart(2,'0')}</div>`
+      : `<div class="timed-clock-label">Čas</div>
+         <div class="timed-clock-time timed-clock-ready" id="timedClockTime">${timeM}:${String(timeS).padStart(2,'0')}</div>
+         <div class="timed-clock-waiting">odgovori za start</div>`;
+    const pct     = Math.min(100, Math.round((this.score / this.level.target) * 100));
+    const streakHTML = this.streak >= 2
+      ? `<span class="timed-streak" id="timedStreakDisplay">🔥 ${this.streak}× ${mult > 1 ? `<strong>×${mult}</strong>` : ''}</span>`
+      : `<span class="timed-streak" id="timedStreakDisplay" style="display:none"></span>`;
+
+    area.innerHTML = `
+      <!-- HEADER -->
+      <div class="timed-header">
+        <div class="timed-level-badge">
+          ${getMedalSVG(this.level.medal, 36)}
+          <div>
+            <div class="timed-level-name" style="color:${this.level.glow}">
+              ${this.level.medal}
+            </div>
+            <div style="font-size:0.67rem;color:rgba(255,255,255,0.38);margin-top:2px">${this.level.hint}</div>
+          </div>
+        </div>
+        <div class="${clockCls}" id="timedClock">
+          ${clockContent}
         </div>
       </div>
-      <div class="timed-clock ${urg}" id="timedClock">
-        <div class="clock-label">Čas</div>
-        <div class="clock-time" id="clockTime">${m}:${String(s).padStart(2,'0')}</div>
-        ${!tTimerStarted?'<div class="clock-waiting">odgovori za start</div>':''}
-      </div>
-    </div>
-    <div class="timed-progress-row">
-      <span class="timed-score-txt" id="timedScoreTxt"><strong>${tScore}</strong> / ${lv.target} točk</span>
-      ${tStreak>=2?`<span class="streak-badge">🔥 ${tStreak}× ${mult>1?'×'+mult:''}</span>`:''}
-    </div>
-    <div class="timed-bar-wrap">
-      <div class="timed-bar-fill" id="timedBar" style="width:${pct}%;background:linear-gradient(90deg,${lv.color},${lv.glow})"></div>
-    </div>
-    <div class="timed-bar-label" id="timedBarLabel">${lv.target-tScore>0?'Manjka še '+(lv.target-tScore)+' točk':'🎯 Cilj dosežen!'}</div>
-    <div class="quiz-question" style="border-color:${lv.glow}">${card.question}</div>
-    ${mult>1?`<div class="streak-badge">🔥 Množilnik ×${mult} aktiven!</div>`:''}
-    <div class="quiz-options" id="timedOpts">
-      ${opts.map(o=>`<button class="quiz-opt-btn" data-val="${o}">${o}</button>`).join('')}
-    </div>
-    <div class="quiz-advance-bar-wrap" id="tAdvWrap" style="display:none">
-      <div class="quiz-advance-bar" id="tAdvBar"></div>
-    </div>`;
 
-  area.querySelectorAll('.quiz-opt-btn').forEach(btn=>{
-    btn.addEventListener('click', function(){ checkTimedAnswer(this, correctAns); });
+      <!-- SCORE ROW -->
+      <div class="timed-score-row">
+        <div class="timed-score-display" id="timedScoreDisplay">
+          <strong>${this.score}</strong> <span>/ ${this.level.target} točk</span>
+        </div>
+        ${streakHTML}
+      </div>
+
+      <!-- PROGRESS BAR -->
+      <div class="timed-progress-wrap">
+        <div class="timed-progress-fill" id="timedProgressFill"
+          style="width:${pct}%;background:linear-gradient(90deg,${this.level.color},${this.level.glow})"></div>
+      </div>
+      <div class="timed-progress-label" id="timedProgressLabel">
+        ${Math.max(0, this.level.target - this.score) > 0 ? `Manjka še ${this.level.target - this.score} točk` : '🎯 Cilj dosežen!'}
+      </div>
+
+      <!-- DIRECTION -->
+      <div class="quiz-meta">
+        <div class="quiz-counter">Vprašanje ${(this.index % this.cards.length) + 1} / ${this.cards.length}</div>
+        <div class="quiz-direction-badge ${card.isSloToEng ? 'slo-to-eng' : 'eng-to-slo'}">
+          ${card.isSloToEng ? 'SLO → EN' : 'EN → SLO'}
+        </div>
+      </div>
+
+      <!-- QUESTION -->
+      <div class="quiz-question-card">
+        <div class="quiz-question-text">${escapeHtml(card.front)}</div>
+      </div>
+
+      ${mult > 1 ? `<div class="timed-mult-notify">🔥 Množilnik <strong>×${mult}</strong> aktiven!</div>` : ''}
+
+      <!-- OPTIONS -->
+      <div class="quiz-options" id="timedOptions">
+        ${options.map((opt, i) => `
+          <button class="quiz-option" data-answer="${escapeHtml(opt)}" data-correct="${escapeHtml(correct)}">
+            <span class="opt-letter">${['A','B','C','D'][i]}</span>
+            <span class="opt-text">${escapeHtml(opt)}</span>
+          </button>
+        `).join('')}
+      </div>
+
+      <div class="quiz-feedback" id="timedFeedback"></div>
+      <div class="overlay-penalty-note">❗ Napačen odgovor: −1 točka in ponastavitev niza</div>
+    `;
+
+    document.querySelectorAll('#timedOptions .quiz-option').forEach(btn => {
+      btn.addEventListener('click', () => this.checkAnswer(btn));
+    });
+  }
+
+  checkAnswer(btn) {
+    if (this.answered) return;
+    this.answered = true;
+
+    const selected  = btn.dataset.answer;
+    const correct   = btn.dataset.correct;
+    const isCorrect = selected === correct;
+    const mult      = getMultiplier(this.streak);
+
+    // Start the countdown on the very first answer
+    if (!this.timerStarted) {
+      this.timerStarted = true;
+      this.timer = setInterval(() => this.tick(), 1000);
+    }
+
+    document.querySelectorAll('#timedOptions .quiz-option').forEach(b => {
+      b.disabled = true;
+      if (b.dataset.answer === correct) b.classList.add('correct');
+      else if (b === btn && !isCorrect) b.classList.add('wrong');
+    });
+
+    const feedback = document.getElementById('timedFeedback');
+
+    if (isCorrect) {
+      SoundFX.correct();
+      const pts = mult; // use the multiplier that was SHOWN to the user before answering
+      this.streak++;
+      this.score += pts;
+      const newMult = getMultiplier(this.streak);
+      if (feedback) {
+        feedback.className = 'quiz-feedback feedback-correct';
+        feedback.innerHTML = `✅ Pravilno! <strong>+${pts} točk${pts > 1 ? ` (×${pts})` : ''}</strong>${newMult > mult ? `<br>🔥 Množilnik ×${newMult} aktiviran!` : this.streak >= 2 ? `<br>🔥 Niz: ${this.streak} zapored!` : ''}`;
+      }
+    } else {
+      SoundFX.wrong();
+      this.streak = 0;
+      this.score  = Math.max(0, this.score - 1);
+      if (feedback) {
+        feedback.className = 'quiz-feedback feedback-wrong';
+        feedback.innerHTML = `❌ Narobe! <strong>-1 točka</strong> · Pravilen odgovor: <strong>${escapeHtml(correct)}</strong>`;
+      }
+    }
+    this.updateScoreDisplay();
+
+    // Check if target hit mid-question
+    if (this.score >= this.level.target && this.timer) {
+      // Let timer naturally expire OR advance immediately after brief pause
+      // We just keep going and let the timer check handle it
+    }
+
+    this._autoTimer = setTimeout(() => this.nextQuestion(), isCorrect ? 500 : 1600);
+  }
+
+  nextQuestion() {
+    if (this._autoTimer) { clearTimeout(this._autoTimer); this._autoTimer = null; }
+    // Stop if time ran out
+    if (!this.timer && this.timeLeft <= 0) return;
+    this.answered = false;
+    this.index++;
+    if (this.index >= this.cards.length) {
+      this.cards = shuffle([...this.allCards]);
+      this.index = 0;
+    }
+    this.render();
+  }
+
+  advanceLevel() {
+    if (this._autoTimer) { clearTimeout(this._autoTimer); this._autoTimer = null; }
+    this.answered = true;
+    if (this.levelIndex >= TIMED_LEVELS.length - 1) {
+      this.showVictory();
+      return;
+    }
+    this.showLevelComplete();
+  }
+
+  removeOverlay() {
+    if (this.overlay && this.overlay.parentNode) {
+      this.overlay.parentNode.removeChild(this.overlay);
+    }
+    this.overlay = null;
+  }
+
+  showGameOver() {
+    SoundFX.wrong();
+    SoundFX.wrong();
+    this.removeOverlay();
+    const div = document.createElement('div');
+    div.className = 'timed-overlay';
+    div.innerHTML = `
+      <div class="timed-overlay-box">
+        <div class="overlay-game-over-title">KONEC IGRE</div>
+        <div class="overlay-divider"></div>
+        ${getMedalSVG(this.level.medal, 64)}
+        <div style="color:rgba(255,255,255,0.55);font-size:0.9rem">
+          Raven: <strong style="color:#fff">${this.level.medal}</strong>
+        </div>
+        <div>
+          <div class="overlay-score-label">Zbrane točke</div>
+          <div class="overlay-score-big">${this.score}</div>
+          <div class="overlay-score-label">cilj: ${this.level.target}</div>
+        </div>
+        <div class="overlay-subtitle">
+          Manjkalo je ${this.level.target - this.score} točk. Poskusi znova! 💪
+        </div>
+        <button class="overlay-btn overlay-btn-retry" id="retryBtn">↺ Poskusi znova</button>
+        <button class="overlay-btn overlay-btn-restart" id="restartBtn">⏮ Začni od začetka</button>
+      </div>
+    `;
+    document.body.appendChild(div);
+    this.overlay = div;
+    div.querySelector('#retryBtn').addEventListener('click', () => this.startLevel());
+    div.querySelector('#restartBtn').addEventListener('click', () => {
+      this.levelIndex = 0;
+      this.startLevel();
+    });
+  }
+
+  showLevelComplete() {
+    SoundFX.rankUp();
+    this.removeOverlay();
+    const nextLevel = TIMED_LEVELS[this.levelIndex + 1];
+    const div = document.createElement('div');
+    div.className = 'timed-overlay';
+    div.innerHTML = `
+      <div class="timed-overlay-box">
+        <div class="overlay-level-complete-title">⭐ Raven opravljena!</div>
+        <div class="overlay-divider"></div>
+        ${getMedalSVG(this.level.medal, 72)}
+        <div class="overlay-score-big" style="color:${this.level.glow}">${this.score}</div>
+        <div class="overlay-score-label">točk / cilj ${this.level.target}</div>
+        <div style="color:rgba(255,255,255,0.6);font-size:0.9rem;text-align:center">
+          Naslednja raven:<br>
+          <strong style="color:${nextLevel.glow};font-size:1rem">${nextLevel.medal}</strong><br>
+          <span style="font-size:0.8rem;color:rgba(255,255,255,0.4)">${nextLevel.hint}</span>
+        </div>
+        <button class="overlay-btn overlay-btn-next" id="nextLevelBtn">Naprej ➡️</button>
+      </div>
+    `;
+    document.body.appendChild(div);
+    this.overlay = div;
+    div.querySelector('#nextLevelBtn').addEventListener('click', () => {
+      this.levelIndex++;
+      this.startLevel();
+    });
+  }
+
+  showVictory() {
+    SoundFX.rankUp();
+    setTimeout(() => SoundFX.rankUp(), 600);
+    this.removeOverlay();
+    const div = document.createElement('div');
+    div.className = 'timed-overlay';
+    div.innerHTML = `
+      <div class="timed-overlay-box">
+        <div class="overlay-victory-title" style="color:${this.level.glow}">🏆 PRVAK! 🏆</div>
+        <div class="overlay-divider"></div>
+        ${getMedalSVG(this.level.medal, 80)}
+        <div class="overlay-score-big" style="color:${this.level.glow}">${this.score}</div>
+        <div class="overlay-score-label">točk na zlati ravni</div>
+        <div class="overlay-subtitle">
+          Čestitke! Premagal si vse ravni tekme s časom. 🎖️
+        </div>
+        <button class="overlay-btn overlay-btn-restart" id="playAgainBtn">🔄 Igraj znova</button>
+      </div>
+    `;
+    document.body.appendChild(div);
+    this.overlay = div;
+    div.querySelector('#playAgainBtn').addEventListener('click', () => {
+      this.levelIndex = 0;
+      this.startLevel();
+    });
+  }
+}
+
+
+function switchMode(mode) {
+  currentMode = mode;
+  const fcPanel  = document.getElementById('flashcardPanel');
+  const qzPanel  = document.getElementById('quizPanel');
+  const tmPanel  = document.getElementById('timedPanel');
+  const scoreHUD = document.getElementById('scoreHUD');
+  const sel      = document.getElementById('modeSelect');
+  if (sel && sel.value !== mode) sel.value = mode;
+
+  if (window.app)      { window.app.destroy();      window.app      = null; }
+  if (window.quizApp)  { window.quizApp.destroy();   window.quizApp  = null; }
+  if (window.timedApp) { window.timedApp.destroy();  window.timedApp = null; }
+
+  fcPanel.style.display  = 'none';
+  qzPanel.style.display  = 'none';
+  if (tmPanel) tmPanel.style.display = 'none';
+  scoreHUD.style.display = 'none';
+
+  if (mode === 'flashcard') {
+    fcPanel.style.display = 'flex';
+    clearDomListeners();
+    const cards = applyFilters();
+    window.app = new FlashcardApp(cards);
+  } else if (mode === 'quiz') {
+    qzPanel.style.display  = 'flex';
+    scoreHUD.style.display = 'flex';
+    reinitQuizApp();
+  } else if (mode === 'timed') {
+    if (tmPanel) tmPanel.style.display = 'flex';
+    reinitTimedApp();
+  }
+}
+
+function reinitFlashcardApp() {
+  if (window.app) { window.app.destroy(); window.app = null; }
+  clearDomListeners();
+  const cards = applyFilters();
+  window.app = new FlashcardApp(cards);
+}
+
+function reinitQuizApp() {
+  if (window.quizApp) { window.quizApp.destroy(); window.quizApp = null; }
+  if (MASTER_DATA.length === 0) {
+    const area = document.getElementById('quizArea');
+    if (area) area.innerHTML = `<div class="quiz-empty">Najprej naloži nabor kartic 👆</div>`;
+    return;
+  }
+  const cards = applyFilters();
+  window.quizApp = new QuizApp(cards);
+}
+
+function reinitTimedApp() {
+  if (window.timedApp) { window.timedApp.destroy(); window.timedApp = null; }
+  if (MASTER_DATA.length === 0) {
+    const area = document.getElementById('timedArea');
+    if (area) area.innerHTML = `<div class="quiz-empty">Najprej naloži nabor kartic 👆</div>`;
+    return;
+  }
+  const cards = applyFilters();
+  window.timedApp = new TimedApp(cards);
+}
+
+
+// ── Load full distractor pool from ALL unit files for current subject ─────────
+async function loadAllUnitsPool() {
+  // Build the pool from all datasets belonging to the current subject
+  const subjectDatasets = DATASETS.filter(d => d.subject === currentSubject);
+  const urlSet = new Set();
+  subjectDatasets.forEach(ds => {
+    if (ds.combined) ds.combined.forEach(u => urlSet.add(u));
+    else if (ds.url) urlSet.add(ds.url);
+  });
+  const t = Date.now();
+  let combined = [];
+  for (const url of urlSet) {
+    try {
+      const resp = await fetch(url + '?t=' + t);
+      if (resp.ok) combined = combined.concat(await resp.json());
+    } catch(e) {}
+  }
+  ALL_UNITS_POOL = combined;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildSubjectSelect();
+buildDatasetSelect();
+const reloadBtn = document.getElementById("reloadBtn");
+
+// Subject change
+document.getElementById("subject").addEventListener("change", function() {
+  currentSubject = this.value;
+  localStorage.setItem(SUBJECT_KEY, currentSubject);
+  buildDatasetSelect();
+  // Reset cards
+  MASTER_DATA = [];
+  ALL_UNITS_POOL = [];
+  if (window.app)     { window.app.destroy();    window.app     = null; }
+  if (window.quizApp) { window.quizApp.destroy(); window.quizApp = null; }
+  clearDomListeners();
+  const ds = currentDataset();
+  if (!ds) {
+    setFaceText(document.getElementById('cardFront'), "Ta predmet še nima naborov 📚");
+    setFaceText(document.getElementById('cardBack'),  "Kmalu prihaja!");
+    ['prevBtn','nextBtn','audioBtn'].forEach(id => { const b = document.getElementById(id); if(b) b.disabled = true; });
+    return;
+  }
+  loadAllUnitsPool().then(() => reloadBtn.click());
+});
+
+function clearDomListeners() {
+  ['prevBtn','nextBtn','audioBtn','flashcard'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const clone = el.cloneNode(true);
+    el.parentNode.replaceChild(clone, el);
   });
 }
 
-function checkTimedAnswer(btn, correctAns) {
-  if (tAnswered) return;
-  tAnswered=true;
-  if (!tTimerStarted){ tTimerStarted=true; tTimer=setInterval(timedTick,1000); }
-
-  const area=document.getElementById('timedArea');
-  area.querySelectorAll('.quiz-opt-btn').forEach(b=>b.disabled=true);
-  const isCorrect=btn.dataset.val===correctAns;
-  const lv=TIMED_LEVELS[tLevelIdx];
-
-  if (isCorrect){
-    SFX.correct(); btn.classList.add('correct');
-    tStreak++; tScore+=getMultiplier(tStreak);
-  } else {
-    SFX.wrong(); btn.classList.add('wrong');
-    area.querySelectorAll('.quiz-opt-btn').forEach(b=>{ if(b.dataset.val===correctAns) b.classList.add('correct'); });
-    tStreak=0; tScore=Math.max(0,tScore-1);
-  }
-
-  // Update progress in-place
-  const pct=Math.min(100,Math.round((tScore/lv.target)*100));
-  const st=document.getElementById('timedScoreTxt');
-  if(st) st.innerHTML=`<strong>${tScore}</strong> / ${lv.target} točk`;
-  const bar=document.getElementById('timedBar');
-  if(bar){ bar.style.width=pct+'%'; }
-  const lbl=document.getElementById('timedBarLabel');
-  if(lbl) lbl.textContent=lv.target-tScore>0?'Manjka še '+(lv.target-tScore)+' točk':'🎯 Cilj dosežen!';
-
-  // Advance bar animation
-  const wrap=document.getElementById('tAdvWrap'), advBar=document.getElementById('tAdvBar');
-  if(wrap&&advBar){
-    wrap.style.display='block';
-    advBar.style.transition=`width ${isCorrect?'0.4s':'0.7s'} linear`;
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{ advBar.style.width='0%'; }));
-  }
-
-  // Win condition
-  if (tScore>=lv.target){
-    clearInterval(tTimer); tTimer=null;
-    setTimeout(()=>{ tAnswered=false; advanceTimedLevel(); }, isCorrect?400:700);
-    return;
-  }
-  setTimeout(()=>{
-    tAnswered=false; tIdx++;
-    if(tIdx>=tQueue.length){ tIdx=0; tQueue=shuffle(tQueue); }
-    renderTimedLevel();
-  }, isCorrect?400:700);
+function reinitApp() {
+  if (currentMode === 'flashcard') reinitFlashcardApp();
+  else if (currentMode === 'quiz') reinitQuizApp();
+  else if (currentMode === 'timed') reinitTimedApp();
 }
 
-function timedTick() {
-  tTimeLeft--;
-  const el=document.getElementById('clockTime');
-  if(el){ const m=Math.floor(tTimeLeft/60),s=tTimeLeft%60; el.textContent=`${m}:${String(s).padStart(2,'0')}`; }
-  const cl=document.getElementById('timedClock');
-  if(cl) cl.className='timed-clock '+(tTimeLeft<=10?'danger':tTimeLeft<=25?'warn':'');
-  if(tTimeLeft<=0){ clearInterval(tTimer); tTimer=null; setTimeout(showTimedGameOver,200); }
-}
-
-function advanceTimedLevel() {
-  const lv=TIMED_LEVELS[tLevelIdx];
-  if (tLevelIdx>=TIMED_LEVELS.length-1){ showTimedVictory(); return; }
-  SFX.levelUp();
-  const nextLv=TIMED_LEVELS[tLevelIdx+1];
-  showTimedOverlay(`
-    <div class="overlay-title" style="color:${lv.glow}">⭐ Raven opravljena!</div>
-    <div class="overlay-divider"></div>
-    ${getMedalSVG(lv.medal,80)}
-    <div class="overlay-score-big" style="color:${lv.glow}">${tScore}</div>
-    <div class="overlay-score-label">točk · cilj ${lv.target}</div>
-    <div class="overlay-subtitle">
-      Naslednja raven:<br>
-      <strong style="color:${nextLv.glow};font-size:1.1rem">${nextLv.medal}</strong><br>
-      <span style="font-size:0.8rem;color:rgba(255,255,255,0.4)">${nextLv.hint}</span>
-    </div>
-    <button class="overlay-btn overlay-btn-next" id="nextLevelBtn">Naprej ➡️</button>
-  `, ()=>{ tLevelIdx++; startTimedLevel(); });
-}
-
-function showTimedGameOver() {
-  SFX.wrong(); setTimeout(SFX.wrong,200);
-  const lv=TIMED_LEVELS[tLevelIdx];
-  showTimedOverlay(`
-    <div class="overlay-gameover">KONEC IGRE</div>
-    <div class="overlay-divider"></div>
-    ${getMedalSVG(lv.medal,64)}
-    <div style="color:rgba(255,255,255,0.55);font-size:0.9rem">Raven: <strong style="color:#fff">${lv.medal}</strong></div>
-    <div>
-      <div class="overlay-score-label">Zbrane točke</div>
-      <div class="overlay-score-big">${tScore}</div>
-      <div class="overlay-score-label">cilj: ${lv.target}</div>
-    </div>
-    <div class="overlay-subtitle">Manjkalo je <strong>${lv.target-tScore}</strong> točk. Poskusi znova! 💪</div>
-    <button class="overlay-btn overlay-btn-retry"   id="retryBtn">↺ Poskusi znova</button>
-    <button class="overlay-btn overlay-btn-restart" id="restartBtn">⏮ Začni od začetka</button>
-  `, null, { retry:()=>startTimedLevel(), restart:()=>{ tLevelIdx=0; startTimedLevel(); } });
-}
-
-function showTimedVictory() {
-  SFX.victory();
-  const lv=TIMED_LEVELS[tLevelIdx];
-  showTimedOverlay(`
-    <div class="overlay-title" style="color:${lv.glow}">🏆 PRVAK! 🏆</div>
-    <div class="overlay-divider"></div>
-    ${getMedalSVG(lv.medal,90)}
-    <div class="overlay-score-big" style="color:${lv.glow}">${tScore}</div>
-    <div class="overlay-score-label">točk na zlati ravni</div>
-    <div class="overlay-subtitle">Čestitke! Premagal si vse ravni! 🎖️</div>
-    <button class="overlay-btn overlay-btn-restart" id="playAgainBtn">🔄 Igraj znova</button>
-  `, ()=>{ tLevelIdx=0; startTimedLevel(); });
-}
-
-function showTimedOverlay(html, onNext, extras) {
-  removeTimedOverlay();
-  const div=document.createElement('div');
-  div.className='timed-overlay';
-  div.innerHTML=`<div class="timed-overlay-box">${html}</div>`;
-  document.body.appendChild(div);
-  tOverlay=div;
-  const nb=div.querySelector('#nextLevelBtn');
-  if(nb&&onNext) nb.addEventListener('click',()=>{ removeTimedOverlay(); onNext(); });
-  const pb=div.querySelector('#playAgainBtn');
-  if(pb&&onNext) pb.addEventListener('click',()=>{ removeTimedOverlay(); onNext(); });
-  if(extras){
-    const rb=div.querySelector('#retryBtn'), sb=div.querySelector('#restartBtn');
-    if(rb) rb.addEventListener('click',()=>{ removeTimedOverlay(); extras.retry(); });
-    if(sb) sb.addEventListener('click',()=>{ removeTimedOverlay(); extras.restart(); });
-  }
-}
-function removeTimedOverlay() {
-  if(tOverlay&&tOverlay.parentNode) tOverlay.parentNode.removeChild(tOverlay);
-  tOverlay=null;
-}
-
-/* ══════════════════════════
-   INIT
-══════════════════════════ */
-updateSummary();
-loadData(()=>{
-  cards=shuffle(getFilteredCards());
-  startFlashcard();
+['chkWords','chkPhrases','chkSentences'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    if (MASTER_DATA.length > 0) reinitApp();
+  });
 });
-collapseToolbar();
+
+reloadBtn.addEventListener("click", async () => {
+  const ds = currentDataset();
+  if (!ds) return;
+  localStorage.setItem(SELECT_KEY, ds.id);
+  if (window.app)      { window.app.destroy();      window.app      = null; }
+  if (window.quizApp)  { window.quizApp.destroy();   window.quizApp  = null; }
+  if (window.timedApp) { window.timedApp.destroy();  window.timedApp = null; }
+  clearDomListeners();
+  setLoadingUI(true);
+  try {
+    MASTER_DATA = await fetchRawData(ds);
+    if (!MASTER_DATA.length) throw new Error("No cards loaded");
+    if (currentMode === 'flashcard') {
+      const cards = applyFilters();
+      window.app = new FlashcardApp(cards);
+    } else if (currentMode === 'quiz') {
+      reinitQuizApp();
+    } else if (currentMode === 'timed') {
+      reinitTimedApp();
+    }
+    // Collapse toolbar once the game is running
+    if (typeof collapseToolbar === 'function') collapseToolbar();
+  } catch (err) {
+    console.error(err);
+    setFaceText(document.getElementById('cardFront'), "Napaka pri nalaganju kartic 😢");
+    setFaceText(document.getElementById('cardBack'),  "(preveri JSON datoteke)");
+  } finally {
+    setLoadingUI(false);
+  }
+});
+
+updateScoreHUD(parseInt(localStorage.getItem(SCORE_KEY) || '0'), 0);
+loadAllUnitsPool().then(() => reloadBtn.click());
