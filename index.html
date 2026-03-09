@@ -13,7 +13,7 @@
   <div class="toolbar" id="toolbar">
     <div class="toolbar-top">
       <div class="brand">
-        <img class="brand-icon" id="brandImg" src="Brihta_ikona.png" alt="">
+        <img class="brand-icon" id="brandImg" src="Brihta.png" alt="">
         <span>Brihta</span>
       </div>
       <div class="toolbar-summary">
@@ -76,6 +76,30 @@
 
   <!-- SCORE HUD (quiz mode) -->
   <div id="scoreHUD" class="score-hud" style="display:none">
+    <div class="score-item score-correct">
+      <span class="score-val" id="scoreCorrect">0</span>
+      <span class="score-lbl">✅ Pravilno</span>
+    </div>
+    <div class="score-sep"></div>
+    <div class="score-item score-wrong">
+      <span class="score-val" id="scoreWrong">0</span>
+      <span class="score-lbl">❌ Napačno</span>
+    </div>
+    <div class="score-sep"></div>
+    <div class="score-item score-pct">
+      <span class="score-val" id="scorePct">—</span>
+      <span class="score-lbl">🎯 Točnost</span>
+    </div>
+    <div class="score-sep"></div>
+    <div class="score-item">
+      <div id="hudMedalSVG"></div>
+      <span class="hud-medal-name" id="hudMedalName">—</span>
+      <span class="score-lbl">Rang</span>
+    </div>
+    <div class="score-sep"></div>
+    <div class="score-item">
+      <span class="streak-hud" id="hudStreak" style="display:none"></span>
+    </div>
   </div>
 
   <!-- FLASHCARD PANEL -->
@@ -86,11 +110,11 @@
     </div>
     <div id="cardContainer" class="card-container">
       <div class="card" id="flashcard">
-        <div class="card-face card-front" id="cardFront">
+        <div class="card-face card-front">
           <span class="card-text" id="cardFrontText">Pritisni ↻ Začni</span>
           <span class="flip-hint">klikni za obrat</span>
         </div>
-        <div class="card-face card-back" id="cardBack">
+        <div class="card-face card-back">
           <span class="card-text" id="cardBackText">🙂</span>
           <span class="flip-hint">klikni za obrat</span>
         </div>
