@@ -1,25 +1,8 @@
-// 📗 Seznam predmetov
-const SUBJECTS = [
-  { id: "anglescina", name: "🇬🇧 Angleščina" },
-  { id: "matematika", name: "🔢 Matematika" },
-];
-
-// 📗 Seznam naborov
-const DATASETS = [
-  { id: "all",      subject: "anglescina", name: "Vse besede",  url: "english_words.json" },
-  { id: "combined", subject: "anglescina", name: "Vse enote",   url: null, combined: ["unit1.json","unit2.json","unit3.json","unit4.json"] },
-  { id: "unit1",    subject: "anglescina", name: "Unit 1",      url: "unit1.json" },
-  { id: "unit2",    subject: "anglescina", name: "Unit 2",      url: "unit2.json" },
-  { id: "unit3",    subject: "anglescina", name: "Unit 3",      url: "unit3.json" },
-  { id: "unit4",    subject: "anglescina", name: "Unit 4",      url: "unit4.json" },
-  { id: "postevanka", subject: "matematika", name: "Poštevalnica", url: "postevanka.json" },
-];
-const SELECT_KEY  = "anki_dataset_id";
-const SUBJECT_KEY = "anki_subject_id";
-const SCORE_KEY   = "anki_quiz_score";
-let currentSubject = localStorage.getItem(SUBJECT_KEY) || "anglescina";
+// ── State ─────────────────────────────────────────────────────────────────────
+const SCORE_KEY = "anki_quiz_score";
+let currentOp   = 'both';   // 'both' | 'multiply' | 'divide'
 let MASTER_DATA  = [];
-let ALL_UNITS_POOL = [];   // pool of ALL items from every unit, for quiz distractors
+let ALL_UNITS_POOL = [];
 let currentMode  = "flashcard";
 
 // ── Ranks ─────────────────────────────────────────────────────────────────────
@@ -135,43 +118,6 @@ function getMedalSVG(rankName, size) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function buildSubjectSelect() {
-  const sel = document.getElementById("subject");
-  if (!sel) return;
-  sel.innerHTML = "";
-  SUBJECTS.forEach(s => {
-    const opt = document.createElement("option");
-    opt.value = s.id; opt.textContent = s.name;
-    sel.appendChild(opt);
-  });
-  sel.value = currentSubject;
-}
-
-function buildDatasetSelect() {
-  const sel = document.getElementById("dataset");
-  sel.innerHTML = "";
-  const filtered = DATASETS.filter(d => d.subject === currentSubject);
-  if (filtered.length === 0) {
-    const opt = document.createElement("option");
-    opt.value = "__none__"; opt.textContent = "— ni naborov —";
-    sel.appendChild(opt);
-    return;
-  }
-  filtered.forEach(ds => {
-    const opt = document.createElement("option");
-    opt.value = ds.id; opt.textContent = ds.name;
-    sel.appendChild(opt);
-  });
-  const saved = localStorage.getItem(SELECT_KEY);
-  if (saved && filtered.find(d => d.id === saved)) sel.value = saved;
-}
-
-function currentDataset() {
-  const id = document.getElementById("dataset").value;
-  const filtered = DATASETS.filter(d => d.subject === currentSubject);
-  return filtered.find(d => d.id === id) || filtered[0] || null;
-}
-
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -189,17 +135,14 @@ function autoFitCardText(faceEl) {
 
   const padTop  = parseInt(getComputedStyle(faceEl).paddingTop)   || 26;
   const padBot  = parseInt(getComputedStyle(faceEl).paddingBottom) || 26;
-  const available = faceEl.clientHeight - padTop - padBot - 30; // 30px for flip-hint
+  const available = faceEl.clientHeight - padTop - padBot - 30;
 
-  // Scale up or down to fill available space
   let size = 2.5;
   span.style.fontSize = size + 'rem';
-  // Shrink if overflowing
   while (span.scrollHeight > available && size > 0.78) {
     size -= 0.04;
     span.style.fontSize = size + 'rem';
   }
-  // Grow if there's room (short text like "15" should be big and bold)
   while (span.scrollHeight < available * 0.65 && size < 2.8) {
     size += 0.04;
     span.style.fontSize = size + 'rem';
@@ -215,64 +158,64 @@ function setFaceText(faceEl, text) {
   autoFitCardText(faceEl);
 }
 
-async function fetchRawData(dataset) {
-  let allData = [];
-  const t = Date.now();
-  if (dataset.combined) {
-    for (const url of dataset.combined) {
-      const resp = await fetch(url + '?t=' + t);
-      if (!resp.ok) throw new Error("Napaka pri prenosu " + url);
-      allData = allData.concat(await resp.json());
-    }
-  } else {
-    const resp = await fetch(dataset.url + '?t=' + t);
-    if (!resp.ok) throw new Error("Napaka pri prenosu");
-    allData = await resp.json();
+// ── Math helpers ──────────────────────────────────────────────────────────────
+// Returns which multiplication-table numbers (1–10) this question relates to
+function getQuestionTables(item) {
+  const q   = item.question || "";
+  const ans = parseInt(item.answer);
+  if (q.includes('×')) {
+    return q.replace('=', '').split('×')
+      .map(s => parseInt(s.trim()))
+      .filter(n => n >= 1 && n <= 10);
+  } else if (q.includes(':')) {
+    const parts = q.replace('=', '').split(':')
+      .map(s => parseInt(s.trim()))
+      .filter(n => n >= 1 && n <= 10);
+    if (!isNaN(ans) && ans >= 1 && ans <= 10) parts.push(ans);
+    return [...new Set(parts)];
   }
-  return allData;
+  return [];
 }
 
-function getCategory(text) {
-  if (!text) return "word";
-  const trimmed = text.trim();
-  if (/[.!?]$/.test(trimmed)) return "sentence";
-  const firstPart = trimmed.split('/')[0].trim();
-  const wordCount = firstPart.split(/\s+/).length;
-  if (wordCount === 1) return "word";
-  if (wordCount >= 5) return "sentence";
-  return "phrase";
-}
-
+// ── Filters ───────────────────────────────────────────────────────────────────
 function applyFilters() {
-  const showWords     = document.getElementById('chkWords').checked;
-  const showPhrases   = document.getElementById('chkPhrases').checked;
-  const showSentences = document.getElementById('chkSentences').checked;
-  let filtered = MASTER_DATA.filter(item => {
-    const eng = item.answer ?? item.english ?? "";
-    const cat = getCategory(eng);
-    if (cat === "word"     && showWords)     return true;
-    if (cat === "phrase"   && showPhrases)   return true;
-    if (cat === "sentence" && showSentences) return true;
-    return false;
+  // Collect selected tables
+  const selectedTables = [];
+  for (let i = 1; i <= 10; i++) {
+    const chk = document.getElementById('chk' + i);
+    if (chk && chk.checked) selectedTables.push(i);
+  }
+
+  const allSelected = selectedTables.length === 10;
+
+  const filtered = MASTER_DATA.filter(item => {
+    const q = item.question || "";
+    const isMultiply = q.includes('×');
+    const isDivide   = q.includes(':');
+
+    // Operation filter
+    if (currentOp === 'multiply' && !isMultiply) return false;
+    if (currentOp === 'divide'   && !isDivide)   return false;
+
+    // Table filter
+    if (selectedTables.length === 0) return false;
+    if (allSelected) return true;
+    const tables = getQuestionTables(item);
+    return tables.some(t => selectedTables.includes(t));
   });
-  let finalCards = filtered.map((item, index) => {
-    const valSlo = item.question ?? item.slovenian ?? "";
-    const valEng = item.answer   ?? item.english   ?? "";
-    const isSloToEng = Math.random() < 0.5;
-    return { 
-      id: index, 
-      front: isSloToEng ? valSlo : valEng, 
-      back: isSloToEng ? valEng : valSlo, 
-      english: valEng, 
-      isSloToEng,
-      image: item.image // <-- We added this!
-    };
-  });
-  return shuffle(finalCards);
+
+  return shuffle(filtered.map((item, index) => ({
+    id:         index,
+    front:      item.question,
+    back:       item.answer,
+    english:    item.answer,   // kept for compatibility
+    isSloToEng: null           // not applicable for math
+  })));
 }
 
+// ── Loading UI ────────────────────────────────────────────────────────────────
 function setLoadingUI(loading) {
-  const buttons = ["prevBtn","nextBtn","audioBtn"].map(id => document.getElementById(id)).filter(Boolean);
+  const buttons = ["prevBtn", "nextBtn"].map(id => document.getElementById(id)).filter(Boolean);
   buttons.forEach(b => b.disabled = loading);
   if (loading) {
     setFaceText(document.getElementById("cardFront"), "Nalagam kartice…");
@@ -282,10 +225,10 @@ function setLoadingUI(loading) {
 
 function escapeHtml(str) {
   return String(str)
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// ── Sound Engine (Web Audio API – no external files) ─────────────────────────
+// ── Sound Engine (Web Audio API) ──────────────────────────────────────────────
 const SoundFX = (() => {
   let ctx = null;
   function getCtx() {
@@ -295,8 +238,8 @@ const SoundFX = (() => {
 
   function playTone(opts) {
     try {
-      const ac  = getCtx();
-      const osc = ac.createOscillator();
+      const ac   = getCtx();
+      const osc  = ac.createOscillator();
       const gain = ac.createGain();
       osc.connect(gain);
       gain.connect(ac.destination);
@@ -312,20 +255,16 @@ const SoundFX = (() => {
   }
 
   function correct() {
-    // Soft, modern, quick ascending bubble/ding
     playTone({ freq: 800, freqEnd: 1000, type: 'sine', dur: 0.1, vol: 0.3 });
     setTimeout(() => playTone({ freq: 1200, freqEnd: 1600, type: 'sine', dur: 0.2, vol: 0.2 }), 80);
   }
 
   function wrong() {
-    // Low descending buzz: two-tone drop
     playTone({ freq: 320, freqEnd: 180, type: 'sawtooth', dur: 0.18, vol: 0.22 });
     setTimeout(() => playTone({ freq: 200, freqEnd: 140, type: 'square', dur: 0.22, vol: 0.15 }), 180);
   }
 
   function rankUp() {
-    // Fanfare: quick ascending arpeggio
-    const ac = getCtx();
     const notes = [523, 659, 784, 1047, 1319];
     notes.forEach((freq, i) => {
       setTimeout(() => playTone({ freq, freqEnd: freq * 1.02, type: 'sine', dur: 0.28, vol: 0.3 }), i * 90);
@@ -349,11 +288,10 @@ function updateScoreHUD(score, streak) {
     progressLabel = `${nextRank.minScore - score} točk do ${nextRank.name}`;
   }
 
-  // Build ranks popup items with progress info
   const popupItems = RANKS.map((r, i) => {
-    const isCurrent = r.name === rank.name;
+    const isCurrent  = r.name === rank.name;
     const isAchieved = score >= r.minScore;
-    const nextR = RANKS[i + 1];
+    const nextR      = RANKS[i + 1];
     let progressInfo = '';
     if (isCurrent && nextR) {
       progressInfo = `<small class="rank-popup-progress">${nextR.minScore - score} do naslednje</small>`;
@@ -394,12 +332,11 @@ function updateScoreHUD(score, streak) {
     </div>
   `;
 
-  // Medal click toggles popup
   document.getElementById('hudMedalBtn').addEventListener('click', function(e) {
     e.stopPropagation();
     document.getElementById('ranksPopup').classList.toggle('open');
   });
-  document.addEventListener('click', function closePopup() {
+  document.addEventListener('click', function() {
     const p = document.getElementById('ranksPopup');
     if (p) p.classList.remove('open');
   }, { once: false });
@@ -438,21 +375,12 @@ class QuizApp {
     }
   }
 
-  getWrongAnswers(correct, isSloToEng) {
-    // Determine category of the correct answer to match distractors to same type
-    const cat = getCategory(correct);
-
-    // Build distractor pool from ALL units (not just current dataset)
-    // Pick the same language side as the correct answer
+  // For math: always pick wrong ANSWERS (numbers) from the pool
+  getWrongAnswers(correct) {
     const pool = ALL_UNITS_POOL.length > 0 ? ALL_UNITS_POOL : MASTER_DATA;
     const candidates = [...new Set(
-      pool
-        .map(item => isSloToEng
-          ? (item.answer   ?? item.english   ?? "")
-          : (item.question ?? item.slovenian ?? ""))
-        .filter(a => a && a !== correct && getCategory(a) === cat)
+      pool.map(item => item.answer ?? "").filter(a => a && a !== correct)
     )];
-
     return shuffle(candidates).slice(0, 3);
   }
 
@@ -462,23 +390,22 @@ class QuizApp {
     if (!area) return;
 
     if (!this.cards || this.cards.length === 0) {
-      area.innerHTML = `<div class="quiz-empty">Ni kartic za izbrane filtre 😕<br><small>Označite vsaj eno kategorijo.</small></div>`;
+      area.innerHTML = `<div class="quiz-empty">Ni kartic za izbrane filtre 😕<br><small>Označi vsaj eno poštevanko.</small></div>`;
       return;
     }
 
     const card    = this.cards[this.index];
     const correct = card.back;
-    const wrongs  = this.getWrongAnswers(correct, card.isSloToEng);
+    const wrongs  = this.getWrongAnswers(correct);
     const options = shuffle([correct, ...wrongs]);
     const mult    = getMultiplier(this.streak);
 
     area.innerHTML = `
       <div class="quiz-meta">
         <div class="quiz-counter">Vprašanje ${this.index + 1} / ${this.cards.length}</div>
-        <div class="quiz-direction-badge ${card.isSloToEng ? 'slo-to-eng' : 'eng-to-slo'}">${card.isSloToEng ? 'SLO → EN' : 'EN → SLO'}</div>
       </div>
       <div class="quiz-progress-wrap">
-        <div class="quiz-progress-fill" style="width:${((this.index+1)/this.cards.length*100)}%"></div>
+        <div class="quiz-progress-fill" style="width:${((this.index + 1) / this.cards.length * 100)}%"></div>
       </div>
       <div class="quiz-question-card">
         <div class="quiz-question-text">${escapeHtml(card.front)}</div>
@@ -508,10 +435,10 @@ class QuizApp {
     if (this.answered) return;
     this.answered = true;
 
-    const selected = btn.dataset.answer;
-    const correct  = btn.dataset.correct;
+    const selected  = btn.dataset.answer;
+    const correct   = btn.dataset.correct;
     const isCorrect = selected === correct;
-    const mult = getMultiplier(this.streak);
+    const mult      = getMultiplier(this.streak);
 
     document.querySelectorAll('.quiz-option').forEach(b => {
       b.disabled = true;
@@ -524,7 +451,7 @@ class QuizApp {
 
     if (isCorrect) {
       SoundFX.correct();
-      const pts = mult; // use the multiplier that was SHOWN to the user before answering
+      const pts = mult;
       this.streak++;
       this.score += pts;
       localStorage.setItem(SCORE_KEY, this.score);
@@ -534,7 +461,7 @@ class QuizApp {
     } else {
       SoundFX.wrong();
       this.streak = 0;
-      this.score = Math.max(0, this.score - 1);
+      this.score  = Math.max(0, this.score - 1);
       localStorage.setItem(SCORE_KEY, this.score);
       feedback.className = 'quiz-feedback feedback-wrong';
       feedback.innerHTML = `❌ Narobe! <strong>-1 točka</strong> · Pravilen odgovor: <strong>${escapeHtml(correct)}</strong>`;
@@ -542,14 +469,12 @@ class QuizApp {
 
     updateScoreHUD(this.score, this.streak);
 
-    // Rank-up check
     const newRank = getRank(this.score);
     if (isCorrect && newRank.name !== prevRank.name) this.showRankUp(newRank);
 
     const nextBtn = document.getElementById('quizNextBtn');
     if (nextBtn) nextBtn.style.display = 'inline-flex';
 
-    // Correct = instant advance; wrong = brief pause to see correct answer
     const delay = isCorrect ? 600 : 1800;
     this._autoTimer = setTimeout(() => this.nextQuestion(), delay);
   }
@@ -574,7 +499,7 @@ class QuizApp {
   nextQuestion() {
     if (this._autoTimer) clearTimeout(this._autoTimer);
     this.answered = false;
-    this.index = (this.index + 1) % this.cards.length;
+    this.index    = (this.index + 1) % this.cards.length;
     this.render();
   }
 }
@@ -590,7 +515,6 @@ class FlashcardApp {
     this.handleKey    = this.handleKey.bind(this);
     this.initializeElements();
     this.setupEventListeners();
-    this.setupAudio();
     this.updateDisplay();
   }
 
@@ -600,30 +524,8 @@ class FlashcardApp {
     this.cardBack       = document.getElementById('cardBack');
     this.cardCounter    = document.getElementById('cardCounter');
     this.progressBar    = document.getElementById('progressBar');
-    this.directionBadge = document.getElementById('directionBadge');
     this.prevBtn        = document.getElementById('prevBtn');
     this.nextBtn        = document.getElementById('nextBtn');
-    this.audioBtn       = document.getElementById('audioBtn');
-  }
-
-  setupAudio() {
-    if ('speechSynthesis' in window) {
-      this.audioBtn.style.display = 'inline-block';
-      this.audioBtn.onclick = () => this.playAudio();
-    } else {
-      this.audioBtn.style.display = 'none';
-    }
-  }
-
-  playAudio() {
-    if (!this.cards || this.cards.length === 0) return;
-    const text = this.cards[this.currentIndex].english;
-    if (text && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = 'en-US'; utt.rate = 0.9;
-      window.speechSynthesis.speak(utt);
-    }
   }
 
   setupEventListeners() {
@@ -656,7 +558,6 @@ class FlashcardApp {
     if (!this.cards || this.cards.length === 0) return;
     this.isFlipped = !this.isFlipped;
     this.cardElement.classList.toggle('flipped', this.isFlipped);
-    // Re-fit the now-visible face (hidden faces have no layout dimensions)
     const visibleFace = this.isFlipped ? this.cardBack : this.cardFront;
     setTimeout(() => autoFitCardText(visibleFace), 50);
   }
@@ -676,11 +577,10 @@ class FlashcardApp {
   updateDisplay() {
     if (!this.cards || this.cards.length === 0) {
       setFaceText(this.cardFront, "Ni kartic za izbrane filtre 😕");
-      setFaceText(this.cardBack,  "Označite vsaj eno kategorijo.");
+      setFaceText(this.cardBack,  "Označi vsaj eno poštevanko.");
       this.cardCounter.textContent = 'Kartica 0 od 0';
       if (this.progressBar) this.progressBar.style.width = '0%';
-      if (this.directionBadge) { this.directionBadge.textContent = 'PRAZNO'; this.directionBadge.className = 'direction-badge slo-to-eng'; }
-      this.prevBtn.disabled = this.nextBtn.disabled = this.audioBtn.disabled = true;
+      this.prevBtn.disabled = this.nextBtn.disabled = true;
       this.isFlipped = false;
       this.cardElement.classList.remove('flipped');
       return;
@@ -691,12 +591,8 @@ class FlashcardApp {
     this.isFlipped = false;
     this.cardElement.classList.remove('flipped');
     this.cardCounter.textContent = `Kartica ${this.currentIndex + 1} od ${this.cards.length}`;
-    if (this.progressBar) this.progressBar.style.width = ((this.currentIndex+1)/this.cards.length*100)+'%';
-    if (this.directionBadge) {
-      this.directionBadge.textContent = card.isSloToEng ? 'SLO → EN' : 'EN → SLO';
-      this.directionBadge.className   = 'direction-badge ' + (card.isSloToEng ? 'slo-to-eng' : 'eng-to-slo');
-    }
-    this.prevBtn.disabled = this.nextBtn.disabled = this.audioBtn.disabled = false;
+    if (this.progressBar) this.progressBar.style.width = ((this.currentIndex + 1) / this.cards.length * 100) + '%';
+    this.prevBtn.disabled = this.nextBtn.disabled = false;
   }
 }
 
@@ -730,7 +626,7 @@ class TimedApp {
   get level() { return TIMED_LEVELS[this.levelIndex]; }
 
   startLevel() {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer)      clearInterval(this.timer);
     if (this._autoTimer) clearTimeout(this._autoTimer);
     this.removeOverlay();
     this.timeLeft     = this.level.timeLimit;
@@ -764,9 +660,9 @@ class TimedApp {
     if (!el || !tm) return;
     const m = Math.floor(this.timeLeft / 60);
     const s = this.timeLeft % 60;
-    tm.textContent = `${m}:${String(s).padStart(2,'0')}`;
+    tm.textContent = `${m}:${String(s).padStart(2, '0')}`;
     el.className = 'timed-clock';
-    if (this.timeLeft <= 10) el.classList.add('danger');
+    if (this.timeLeft <= 10)      el.classList.add('danger');
     else if (this.timeLeft <= 25) el.classList.add('warn');
     this.updateScoreDisplay();
   }
@@ -779,7 +675,7 @@ class TimedApp {
     if (sd) sd.innerHTML = `<strong>${this.score}</strong> <span>/ ${this.level.target} točk</span>`;
     if (pf) {
       const pct = Math.min(100, Math.round((this.score / this.level.target) * 100));
-      pf.style.width = pct + '%';
+      pf.style.width      = pct + '%';
       pf.style.background = pct >= 100
         ? 'linear-gradient(90deg, #28a745, #ffe066)'
         : `linear-gradient(90deg, ${this.level.color}, ${this.level.glow})`;
@@ -790,7 +686,7 @@ class TimedApp {
     }
     if (st) {
       if (this.streak >= 2) {
-        const mult = getMultiplier(this.streak);
+        const mult  = getMultiplier(this.streak);
         st.innerHTML = `🔥 ${this.streak}× ${mult > 1 ? `<strong>×${mult}</strong>` : ''}`;
         st.style.display = 'inline-flex';
       } else {
@@ -799,14 +695,11 @@ class TimedApp {
     }
   }
 
-  getWrongAnswers(correct, isSloToEng) {
-    const cat = getCategory(correct);
+  // For math: always pick wrong ANSWERS (numbers) from pool
+  getWrongAnswers(correct) {
     const pool = ALL_UNITS_POOL.length > 0 ? ALL_UNITS_POOL : MASTER_DATA;
     const candidates = [...new Set(
-      pool.map(item => isSloToEng
-        ? (item.answer   ?? item.english   ?? "")
-        : (item.question ?? item.slovenian ?? ""))
-        .filter(a => a && a !== correct && getCategory(a) === cat)
+      pool.map(item => item.answer ?? "").filter(a => a && a !== correct)
     )];
     return shuffle(candidates).slice(0, 3);
   }
@@ -821,7 +714,7 @@ class TimedApp {
 
     const card    = this.cards[this.index % this.cards.length];
     const correct = card.back;
-    const wrongs  = this.getWrongAnswers(correct, card.isSloToEng);
+    const wrongs  = this.getWrongAnswers(correct);
     const options = shuffle([correct, ...wrongs]);
     const mult    = getMultiplier(this.streak);
     const timeM   = Math.floor(this.timeLeft / 60);
@@ -829,41 +722,32 @@ class TimedApp {
     const clockCls = this.timeLeft <= 10 ? 'timed-clock danger' : this.timeLeft <= 25 ? 'timed-clock warn' : 'timed-clock';
     const clockContent = this.timerStarted
       ? `<div class="timed-clock-label">Čas</div>
-         <div class="timed-clock-time" id="timedClockTime">${timeM}:${String(timeS).padStart(2,'0')}</div>`
+         <div class="timed-clock-time" id="timedClockTime">${timeM}:${String(timeS).padStart(2, '0')}</div>`
       : `<div class="timed-clock-label">Čas</div>
-         <div class="timed-clock-time timed-clock-ready" id="timedClockTime">${timeM}:${String(timeS).padStart(2,'0')}</div>
+         <div class="timed-clock-time timed-clock-ready" id="timedClockTime">${timeM}:${String(timeS).padStart(2, '0')}</div>
          <div class="timed-clock-waiting">odgovori za start</div>`;
-    const pct     = Math.min(100, Math.round((this.score / this.level.target) * 100));
+    const pct       = Math.min(100, Math.round((this.score / this.level.target) * 100));
     const streakHTML = this.streak >= 2
       ? `<span class="timed-streak" id="timedStreakDisplay">🔥 ${this.streak}× ${mult > 1 ? `<strong>×${mult}</strong>` : ''}</span>`
       : `<span class="timed-streak" id="timedStreakDisplay" style="display:none"></span>`;
 
     area.innerHTML = `
-      <!-- HEADER -->
       <div class="timed-header">
         <div class="timed-level-badge">
           ${getMedalSVG(this.level.medal, 36)}
           <div>
-            <div class="timed-level-name" style="color:${this.level.glow}">
-              ${this.level.medal}
-            </div>
+            <div class="timed-level-name" style="color:${this.level.glow}">${this.level.medal}</div>
             <div style="font-size:0.67rem;color:rgba(255,255,255,0.38);margin-top:2px">${this.level.hint}</div>
           </div>
         </div>
-        <div class="${clockCls}" id="timedClock">
-          ${clockContent}
-        </div>
+        <div class="${clockCls}" id="timedClock">${clockContent}</div>
       </div>
-
-      <!-- SCORE ROW -->
       <div class="timed-score-row">
         <div class="timed-score-display" id="timedScoreDisplay">
           <strong>${this.score}</strong> <span>/ ${this.level.target} točk</span>
         </div>
         ${streakHTML}
       </div>
-
-      <!-- PROGRESS BAR -->
       <div class="timed-progress-wrap">
         <div class="timed-progress-fill" id="timedProgressFill"
           style="width:${pct}%;background:linear-gradient(90deg,${this.level.color},${this.level.glow})"></div>
@@ -871,23 +755,13 @@ class TimedApp {
       <div class="timed-progress-label" id="timedProgressLabel">
         ${Math.max(0, this.level.target - this.score) > 0 ? `Manjka še ${this.level.target - this.score} točk` : '🎯 Cilj dosežen!'}
       </div>
-
-      <!-- DIRECTION -->
       <div class="quiz-meta">
         <div class="quiz-counter">Vprašanje ${(this.index % this.cards.length) + 1} / ${this.cards.length}</div>
-        <div class="quiz-direction-badge ${card.isSloToEng ? 'slo-to-eng' : 'eng-to-slo'}">
-          ${card.isSloToEng ? 'SLO → EN' : 'EN → SLO'}
-        </div>
       </div>
-
-      <!-- QUESTION -->
       <div class="quiz-question-card">
         <div class="quiz-question-text">${escapeHtml(card.front)}</div>
       </div>
-
       ${mult > 1 ? `<div class="timed-mult-notify">🔥 Množilnik <strong>×${mult}</strong> aktiven!</div>` : ''}
-
-      <!-- OPTIONS -->
       <div class="quiz-options" id="timedOptions">
         ${options.map((opt, i) => `
           <button class="quiz-option" data-answer="${escapeHtml(opt)}" data-correct="${escapeHtml(correct)}">
@@ -896,7 +770,6 @@ class TimedApp {
           </button>
         `).join('')}
       </div>
-
       <div class="quiz-feedback" id="timedFeedback"></div>
       <div class="overlay-penalty-note">❗ Napačen odgovor: −1 točka in ponastavitev niza</div>
     `;
@@ -915,7 +788,6 @@ class TimedApp {
     const isCorrect = selected === correct;
     const mult      = getMultiplier(this.streak);
 
-    // Start the countdown on the very first answer
     if (!this.timerStarted) {
       this.timerStarted = true;
       this.timer = setInterval(() => this.tick(), 1000);
@@ -931,9 +803,9 @@ class TimedApp {
 
     if (isCorrect) {
       SoundFX.correct();
-      const pts = mult; // use the multiplier that was SHOWN to the user before answering
+      const pts    = mult;
       this.streak++;
-      this.score += pts;
+      this.score  += pts;
       const newMult = getMultiplier(this.streak);
       if (feedback) {
         feedback.className = 'quiz-feedback feedback-correct';
@@ -949,19 +821,11 @@ class TimedApp {
       }
     }
     this.updateScoreDisplay();
-
-    // Check if target hit mid-question
-    if (this.score >= this.level.target && this.timer) {
-      // Let timer naturally expire OR advance immediately after brief pause
-      // We just keep going and let the timer check handle it
-    }
-
     this._autoTimer = setTimeout(() => this.nextQuestion(), isCorrect ? 500 : 1600);
   }
 
   nextQuestion() {
     if (this._autoTimer) { clearTimeout(this._autoTimer); this._autoTimer = null; }
-    // Stop if time ran out
     if (!this.timer && this.timeLeft <= 0) return;
     this.answered = false;
     this.index++;
@@ -990,8 +854,7 @@ class TimedApp {
   }
 
   showGameOver() {
-    SoundFX.wrong();
-    SoundFX.wrong();
+    SoundFX.wrong(); SoundFX.wrong();
     this.removeOverlay();
     const div = document.createElement('div');
     div.className = 'timed-overlay';
@@ -1008,20 +871,15 @@ class TimedApp {
           <div class="overlay-score-big">${this.score}</div>
           <div class="overlay-score-label">cilj: ${this.level.target}</div>
         </div>
-        <div class="overlay-subtitle">
-          Manjkalo je ${this.level.target - this.score} točk. Poskusi znova! 💪
-        </div>
+        <div class="overlay-subtitle">Manjkalo je ${this.level.target - this.score} točk. Poskusi znova! 💪</div>
         <button class="overlay-btn overlay-btn-retry" id="retryBtn">↺ Poskusi znova</button>
         <button class="overlay-btn overlay-btn-restart" id="restartBtn">⏮ Začni od začetka</button>
       </div>
     `;
     document.body.appendChild(div);
     this.overlay = div;
-    div.querySelector('#retryBtn').addEventListener('click', () => this.startLevel());
-    div.querySelector('#restartBtn').addEventListener('click', () => {
-      this.levelIndex = 0;
-      this.startLevel();
-    });
+    div.querySelector('#retryBtn').addEventListener('click',   () => this.startLevel());
+    div.querySelector('#restartBtn').addEventListener('click', () => { this.levelIndex = 0; this.startLevel(); });
   }
 
   showLevelComplete() {
@@ -1047,10 +905,7 @@ class TimedApp {
     `;
     document.body.appendChild(div);
     this.overlay = div;
-    div.querySelector('#nextLevelBtn').addEventListener('click', () => {
-      this.levelIndex++;
-      this.startLevel();
-    });
+    div.querySelector('#nextLevelBtn').addEventListener('click', () => { this.levelIndex++; this.startLevel(); });
   }
 
   showVictory() {
@@ -1066,22 +921,17 @@ class TimedApp {
         ${getMedalSVG(this.level.medal, 80)}
         <div class="overlay-score-big" style="color:${this.level.glow}">${this.score}</div>
         <div class="overlay-score-label">točk na zlati ravni</div>
-        <div class="overlay-subtitle">
-          Čestitke! Premagal si vse ravni tekme s časom. 🎖️
-        </div>
+        <div class="overlay-subtitle">Čestitke! Premagal si vse ravni tekme s časom. 🎖️</div>
         <button class="overlay-btn overlay-btn-restart" id="playAgainBtn">🔄 Igraj znova</button>
       </div>
     `;
     document.body.appendChild(div);
     this.overlay = div;
-    div.querySelector('#playAgainBtn').addEventListener('click', () => {
-      this.levelIndex = 0;
-      this.startLevel();
-    });
+    div.querySelector('#playAgainBtn').addEventListener('click', () => { this.levelIndex = 0; this.startLevel(); });
   }
 }
 
-
+// ── Mode switching ────────────────────────────────────────────────────────────
 function switchMode(mode) {
   currentMode = mode;
   const fcPanel  = document.getElementById('flashcardPanel');
@@ -1126,7 +976,7 @@ function reinitQuizApp() {
   if (window.quizApp) { window.quizApp.destroy(); window.quizApp = null; }
   if (MASTER_DATA.length === 0) {
     const area = document.getElementById('quizArea');
-    if (area) area.innerHTML = `<div class="quiz-empty">Najprej naloži nabor kartic 👆</div>`;
+    if (area) area.innerHTML = `<div class="quiz-empty">Najprej pritisni ↻ Začni 👆</div>`;
     return;
   }
   const cards = applyFilters();
@@ -1137,62 +987,21 @@ function reinitTimedApp() {
   if (window.timedApp) { window.timedApp.destroy(); window.timedApp = null; }
   if (MASTER_DATA.length === 0) {
     const area = document.getElementById('timedArea');
-    if (area) area.innerHTML = `<div class="quiz-empty">Najprej naloži nabor kartic 👆</div>`;
+    if (area) area.innerHTML = `<div class="quiz-empty">Najprej pritisni ↻ Začni 👆</div>`;
     return;
   }
   const cards = applyFilters();
   window.timedApp = new TimedApp(cards);
 }
 
-
-// ── Load full distractor pool from ALL unit files for current subject ─────────
-async function loadAllUnitsPool() {
-  // Build the pool from all datasets belonging to the current subject
-  const subjectDatasets = DATASETS.filter(d => d.subject === currentSubject);
-  const urlSet = new Set();
-  subjectDatasets.forEach(ds => {
-    if (ds.combined) ds.combined.forEach(u => urlSet.add(u));
-    else if (ds.url) urlSet.add(ds.url);
-  });
-  const t = Date.now();
-  let combined = [];
-  for (const url of urlSet) {
-    try {
-      const resp = await fetch(url + '?t=' + t);
-      if (resp.ok) combined = combined.concat(await resp.json());
-    } catch(e) {}
-  }
-  ALL_UNITS_POOL = combined;
+function reinitApp() {
+  if (currentMode === 'flashcard')  reinitFlashcardApp();
+  else if (currentMode === 'quiz')  reinitQuizApp();
+  else if (currentMode === 'timed') reinitTimedApp();
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-buildSubjectSelect();
-buildDatasetSelect();
-const reloadBtn = document.getElementById("reloadBtn");
-
-// Subject change
-document.getElementById("subject").addEventListener("change", function() {
-  currentSubject = this.value;
-  localStorage.setItem(SUBJECT_KEY, currentSubject);
-  buildDatasetSelect();
-  // Reset cards
-  MASTER_DATA = [];
-  ALL_UNITS_POOL = [];
-  if (window.app)     { window.app.destroy();    window.app     = null; }
-  if (window.quizApp) { window.quizApp.destroy(); window.quizApp = null; }
-  clearDomListeners();
-  const ds = currentDataset();
-  if (!ds) {
-    setFaceText(document.getElementById('cardFront'), "Ta predmet še nima naborov 📚");
-    setFaceText(document.getElementById('cardBack'),  "Kmalu prihaja!");
-    ['prevBtn','nextBtn','audioBtn'].forEach(id => { const b = document.getElementById(id); if(b) b.disabled = true; });
-    return;
-  }
-  loadAllUnitsPool().then(() => reloadBtn.click());
-});
-
 function clearDomListeners() {
-  ['prevBtn','nextBtn','audioBtn','flashcard'].forEach(id => {
+  ['prevBtn', 'nextBtn', 'flashcard'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const clone = el.cloneNode(true);
@@ -1200,30 +1009,109 @@ function clearDomListeners() {
   });
 }
 
-function reinitApp() {
-  if (currentMode === 'flashcard') reinitFlashcardApp();
-  else if (currentMode === 'quiz') reinitQuizApp();
-  else if (currentMode === 'timed') reinitTimedApp();
+// ── Toolbar helpers ───────────────────────────────────────────────────────────
+function collapseToolbar() {
+  document.getElementById('toolbar').classList.add('collapsed');
+  updateSummary();
 }
 
-['chkWords','chkPhrases','chkSentences'].forEach(id => {
-  document.getElementById(id).addEventListener('change', () => {
+function updateSummary() {
+  const modeEl = document.getElementById('modeSelect');
+  if (modeEl) {
+    document.getElementById('summaryMode').textContent =
+      modeEl.options[modeEl.selectedIndex].text;
+  }
+  const activeOp = document.querySelector('.op-btn.active');
+  if (activeOp) document.getElementById('summaryOp').textContent = activeOp.textContent.trim();
+
+  const tables = [];
+  for (let i = 1; i <= 10; i++) {
+    const c = document.getElementById('chk' + i);
+    if (c && c.checked) tables.push(i);
+  }
+  document.getElementById('summaryFilter').textContent =
+    tables.length === 10 ? 'Vse' : (tables.length === 0 ? 'Nič' : tables.join(', '));
+}
+
+// Update filter-button label based on checked tables
+function updateFilterBtnLabel() {
+  const tables = [];
+  for (let i = 1; i <= 10; i++) {
+    const c = document.getElementById('chk' + i);
+    if (c && c.checked) tables.push(i);
+  }
+  const btn = document.getElementById('filterToggle');
+  if (btn) btn.textContent = tables.length === 10 ? '⚙ Vse ▾' : `⚙ ${tables.join(',')} ▾`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+// Toolbar toggle
+document.getElementById('toolbarToggle').addEventListener('click', () => {
+  document.getElementById('toolbar').classList.toggle('collapsed');
+  updateSummary();
+});
+
+// Mode select
+document.getElementById('modeSelect').addEventListener('change', function() {
+  if (MASTER_DATA.length > 0) switchMode(this.value);
+  updateSummary();
+});
+
+// Op buttons
+document.querySelectorAll('.op-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.op-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    currentOp = this.dataset.op;
     if (MASTER_DATA.length > 0) reinitApp();
+    updateSummary();
   });
 });
 
-reloadBtn.addEventListener("click", async () => {
-  const ds = currentDataset();
-  if (!ds) return;
-  localStorage.setItem(SELECT_KEY, ds.id);
+// Table checkboxes (1–10)
+for (let i = 1; i <= 10; i++) {
+  const chk = document.getElementById('chk' + i);
+  if (chk) chk.addEventListener('change', () => {
+    if (MASTER_DATA.length > 0) reinitApp();
+    updateFilterBtnLabel();
+    updateSummary();
+  });
+}
+
+// Filter dropdown toggle
+document.getElementById('filterToggle').addEventListener('click', function(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('filterPanel');
+  if (panel.classList.contains('open')) {
+    panel.classList.remove('open');
+  } else {
+    const rect = this.getBoundingClientRect();
+    panel.style.top  = (rect.bottom + 4) + 'px';
+    panel.style.left = rect.left + 'px';
+    panel.classList.add('open');
+  }
+});
+document.addEventListener('click', () => {
+  document.getElementById('filterPanel')?.classList.remove('open');
+});
+document.getElementById('filterPanel').addEventListener('click', e => e.stopPropagation());
+
+// Reload / Start button
+const reloadBtn = document.getElementById('reloadBtn');
+reloadBtn.addEventListener('click', async () => {
   if (window.app)      { window.app.destroy();      window.app      = null; }
   if (window.quizApp)  { window.quizApp.destroy();   window.quizApp  = null; }
   if (window.timedApp) { window.timedApp.destroy();  window.timedApp = null; }
   clearDomListeners();
   setLoadingUI(true);
   try {
-    MASTER_DATA = await fetchRawData(ds);
-    if (!MASTER_DATA.length) throw new Error("No cards loaded");
+    const resp = await fetch('postevanka.json?t=' + Date.now());
+    if (!resp.ok) throw new Error("Ne najdem postevanka.json");
+    MASTER_DATA    = await resp.json();
+    ALL_UNITS_POOL = MASTER_DATA;
+    if (!MASTER_DATA.length) throw new Error("Datoteka je prazna");
+
     if (currentMode === 'flashcard') {
       const cards = applyFilters();
       window.app = new FlashcardApp(cards);
@@ -1232,16 +1120,14 @@ reloadBtn.addEventListener("click", async () => {
     } else if (currentMode === 'timed') {
       reinitTimedApp();
     }
-    // Collapse toolbar once the game is running
-    if (typeof collapseToolbar === 'function') collapseToolbar();
+    collapseToolbar();
   } catch (err) {
     console.error(err);
-    setFaceText(document.getElementById('cardFront'), "Napaka pri nalaganju kartic 😢");
-    setFaceText(document.getElementById('cardBack'),  "(preveri JSON datoteke)");
+    setFaceText(document.getElementById('cardFront'), "Napaka pri nalaganju 😢");
+    setFaceText(document.getElementById('cardBack'),  "(preveri postevanka.json)");
   } finally {
     setLoadingUI(false);
   }
 });
 
 updateScoreHUD(parseInt(localStorage.getItem(SCORE_KEY) || '0'), 0);
-loadAllUnitsPool().then(() => reloadBtn.click());
