@@ -4,7 +4,6 @@
 
 /* ══════════════════════════
    SOUND ENGINE (Web Audio)
-   Duolingo-style
 ══════════════════════════ */
 const SFX = (() => {
   let ctx = null;
@@ -26,15 +25,16 @@ const SFX = (() => {
   }
   return {
     correct() {
-      // Bright ascending triple ping
       tone(523, 'sine', 0.09, 0.32);
       setTimeout(() => tone(784,  'sine', 0.10, 0.26), 80);
       setTimeout(() => tone(1047, 'sine', 0.18, 0.20), 170);
     },
     wrong() {
-      // Short low descending buzz
       tone(280, 'sawtooth', 0.14, 0.22, 160);
       setTimeout(() => tone(200, 'square', 0.18, 0.16, 140), 150);
+    },
+    click() {
+      tone(660, 'sine', 0.04, 0.12);
     },
     levelUp() {
       [523, 659, 784, 1047, 1319].forEach((f, i) =>
@@ -52,7 +52,6 @@ const SFX = (() => {
 
 /* ══════════════════════════
    RANKS & SVG MEDALS
-   (your exact definitions)
 ══════════════════════════ */
 const RANKS = [
   { name: "Lesena medalja",   minScore: 0,   color: "#a07850", glow: "#d4a96a" },
@@ -83,11 +82,6 @@ function getRank(score) {
 function getNextRank(score) {
   for (const r of RANKS) { if (score < r.minScore) return r; }
   return null;
-}
-// For quiz end-screen: map correct-answer count → score equivalent
-function getRankByPct(pct, total) {
-  const score = Math.round((pct / 100) * (total || 10));
-  return getRank(score);
 }
 function getMultiplier(streak) {
   if (streak >= 10) return 3;
@@ -173,18 +167,46 @@ function getMedalSVG(rankName, size) {
    STATE
 ══════════════════════════ */
 let allCards = [];
-let mode     = 'flashcard';
+let mode     = 'quiz';
 let opType   = 'both';
 let tables   = new Set([1,2,3,4,5,6,7,8,9,10]);
-let cards    = [], cardIdx = 0;
+let cards    = [];
 
-// Quiz state
 let qQueue = [], qIdx = 0, qOk = 0, qNo = 0, qStreak = 0, qTimer = null;
 
-// Timed state
+let kQueue = [], kIdx = 0, kOk = 0, kNo = 0, kStreak = 0;
+let kInput = '', kAnswered = false, kTimer = null;
+
 let tLevelIdx = 0, tScore = 0, tStreak = 0, tTimeLeft = 0;
 let tQueue = [], tIdx = 0, tTimer = null, tTimerStarted = false;
 let tOverlay = null, tAnswered = false;
+
+let restartDebounce = null;
+
+/* ══════════════════════════
+   SETTINGS PERSISTENCE
+══════════════════════════ */
+const STORAGE_KEY = 'brihta_settings_v1';
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s && ['quiz','keypad','timed'].includes(s.mode)) mode = s.mode;
+    if (s && ['both','multiply','divide'].includes(s.op)) opType = s.op;
+    if (s && Array.isArray(s.tables)) {
+      const arr = s.tables.filter(n => Number.isInteger(n) && n>=1 && n<=10);
+      if (arr.length) tables = new Set(arr);
+    }
+  } catch(e) {}
+}
+function saveSettings() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      mode, op: opType, tables: [...tables]
+    }));
+  } catch(e) {}
+}
 
 /* ══════════════════════════
    UTILS
@@ -207,15 +229,26 @@ function parseQuestion(q) {
   }
   return null;
 }
+
+/* FIXED FILTER:
+   - For a × b: both a AND b must be in selected tables
+   - For c : b = a: divisor b AND quotient a must be in selected tables
+     (the dividend c is the product, can be anything) */
 function getFilteredCards() {
   return allCards.filter(card => {
     const p = parseQuestion(card.question);
     if (!p) return false;
     if (opType==='multiply' && p.op!=='multiply') return false;
     if (opType==='divide'   && p.op!=='divide')   return false;
-    return tables.has(p.op==='multiply' ? p.a : p.b);
+    if (p.op === 'multiply') {
+      return tables.has(p.a) && tables.has(p.b);
+    } else {
+      const quotient = parseInt(card.answer);
+      return tables.has(p.b) && tables.has(quotient);
+    }
   });
 }
+
 function getWrongAnswers(correct) {
   const n = parseInt(correct);
   const cands = new Set();
@@ -244,174 +277,230 @@ document.getElementById('brandImg').onerror = function() {
 };
 
 /* ══════════════════════════
-   TOOLBAR
+   TOOLBAR — chip toggles only (no auto-collapse)
 ══════════════════════════ */
-const toolbar   = document.getElementById('toolbar');
-const toggleBtn = document.getElementById('toolbarToggle');
-function collapseToolbar() { toolbar.classList.add('collapsed');    toggleBtn.textContent='⚙️'; }
-function expandToolbar()   { toolbar.classList.remove('collapsed'); toggleBtn.textContent='✕'; }
-toggleBtn.addEventListener('click', e => {
-  e.stopPropagation();
+const toolbar = document.getElementById('toolbar');
+const summaryArrow = document.getElementById('summaryArrow');
+function collapseToolbar() {
+  toolbar.classList.add('collapsed');
+  if (summaryArrow) summaryArrow.textContent = '▾';
+}
+function expandToolbar() {
+  toolbar.classList.remove('collapsed');
+  if (summaryArrow) summaryArrow.textContent = '▴';
+}
+document.getElementById('summaryChip').addEventListener('click', () => {
   toolbar.classList.contains('collapsed') ? expandToolbar() : collapseToolbar();
-  document.getElementById('filterPanel').classList.remove('open');
-});
-document.addEventListener('click', e => {
-  if (!toolbar.contains(e.target) && !toolbar.classList.contains('collapsed')) collapseToolbar();
 });
 
-const filterPanel = document.getElementById('filterPanel');
-document.getElementById('filterToggle').addEventListener('click', function(e) {
-  e.stopPropagation();
-  if (!filterPanel.classList.contains('open')) {
-    const r = this.getBoundingClientRect();
-    filterPanel.style.top=(r.bottom+6)+'px'; filterPanel.style.left=r.left+'px';
-  }
-  filterPanel.classList.toggle('open');
+/* ── MODE BUTTONS ── */
+document.querySelectorAll('#modeBtnGroup .seg-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    if (this.classList.contains('active')) return;
+    document.querySelectorAll('#modeBtnGroup .seg-btn').forEach(b=>b.classList.remove('active'));
+    this.classList.add('active');
+    mode = this.dataset.mode;
+    showPanel(mode);
+    updateSummary();
+    saveSettings();
+    triggerRestart();
+  });
 });
-document.addEventListener('click', () => filterPanel.classList.remove('open'));
-filterPanel.addEventListener('click', e => e.stopPropagation());
 
-function updateFilterLabel() {
-  const sel=[...tables].sort((a,b)=>a-b);
-  document.getElementById('filterToggle').textContent =
-    sel.length===10?'⚙ Vse ▾':sel.length===0?'⚙ Nič ▾':'⚙ '+sel.join(', ')+'▾';
+/* ── OP BUTTONS ── */
+document.querySelectorAll('#opBtnGroup .seg-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    if (this.classList.contains('active')) return;
+    document.querySelectorAll('#opBtnGroup .seg-btn').forEach(b=>b.classList.remove('active'));
+    this.classList.add('active');
+    opType = this.dataset.op;
+    updateSummary();
+    saveSettings();
+    triggerRestart();
+  });
+});
+
+/* ── TABLE BUTTONS ── */
+document.querySelectorAll('.table-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const n = parseInt(this.dataset.n);
+    if (tables.has(n)) { tables.delete(n); this.classList.remove('active'); }
+    else               { tables.add(n);    this.classList.add('active'); }
+    updateSummary();
+    saveSettings();
+    triggerRestartDebounced();
+  });
+});
+document.getElementById('selAll').addEventListener('click', () => {
+  tables = new Set([1,2,3,4,5,6,7,8,9,10]);
+  document.querySelectorAll('.table-btn').forEach(b => b.classList.add('active'));
   updateSummary();
-}
-for (let i=1; i<=10; i++) {
-  const el=document.getElementById('chk'+i);
-  if (el) el.addEventListener('change', ()=>{ el.checked?tables.add(i):tables.delete(i); updateFilterLabel(); });
-}
-document.querySelectorAll('.op-btn').forEach(btn=>btn.addEventListener('click', function() {
-  document.querySelectorAll('.op-btn').forEach(b=>b.classList.remove('active'));
-  this.classList.add('active'); opType=this.dataset.op; updateSummary();
-}));
-document.getElementById('modeSelect').addEventListener('change', function() {
-  mode=this.value; showPanel(mode); updateSummary(); setTimeout(collapseToolbar,200);
+  saveSettings();
+  triggerRestart();
 });
-function showPanel(m) {
-  document.getElementById('flashcardPanel').style.display = m==='flashcard'?'':'none';
-  document.getElementById('quizPanel').style.display      = m==='quiz'?'':'none';
-  document.getElementById('timedPanel').style.display     = m==='timed'?'':'none';
-  document.getElementById('scoreHUD').style.display = (m==='quiz'||m==='timed')?'flex':'none';
-}
-function updateSummary() {
-  const mm={flashcard:'🃏 Kartice',quiz:'🎯 Kviz',timed:'⏱️ Tekma'};
-  const om={both:'× ÷',multiply:'×',divide:'÷'};
-  document.getElementById('summaryMode').textContent=mm[mode]||mode;
-  document.getElementById('summaryOp').textContent=om[opType];
-  const sel=[...tables].sort((a,b)=>a-b);
-  document.getElementById('summaryFilter').textContent=sel.length===10?'Vse':sel.length===0?'Nič':sel.join(', ');
+document.getElementById('selNone').addEventListener('click', () => {
+  tables = new Set();
+  document.querySelectorAll('.table-btn').forEach(b => b.classList.remove('active'));
+  updateSummary();
+  saveSettings();
+  triggerRestart();
+});
+
+function applyUIFromState() {
+  document.querySelectorAll('#modeBtnGroup .seg-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  document.querySelectorAll('#opBtnGroup .seg-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.op === opType);
+  });
+  document.querySelectorAll('.table-btn').forEach(b => {
+    b.classList.toggle('active', tables.has(parseInt(b.dataset.n)));
+  });
 }
 
-/* ── SCORE HUD ── */
+function showPanel(m) {
+  document.getElementById('quizPanel').style.display   = m==='quiz'   ? '' : 'none';
+  document.getElementById('keypadPanel').style.display = m==='keypad' ? '' : 'none';
+  document.getElementById('timedPanel').style.display  = m==='timed'  ? '' : 'none';
+  document.getElementById('scoreHUD').style.display = 'flex';
+}
+
+function updateSummary() {
+  const mm = { quiz:'🎯 Kviz', keypad:'⌨️ Tipkovnica', timed:'⏱️ Tekma' };
+  const om = { both:'× ÷', multiply:'×', divide:'÷' };
+  document.getElementById('summaryMode').textContent = mm[mode] || mode;
+  document.getElementById('summaryOp').textContent = om[opType];
+  const sel = [...tables].sort((a,b)=>a-b);
+  document.getElementById('summaryFilter').textContent =
+    sel.length===10 ? 'Vse' : sel.length===0 ? 'Nič' : sel.join(', ');
+}
+
+/* ══════════════════════════
+   RESTART
+══════════════════════════ */
+function triggerRestart() {
+  if (restartDebounce) { clearTimeout(restartDebounce); restartDebounce = null; }
+  doRestart();
+}
+function triggerRestartDebounced() {
+  if (restartDebounce) clearTimeout(restartDebounce);
+  restartDebounce = setTimeout(doRestart, 500);
+}
+function doRestart() {
+  restartDebounce = null;
+  if (tTimer) { clearInterval(tTimer); tTimer = null; }
+  if (qTimer) { clearTimeout(qTimer);  qTimer = null; }
+  if (kTimer) { clearTimeout(kTimer);  kTimer = null; }
+  removeTimedOverlay();
+  tLevelIdx = 0;
+  cards = shuffle(getFilteredCards());
+  if      (mode === 'quiz')   startQuiz();
+  else if (mode === 'keypad') startKeypad();
+  else                        startTimedLevel();
+}
+
+/* ══════════════════════════
+   SCORE HUD
+══════════════════════════ */
 function updateScoreHUD(ok, no, streak) {
   document.getElementById('scoreCorrect').textContent = ok;
   document.getElementById('scoreWrong').textContent   = no;
-  const total=ok+no, pct=total?Math.round(ok/total*100):null;
-  document.getElementById('scorePct').textContent = pct!==null?pct+'%':'—';
-  const rank = ok>0 ? getRank(ok) : RANKS[0];
+  const total = ok + no, pct = total ? Math.round(ok/total*100) : null;
+  document.getElementById('scorePct').textContent = pct !== null ? pct + '%' : '—';
+
+  const rank = ok > 0 ? getRank(ok) : RANKS[0];
+  const next = getNextRank(ok);
   document.getElementById('hudMedalSVG').innerHTML  = getMedalSVG(rank.name, 38);
-  document.getElementById('hudMedalName').textContent = rank.name;
+  document.getElementById('hudMedalName').textContent = rank.name.replace(' medalja', '');
+  const nextEl = document.getElementById('hudMedalNext');
+  if (next) {
+    nextEl.textContent = `še ${next.minScore - ok} do ${next.name.replace(' medalja','')}`;
+    nextEl.style.color = next.glow;
+  } else {
+    nextEl.textContent = '🏆 najvišji rang!';
+    nextEl.style.color = '#ffe033';
+  }
+
   const se = document.getElementById('hudStreak');
   if (se) {
-    const mult=getMultiplier(streak||0);
-    se.textContent=(streak>=2)?`🔥 ${streak}×${mult>1?' ×'+mult:''}`:' ';
-    se.style.display=(streak>=2)?'inline-block':'none';
+    const mult = getMultiplier(streak || 0);
+    se.textContent = (streak >= 2) ? `🔥 ${streak}×${mult>1?' ×'+mult:''}` : ' ';
+    se.style.display = (streak >= 2) ? 'inline-block' : 'none';
   }
 }
-
-/* ── START BUTTON ── */
-document.getElementById('reloadBtn').addEventListener('click', () => {
-  if (tTimer) clearInterval(tTimer);
-  if (qTimer) clearTimeout(qTimer);
-  removeTimedOverlay();
-  tLevelIdx=0;
-  cards=shuffle(getFilteredCards());
-  if (mode==='flashcard')  startFlashcard();
-  else if (mode==='quiz')  startQuiz();
-  else                     startTimedLevel();
-  updateSummary();
-  setTimeout(collapseToolbar,300);
-});
 
 /* ══════════════════════════
-   FLASHCARD MODE
+   MEDAL INFO MODAL
 ══════════════════════════ */
-function startFlashcard() {
-  cardIdx=0;
-  document.getElementById('flashcard').classList.remove('flipped');
-  updateFlashcard();
+function openMedalModal() {
+  const list = document.getElementById('medalList');
+  list.innerHTML = RANKS.map(r => `
+    <div class="medal-row">
+      <div class="medal-row-icon">${getMedalSVG(r.name, 48)}</div>
+      <div class="medal-row-info">
+        <div class="medal-row-name" style="color:${r.glow}">${r.name}</div>
+        <div class="medal-row-score">od <strong>${r.minScore}</strong> točk</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('medalModal').style.display = 'flex';
 }
-function updateFlashcard() {
-  document.getElementById('flashcard').classList.remove('flipped');
-  if (!cards.length) {
-    document.getElementById('cardFrontText').textContent='Ni kartic za prikaz';
-    document.getElementById('cardBackText').textContent='—';
-    document.getElementById('cardCounter').textContent='Ni kartic';
-    document.getElementById('progressBar').style.width='0%';
-    document.getElementById('prevBtn').disabled=true;
-    document.getElementById('nextBtn').disabled=true;
-    return;
-  }
-  const c=cards[cardIdx];
-  document.getElementById('cardFrontText').textContent=c.question;
-  document.getElementById('cardBackText').textContent=c.answer;
-  document.getElementById('cardCounter').textContent='Kartica '+(cardIdx+1)+' od '+cards.length;
-  document.getElementById('progressBar').style.width=((cardIdx+1)/cards.length*100)+'%';
-  document.getElementById('prevBtn').disabled=cardIdx===0;
-  document.getElementById('nextBtn').disabled=cardIdx===cards.length-1;
+function closeMedalModal() {
+  document.getElementById('medalModal').style.display = 'none';
 }
-document.getElementById('flashcard').addEventListener('click', function(){ if(cards.length) this.classList.toggle('flipped'); });
-document.getElementById('prevBtn').addEventListener('click', ()=>{ if(cardIdx>0){cardIdx--;updateFlashcard();} });
-document.getElementById('nextBtn').addEventListener('click', ()=>{ if(cardIdx<cards.length-1){cardIdx++;updateFlashcard();} });
-document.addEventListener('keydown', e=>{
-  if (mode!=='flashcard') return;
-  if      (e.key==='ArrowRight') document.getElementById('nextBtn').click();
-  else if (e.key==='ArrowLeft')  document.getElementById('prevBtn').click();
-  else if (e.key===' ')          { e.preventDefault(); document.getElementById('flashcard').click(); }
+document.getElementById('medalItem').addEventListener('click', openMedalModal);
+document.getElementById('medalModalClose').addEventListener('click', closeMedalModal);
+document.getElementById('medalModal').addEventListener('click', e => {
+  if (e.target.id === 'medalModal') closeMedalModal();
 });
-let touchStartX=0;
-document.getElementById('cardContainer').addEventListener('touchstart', e=>{ touchStartX=e.touches[0].clientX; },{passive:true});
-document.getElementById('cardContainer').addEventListener('touchend', e=>{
-  const dx=e.changedTouches[0].clientX-touchStartX;
-  if (Math.abs(dx)>40){ dx<0?document.getElementById('nextBtn').click():document.getElementById('prevBtn').click(); }
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('medalModal').style.display !== 'none') {
+    closeMedalModal();
+  }
+});
+
+/* delegated click for any element with .medal-clickable opens modal */
+document.body.addEventListener('click', e => {
+  const el = e.target.closest('.medal-clickable');
+  if (el) openMedalModal();
 });
 
 /* ══════════════════════════
    QUIZ MODE
-   Sounds · 400ms/700ms advance
 ══════════════════════════ */
 function startQuiz() {
-  qQueue=shuffle(cards); qIdx=0; qOk=0; qNo=0; qStreak=0;
+  qQueue = shuffle(cards); qIdx = 0; qOk = 0; qNo = 0; qStreak = 0;
   updateScoreHUD(0,0,0);
   renderQuizQ();
 }
 function renderQuizQ() {
-  const area=document.getElementById('quizArea');
+  const area = document.getElementById('quizArea');
   if (!qQueue.length) {
-    area.innerHTML='<div class="quiz-empty">Ni kartic. Nastavi filtre in klikni ↻ Začni.</div>';
+    area.innerHTML = '<div class="quiz-empty">Ni računov. Izberi vsaj eno poštevanko v nastavitvah.</div>';
     return;
   }
-  if (qIdx>=qQueue.length) {
-    const pct=Math.round(qOk/qQueue.length*100);
-    const rank=getRank(qOk);
-    const next=getNextRank(qOk);
-    area.innerHTML=`
+  if (qIdx >= qQueue.length) {
+    const pct = Math.round(qOk / qQueue.length * 100);
+    const rank = getRank(qOk);
+    const next = getNextRank(qOk);
+    area.innerHTML = `
       <div class="end-card">
-        <div class="end-medal-svg">${getMedalSVG(rank.name,80)}</div>
+        <div class="end-medal-svg medal-clickable" title="Klikni za seznam medalj">${getMedalSVG(rank.name,80)}</div>
         <h2 style="color:${rank.glow}">${rank.name}!</h2>
         <p>Pravilno: <strong>${qOk}</strong> / ${qQueue.length}</p>
         <p>Točnost: <strong>${pct}%</strong></p>
-        ${next ? `<p style="font-size:.8rem;color:rgba(255,255,255,.4);margin-top:6px">Naslednja: <strong style="color:${next.glow}">${next.name}</strong> pri ${next.minScore} točkah</p>` : '<p style="font-size:.85rem;color:#ffe033;margin-top:6px">🏆 Najvišji rang dosežen!</p>'}
+        ${next
+          ? `<p class="end-next">Naslednja: <strong style="color:${next.glow}">${next.name}</strong> pri ${next.minScore} točkah</p>`
+          : '<p class="end-next" style="color:#ffe033">🏆 Najvišji rang dosežen!</p>'}
         <button class="restart-btn" onclick="startQuiz()">Znova ↻</button>
       </div>`;
     return;
   }
-  const cur=qQueue[qIdx];
-  const correctAns=cur.answer;
-  const opts=shuffle([correctAns,...getWrongAnswers(correctAns)]);
-  const mult=getMultiplier(qStreak);
-  area.innerHTML=`
+  const cur = qQueue[qIdx];
+  const correctAns = cur.answer;
+  const opts = shuffle([correctAns, ...getWrongAnswers(correctAns)]);
+  const mult = getMultiplier(qStreak);
+  area.innerHTML = `
     <div class="quiz-question">${cur.question}</div>
     ${mult>1?`<div class="streak-badge">🔥 Množilnik ×${mult} aktiven!</div>`:''}
     <div class="quiz-options" id="quizOpts">
@@ -420,61 +509,202 @@ function renderQuizQ() {
     <div class="quiz-advance-bar-wrap" id="advWrap">
       <div class="quiz-advance-bar" id="advBar"></div>
     </div>`;
-  area.querySelectorAll('.quiz-opt-btn').forEach(btn=>{
-    btn.addEventListener('click', function(){
+  area.querySelectorAll('.quiz-opt-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
       area.querySelectorAll('.quiz-opt-btn').forEach(b=>b.disabled=true);
-      const isCorrect=this.dataset.val===correctAns;
-      if (isCorrect){ SFX.correct(); this.classList.add('correct'); qOk++; qStreak++; }
+      const isCorrect = this.dataset.val === correctAns;
+      if (isCorrect) { SFX.correct(); this.classList.add('correct'); qOk++; qStreak++; }
       else {
-        SFX.wrong(); this.classList.add('wrong'); qStreak=0; qNo++;
-        area.querySelectorAll('.quiz-opt-btn').forEach(b=>{ if(b.dataset.val===correctAns) b.classList.add('correct'); });
+        SFX.wrong(); this.classList.add('wrong'); qStreak = 0; qNo++;
+        area.querySelectorAll('.quiz-opt-btn').forEach(b => {
+          if (b.dataset.val === correctAns) b.classList.add('correct');
+        });
       }
-      updateScoreHUD(qOk,qNo,qStreak);
-      // Shrink bar to match advance delay
-      const wrap=document.getElementById('advWrap'), bar=document.getElementById('advBar');
-      if (wrap&&bar){
-        wrap.style.display='block';
-        bar.style.transition=`width ${isCorrect?'0.4s':'0.7s'} linear`;
-        requestAnimationFrame(()=>requestAnimationFrame(()=>{ bar.style.width='0%'; }));
+      updateScoreHUD(qOk, qNo, qStreak);
+      const wrap = document.getElementById('advWrap'), bar = document.getElementById('advBar');
+      if (wrap && bar) {
+        wrap.style.display = 'block';
+        bar.style.transition = `width ${isCorrect?'0.4s':'0.7s'} linear`;
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{ bar.style.width = '0%'; }));
       }
-      qTimer=setTimeout(()=>{ qIdx++; renderQuizQ(); }, isCorrect?400:700);
+      qTimer = setTimeout(()=>{ qIdx++; renderQuizQ(); }, isCorrect ? 400 : 700);
     });
   });
 }
 
+/* ══════════════════════════
+   KEYPAD MODE
+══════════════════════════ */
+function startKeypad() {
+  kQueue = shuffle(cards); kIdx = 0; kOk = 0; kNo = 0; kStreak = 0;
+  kInput = ''; kAnswered = false;
+  updateScoreHUD(0,0,0);
+  renderKeypadQ();
+}
+function renderKeypadQ() {
+  const area = document.getElementById('keypadArea');
+  if (!kQueue.length) {
+    area.innerHTML = '<div class="quiz-empty">Ni računov. Izberi vsaj eno poštevanko v nastavitvah.</div>';
+    return;
+  }
+  if (kIdx >= kQueue.length) {
+    const pct = Math.round(kOk / kQueue.length * 100);
+    const rank = getRank(kOk);
+    const next = getNextRank(kOk);
+    area.innerHTML = `
+      <div class="end-card">
+        <div class="end-medal-svg medal-clickable" title="Klikni za seznam medalj">${getMedalSVG(rank.name,80)}</div>
+        <h2 style="color:${rank.glow}">${rank.name}!</h2>
+        <p>Pravilno: <strong>${kOk}</strong> / ${kQueue.length}</p>
+        <p>Točnost: <strong>${pct}%</strong></p>
+        ${next
+          ? `<p class="end-next">Naslednja: <strong style="color:${next.glow}">${next.name}</strong> pri ${next.minScore} točkah</p>`
+          : '<p class="end-next" style="color:#ffe033">🏆 Najvišji rang dosežen!</p>'}
+        <button class="restart-btn" onclick="startKeypad()">Znova ↻</button>
+      </div>`;
+    return;
+  }
+  const cur = kQueue[kIdx];
+  const mult = getMultiplier(kStreak);
+  area.innerHTML = `
+    <div class="quiz-question">${cur.question}</div>
+    ${mult>1?`<div class="streak-badge">🔥 Množilnik ×${mult} aktiven!</div>`:''}
+    <div class="keypad-display" id="keypadDisplay">
+      <span class="keypad-display-text" id="keypadDisplayText">_</span>
+    </div>
+    <div class="keypad-grid" id="keypadGrid">
+      <button class="keypad-btn" data-d="7">7</button>
+      <button class="keypad-btn" data-d="8">8</button>
+      <button class="keypad-btn" data-d="9">9</button>
+      <button class="keypad-btn" data-d="4">4</button>
+      <button class="keypad-btn" data-d="5">5</button>
+      <button class="keypad-btn" data-d="6">6</button>
+      <button class="keypad-btn" data-d="1">1</button>
+      <button class="keypad-btn" data-d="2">2</button>
+      <button class="keypad-btn" data-d="3">3</button>
+      <button class="keypad-btn keypad-back" data-d="back">⌫</button>
+      <button class="keypad-btn" data-d="0">0</button>
+      <button class="keypad-btn keypad-ok" data-d="ok">✓</button>
+    </div>
+    <div class="quiz-advance-bar-wrap" id="kAdvWrap" style="display:none">
+      <div class="quiz-advance-bar" id="kAdvBar"></div>
+    </div>
+    <div class="keyboard-hint">💡 lahko tipkaš tudi na pravi tipkovnici · Enter potrdi · Backspace briše</div>`;
+  area.querySelectorAll('.keypad-btn').forEach(btn => {
+    btn.addEventListener('click', () => handleKeypadInput(btn.dataset.d));
+  });
+}
+
+function handleKeypadInput(d) {
+  if (kAnswered) return;
+  if (d === 'back') {
+    kInput = kInput.slice(0, -1);
+    SFX.click();
+  } else if (d === 'ok') {
+    checkKeypadAnswer();
+    return;
+  } else {
+    if (kInput.length >= 3) return;
+    kInput += d;
+    SFX.click();
+  }
+  const display = document.getElementById('keypadDisplayText');
+  if (display) display.textContent = kInput || '_';
+}
+
+function checkKeypadAnswer() {
+  if (kAnswered) return;
+  if (!kInput.length) return;
+  kAnswered = true;
+  const cur = kQueue[kIdx];
+  const correctAns = cur.answer;
+  const isCorrect = kInput === correctAns;
+  const display = document.getElementById('keypadDisplay');
+
+  if (isCorrect) {
+    SFX.correct();
+    if (display) display.classList.add('correct');
+    kOk++; kStreak++;
+  } else {
+    SFX.wrong();
+    if (display) {
+      display.classList.add('wrong');
+      display.innerHTML = `
+        <span class="keypad-display-text keypad-strike">${kInput}</span>
+        <span class="keypad-display-arrow">→</span>
+        <span class="keypad-display-correct">${correctAns}</span>`;
+    }
+    kStreak = 0; kNo++;
+  }
+  updateScoreHUD(kOk, kNo, kStreak);
+
+  document.querySelectorAll('.keypad-btn').forEach(b => b.disabled = true);
+
+  const wrap = document.getElementById('kAdvWrap'), bar = document.getElementById('kAdvBar');
+  if (wrap && bar) {
+    wrap.style.display = 'block';
+    bar.style.transition = `width ${isCorrect?'0.4s':'0.7s'} linear`;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{ bar.style.width = '0%'; }));
+  }
+
+  kTimer = setTimeout(() => {
+    kIdx++; kInput = ''; kAnswered = false;
+    renderKeypadQ();
+  }, isCorrect ? 400 : 700);
+}
+
+/* physical keyboard for keypad mode */
+document.addEventListener('keydown', e => {
+  if (mode !== 'keypad') return;
+  // ignore when modal is open or focus is in an input
+  if (document.getElementById('medalModal').style.display === 'flex') return;
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+  if (e.key >= '0' && e.key <= '9') {
+    e.preventDefault();
+    handleKeypadInput(e.key);
+  } else if (e.key === 'Backspace') {
+    e.preventDefault();
+    handleKeypadInput('back');
+  } else if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    handleKeypadInput('ok');
+  }
+});
+
 /* ══════════════════════════════════════════
    TIMED MODE — 5-LEVEL MEDAL PROGRESSION
-   Multiple choice · score target in time
 ══════════════════════════════════════════ */
 function startTimedLevel() {
   if (tTimer) { clearInterval(tTimer); tTimer=null; }
   removeTimedOverlay();
-  const lv=TIMED_LEVELS[tLevelIdx];
-  tScore=0; tStreak=0; tTimeLeft=lv.timeLimit;
-  tQueue=shuffle([...cards]); tIdx=0;
-  tTimerStarted=false; tAnswered=false;
+  const lv = TIMED_LEVELS[tLevelIdx];
+  tScore = 0; tStreak = 0; tTimeLeft = lv.timeLimit;
+  tQueue = shuffle([...cards]); tIdx = 0;
+  tTimerStarted = false; tAnswered = false;
   renderTimedLevel();
 }
 
 function renderTimedLevel() {
-  const area=document.getElementById('timedArea');
-  if (!cards.length){
-    area.innerHTML='<div class="quiz-empty">Ni kartic. Nastavi filtre in klikni ↻ Začni.</div>';
+  const area = document.getElementById('timedArea');
+  if (!cards.length) {
+    area.innerHTML = '<div class="quiz-empty">Ni računov. Izberi vsaj eno poštevanko v nastavitvah.</div>';
     return;
   }
-  const lv=TIMED_LEVELS[tLevelIdx];
-  const card=tQueue[tIdx%tQueue.length];
-  const correctAns=card.answer;
-  const opts=shuffle([correctAns,...getWrongAnswers(correctAns)]);
-  const mult=getMultiplier(tStreak);
-  const pct=Math.min(100,Math.round((tScore/lv.target)*100));
-  const m=Math.floor(tTimeLeft/60), s=tTimeLeft%60;
-  const urg=tTimeLeft<=10?'danger':tTimeLeft<=25?'warn':'';
+  const lv = TIMED_LEVELS[tLevelIdx];
+  const card = tQueue[tIdx % tQueue.length];
+  const correctAns = card.answer;
+  const opts = shuffle([correctAns, ...getWrongAnswers(correctAns)]);
+  const mult = getMultiplier(tStreak);
+  const pct = Math.min(100, Math.round((tScore/lv.target)*100));
+  const m = Math.floor(tTimeLeft/60), s = tTimeLeft%60;
+  const urg = tTimeLeft<=10 ? 'danger' : tTimeLeft<=25 ? 'warn' : '';
 
-  area.innerHTML=`
+  area.innerHTML = `
     <div class="timed-header">
-      <div class="timed-level-badge">
-        ${getMedalSVG(lv.medal,36)}
+      <div class="timed-level-badge medal-clickable" title="Klikni za seznam medalj">
+        ${getMedalSVG(lv.medal, 36)}
         <div>
           <div class="timed-level-name" style="color:${lv.glow}">${lv.medal}</div>
           <div class="timed-hint">${lv.hint}</div>
@@ -483,19 +713,19 @@ function renderTimedLevel() {
       <div class="timed-clock ${urg}" id="timedClock">
         <div class="clock-label">Čas</div>
         <div class="clock-time" id="clockTime">${m}:${String(s).padStart(2,'0')}</div>
-        ${!tTimerStarted?'<div class="clock-waiting">odgovori za start</div>':''}
+        ${!tTimerStarted ? '<div class="clock-waiting">odgovori za start</div>' : ''}
       </div>
     </div>
     <div class="timed-progress-row">
       <span class="timed-score-txt" id="timedScoreTxt"><strong>${tScore}</strong> / ${lv.target} točk</span>
-      ${tStreak>=2?`<span class="streak-badge">🔥 ${tStreak}× ${mult>1?'×'+mult:''}</span>`:''}
+      ${tStreak>=2 ? `<span class="streak-badge">🔥 ${tStreak}× ${mult>1?'×'+mult:''}</span>` : ''}
     </div>
     <div class="timed-bar-wrap">
       <div class="timed-bar-fill" id="timedBar" style="width:${pct}%;background:linear-gradient(90deg,${lv.color},${lv.glow})"></div>
     </div>
-    <div class="timed-bar-label" id="timedBarLabel">${lv.target-tScore>0?'Manjka še '+(lv.target-tScore)+' točk':'🎯 Cilj dosežen!'}</div>
+    <div class="timed-bar-label" id="timedBarLabel">${lv.target-tScore>0 ? 'Manjka še '+(lv.target-tScore)+' točk' : '🎯 Cilj dosežen!'}</div>
     <div class="quiz-question" style="border-color:${lv.glow}">${card.question}</div>
-    ${mult>1?`<div class="streak-badge">🔥 Množilnik ×${mult} aktiven!</div>`:''}
+    ${mult>1 ? `<div class="streak-badge">🔥 Množilnik ×${mult} aktiven!</div>` : ''}
     <div class="quiz-options" id="timedOpts">
       ${opts.map(o=>`<button class="quiz-opt-btn" data-val="${o}">${o}</button>`).join('')}
     </div>
@@ -503,78 +733,77 @@ function renderTimedLevel() {
       <div class="quiz-advance-bar" id="tAdvBar"></div>
     </div>`;
 
-  area.querySelectorAll('.quiz-opt-btn').forEach(btn=>{
-    btn.addEventListener('click', function(){ checkTimedAnswer(this, correctAns); });
+  area.querySelectorAll('.quiz-opt-btn').forEach(btn => {
+    btn.addEventListener('click', function() { checkTimedAnswer(this, correctAns); });
   });
 }
 
 function checkTimedAnswer(btn, correctAns) {
   if (tAnswered) return;
-  tAnswered=true;
-  if (!tTimerStarted){ tTimerStarted=true; tTimer=setInterval(timedTick,1000); }
+  tAnswered = true;
+  if (!tTimerStarted) { tTimerStarted = true; tTimer = setInterval(timedTick, 1000); }
 
-  const area=document.getElementById('timedArea');
+  const area = document.getElementById('timedArea');
   area.querySelectorAll('.quiz-opt-btn').forEach(b=>b.disabled=true);
-  const isCorrect=btn.dataset.val===correctAns;
-  const lv=TIMED_LEVELS[tLevelIdx];
+  const isCorrect = btn.dataset.val === correctAns;
+  const lv = TIMED_LEVELS[tLevelIdx];
 
-  if (isCorrect){
+  if (isCorrect) {
     SFX.correct(); btn.classList.add('correct');
-    tStreak++; tScore+=getMultiplier(tStreak);
+    tStreak++; tScore += getMultiplier(tStreak);
   } else {
     SFX.wrong(); btn.classList.add('wrong');
-    area.querySelectorAll('.quiz-opt-btn').forEach(b=>{ if(b.dataset.val===correctAns) b.classList.add('correct'); });
-    tStreak=0; tScore=Math.max(0,tScore-1);
+    area.querySelectorAll('.quiz-opt-btn').forEach(b => {
+      if (b.dataset.val === correctAns) b.classList.add('correct');
+    });
+    tStreak = 0; tScore = Math.max(0, tScore - 1);
   }
 
-  // Update progress in-place
-  const pct=Math.min(100,Math.round((tScore/lv.target)*100));
-  const st=document.getElementById('timedScoreTxt');
-  if(st) st.innerHTML=`<strong>${tScore}</strong> / ${lv.target} točk`;
-  const bar=document.getElementById('timedBar');
-  if(bar){ bar.style.width=pct+'%'; }
-  const lbl=document.getElementById('timedBarLabel');
-  if(lbl) lbl.textContent=lv.target-tScore>0?'Manjka še '+(lv.target-tScore)+' točk':'🎯 Cilj dosežen!';
+  const pct = Math.min(100, Math.round((tScore/lv.target)*100));
+  const st = document.getElementById('timedScoreTxt');
+  if (st) st.innerHTML = `<strong>${tScore}</strong> / ${lv.target} točk`;
+  const bar = document.getElementById('timedBar');
+  if (bar) bar.style.width = pct + '%';
+  const lbl = document.getElementById('timedBarLabel');
+  if (lbl) lbl.textContent = lv.target - tScore > 0 ? 'Manjka še '+(lv.target-tScore)+' točk' : '🎯 Cilj dosežen!';
 
-  // Advance bar animation
-  const wrap=document.getElementById('tAdvWrap'), advBar=document.getElementById('tAdvBar');
-  if(wrap&&advBar){
-    wrap.style.display='block';
-    advBar.style.transition=`width ${isCorrect?'0.4s':'0.7s'} linear`;
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{ advBar.style.width='0%'; }));
+  const wrap = document.getElementById('tAdvWrap'), advBar = document.getElementById('tAdvBar');
+  if (wrap && advBar) {
+    wrap.style.display = 'block';
+    advBar.style.transition = `width ${isCorrect?'0.4s':'0.7s'} linear`;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{ advBar.style.width = '0%'; }));
   }
 
-  // Win condition
-  if (tScore>=lv.target){
-    clearInterval(tTimer); tTimer=null;
-    setTimeout(()=>{ tAnswered=false; advanceTimedLevel(); }, isCorrect?400:700);
+  if (tScore >= lv.target) {
+    clearInterval(tTimer); tTimer = null;
+    setTimeout(() => { tAnswered = false; advanceTimedLevel(); }, isCorrect ? 400 : 700);
     return;
   }
-  setTimeout(()=>{
-    tAnswered=false; tIdx++;
-    if(tIdx>=tQueue.length){ tIdx=0; tQueue=shuffle(tQueue); }
+  setTimeout(() => {
+    tAnswered = false; tIdx++;
+    if (tIdx >= tQueue.length) { tIdx = 0; tQueue = shuffle(tQueue); }
     renderTimedLevel();
-  }, isCorrect?400:700);
+  }, isCorrect ? 400 : 700);
 }
 
 function timedTick() {
   tTimeLeft--;
-  const el=document.getElementById('clockTime');
-  if(el){ const m=Math.floor(tTimeLeft/60),s=tTimeLeft%60; el.textContent=`${m}:${String(s).padStart(2,'0')}`; }
-  const cl=document.getElementById('timedClock');
-  if(cl) cl.className='timed-clock '+(tTimeLeft<=10?'danger':tTimeLeft<=25?'warn':'');
-  if(tTimeLeft<=0){ clearInterval(tTimer); tTimer=null; setTimeout(showTimedGameOver,200); }
+  const el = document.getElementById('clockTime');
+  if (el) { const m = Math.floor(tTimeLeft/60), s = tTimeLeft%60; el.textContent = `${m}:${String(s).padStart(2,'0')}`; }
+  const cl = document.getElementById('timedClock');
+  if (cl) cl.className = 'timed-clock ' + (tTimeLeft<=10 ? 'danger' : tTimeLeft<=25 ? 'warn' : '');
+  if (tTimeLeft <= 0) { clearInterval(tTimer); tTimer = null; setTimeout(showTimedGameOver, 200); }
 }
 
 function advanceTimedLevel() {
-  const lv=TIMED_LEVELS[tLevelIdx];
-  if (tLevelIdx>=TIMED_LEVELS.length-1){ showTimedVictory(); return; }
+  const lv = TIMED_LEVELS[tLevelIdx];
+  if (tLevelIdx >= TIMED_LEVELS.length - 1) { showTimedVictory(); return; }
   SFX.levelUp();
-  const nextLv=TIMED_LEVELS[tLevelIdx+1];
+  const nextLv = TIMED_LEVELS[tLevelIdx + 1];
   showTimedOverlay(`
     <div class="overlay-title" style="color:${lv.glow}">⭐ Raven opravljena!</div>
     <div class="overlay-divider"></div>
-    ${getMedalSVG(lv.medal,80)}
+    ${getMedalSVG(lv.medal, 80)}
     <div class="overlay-score-big" style="color:${lv.glow}">${tScore}</div>
     <div class="overlay-score-label">točk · cilj ${lv.target}</div>
     <div class="overlay-subtitle">
@@ -583,16 +812,16 @@ function advanceTimedLevel() {
       <span style="font-size:0.8rem;color:rgba(255,255,255,0.4)">${nextLv.hint}</span>
     </div>
     <button class="overlay-btn overlay-btn-next" id="nextLevelBtn">Naprej ➡️</button>
-  `, ()=>{ tLevelIdx++; startTimedLevel(); });
+  `, () => { tLevelIdx++; startTimedLevel(); });
 }
 
 function showTimedGameOver() {
-  SFX.wrong(); setTimeout(SFX.wrong,200);
-  const lv=TIMED_LEVELS[tLevelIdx];
+  SFX.wrong(); setTimeout(SFX.wrong, 200);
+  const lv = TIMED_LEVELS[tLevelIdx];
   showTimedOverlay(`
     <div class="overlay-gameover">KONEC IGRE</div>
     <div class="overlay-divider"></div>
-    ${getMedalSVG(lv.medal,64)}
+    ${getMedalSVG(lv.medal, 64)}
     <div style="color:rgba(255,255,255,0.55);font-size:0.9rem">Raven: <strong style="color:#fff">${lv.medal}</strong></div>
     <div>
       <div class="overlay-score-label">Zbrane točke</div>
@@ -607,46 +836,51 @@ function showTimedGameOver() {
 
 function showTimedVictory() {
   SFX.victory();
-  const lv=TIMED_LEVELS[tLevelIdx];
+  const lv = TIMED_LEVELS[tLevelIdx];
   showTimedOverlay(`
     <div class="overlay-title" style="color:${lv.glow}">🏆 PRVAK! 🏆</div>
     <div class="overlay-divider"></div>
-    ${getMedalSVG(lv.medal,90)}
+    ${getMedalSVG(lv.medal, 90)}
     <div class="overlay-score-big" style="color:${lv.glow}">${tScore}</div>
     <div class="overlay-score-label">točk na zlati ravni</div>
     <div class="overlay-subtitle">Čestitke! Premagal si vse ravni! 🎖️</div>
     <button class="overlay-btn overlay-btn-restart" id="playAgainBtn">🔄 Igraj znova</button>
-  `, ()=>{ tLevelIdx=0; startTimedLevel(); });
+  `, () => { tLevelIdx = 0; startTimedLevel(); });
 }
 
 function showTimedOverlay(html, onNext, extras) {
   removeTimedOverlay();
-  const div=document.createElement('div');
-  div.className='timed-overlay';
-  div.innerHTML=`<div class="timed-overlay-box">${html}</div>`;
+  const div = document.createElement('div');
+  div.className = 'timed-overlay';
+  div.innerHTML = `<div class="timed-overlay-box">${html}</div>`;
   document.body.appendChild(div);
-  tOverlay=div;
-  const nb=div.querySelector('#nextLevelBtn');
-  if(nb&&onNext) nb.addEventListener('click',()=>{ removeTimedOverlay(); onNext(); });
-  const pb=div.querySelector('#playAgainBtn');
-  if(pb&&onNext) pb.addEventListener('click',()=>{ removeTimedOverlay(); onNext(); });
-  if(extras){
-    const rb=div.querySelector('#retryBtn'), sb=div.querySelector('#restartBtn');
-    if(rb) rb.addEventListener('click',()=>{ removeTimedOverlay(); extras.retry(); });
-    if(sb) sb.addEventListener('click',()=>{ removeTimedOverlay(); extras.restart(); });
+  tOverlay = div;
+  const nb = div.querySelector('#nextLevelBtn');
+  if (nb && onNext) nb.addEventListener('click', () => { removeTimedOverlay(); onNext(); });
+  const pb = div.querySelector('#playAgainBtn');
+  if (pb && onNext) pb.addEventListener('click', () => { removeTimedOverlay(); onNext(); });
+  if (extras) {
+    const rb = div.querySelector('#retryBtn'), sb = div.querySelector('#restartBtn');
+    if (rb) rb.addEventListener('click', () => { removeTimedOverlay(); extras.retry(); });
+    if (sb) sb.addEventListener('click', () => { removeTimedOverlay(); extras.restart(); });
   }
 }
 function removeTimedOverlay() {
-  if(tOverlay&&tOverlay.parentNode) tOverlay.parentNode.removeChild(tOverlay);
-  tOverlay=null;
+  if (tOverlay && tOverlay.parentNode) tOverlay.parentNode.removeChild(tOverlay);
+  tOverlay = null;
 }
 
 /* ══════════════════════════
    INIT
 ══════════════════════════ */
+loadSettings();
+applyUIFromState();
 updateSummary();
-loadData(()=>{
-  cards=shuffle(getFilteredCards());
-  startFlashcard();
+showPanel(mode);
+loadData(() => {
+  cards = shuffle(getFilteredCards());
+  if      (mode === 'quiz')   startQuiz();
+  else if (mode === 'keypad') startKeypad();
+  else                        startTimedLevel();
 });
 collapseToolbar();
