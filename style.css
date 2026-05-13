@@ -225,11 +225,43 @@ body {
   background: #16213e; border-radius: 20px;
   border: 2px solid #f0a500; margin-top: 10px;
 }
+.end-card-title {
+  font-size: .8rem; font-weight: 700;
+  color: rgba(255,255,255,.45);
+  letter-spacing: .12em; text-transform: uppercase;
+  margin-bottom: 12px;
+}
 .end-medal-svg { display: flex; justify-content: center; margin-bottom: 12px; }
 .end-medal-svg.medal-clickable { cursor: pointer; }
 .end-card h2 { font-size: 1.8rem; margin-bottom: 10px; }
 .end-card p  { font-size: 1.1rem; margin: 6px 0; color: #ccc; }
 .end-next { font-size: .85rem !important; color: rgba(255,255,255,.5) !important; margin-top: 8px !important; }
+
+.end-btn-row {
+  display: flex; gap: 10px; justify-content: center;
+  flex-wrap: wrap; margin-top: 20px;
+}
+.end-btn {
+  border: none; border-radius: 10px;
+  padding: 12px 22px; font-size: 1rem; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  transition: transform .15s, box-shadow .15s, background .15s;
+  flex: 1; min-width: 140px;
+}
+.end-btn:hover { transform: translateY(-2px); }
+.end-btn-primary {
+  background: linear-gradient(135deg, #28a745, #1e8e3e);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(40,167,69,.35);
+}
+.end-btn-primary:hover { box-shadow: 0 6px 20px rgba(40,167,69,.5); }
+.end-btn-secondary {
+  background: #f0a500; color: #000;
+  box-shadow: 0 4px 14px rgba(240,165,0,.3);
+}
+.end-btn-secondary:hover { background: #ffc300; box-shadow: 0 6px 20px rgba(240,165,0,.45); }
+
+/* legacy single-button class — keep in case it's referenced */
 .restart-btn {
   background: #f0a500; color: #000;
   border: none; border-radius: 10px;

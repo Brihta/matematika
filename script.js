@@ -448,6 +448,32 @@ function openMedalModal() {
 function closeMedalModal() {
   document.getElementById('medalModal').style.display = 'none';
 }
+
+/* ══════════════════════════
+   MEDAL EARNED OVERLAY
+   Shown mid-game when a new medal threshold is crossed.
+══════════════════════════ */
+function showMedalEarnedOverlay(rank, score, onContinue) {
+  removeTimedOverlay();
+  const div = document.createElement('div');
+  div.className = 'timed-overlay';
+  div.innerHTML = `
+    <div class="timed-overlay-box">
+      <div class="overlay-title" style="color:${rank.glow}">🎉 Nova medalja!</div>
+      <div class="overlay-divider"></div>
+      ${getMedalSVG(rank.name, 90)}
+      <div class="overlay-score-big" style="color:${rank.glow}">${rank.name}</div>
+      <div class="overlay-score-label">${score} pravilnih odgovorov</div>
+      <div class="overlay-subtitle">Bravo! Napredek se ohrani — kar nadaljuj. 💪</div>
+      <button class="overlay-btn overlay-btn-next" id="medalContinueBtn">Naprej ➡️</button>
+    </div>`;
+  document.body.appendChild(div);
+  tOverlay = div;
+  div.querySelector('#medalContinueBtn').addEventListener('click', () => {
+    removeTimedOverlay();
+    if (onContinue) onContinue();
+  });
+}
 document.getElementById('medalItem').addEventListener('click', openMedalModal);
 document.getElementById('medalModalClose').addEventListener('click', closeMedalModal);
 document.getElementById('medalModal').addEventListener('click', e => {
@@ -473,6 +499,10 @@ function startQuiz() {
   updateScoreHUD(0,0,0);
   renderQuizQ();
 }
+function continueQuiz() {
+  qQueue = shuffle(cards); qIdx = 0;
+  renderQuizQ();
+}
 function renderQuizQ() {
   const area = document.getElementById('quizArea');
   if (!qQueue.length) {
@@ -480,19 +510,24 @@ function renderQuizQ() {
     return;
   }
   if (qIdx >= qQueue.length) {
-    const pct = Math.round(qOk / qQueue.length * 100);
+    const total = qOk + qNo;
+    const pct = total ? Math.round(qOk / total * 100) : 0;
     const rank = getRank(qOk);
     const next = getNextRank(qOk);
     area.innerHTML = `
       <div class="end-card">
+        <div class="end-card-title">🏁 Konec kroga</div>
         <div class="end-medal-svg medal-clickable" title="Klikni za seznam medalj">${getMedalSVG(rank.name,80)}</div>
-        <h2 style="color:${rank.glow}">${rank.name}!</h2>
-        <p>Pravilno: <strong>${qOk}</strong> / ${qQueue.length}</p>
+        <h2 style="color:${rank.glow}">${rank.name}</h2>
+        <p>Pravilno: <strong>${qOk}</strong> / ${total}</p>
         <p>Točnost: <strong>${pct}%</strong></p>
         ${next
           ? `<p class="end-next">Naslednja: <strong style="color:${next.glow}">${next.name}</strong> pri ${next.minScore} točkah</p>`
           : '<p class="end-next" style="color:#ffe033">🏆 Najvišji rang dosežen!</p>'}
-        <button class="restart-btn" onclick="startQuiz()">Znova ↻</button>
+        <div class="end-btn-row">
+          <button class="end-btn end-btn-primary" onclick="continueQuiz()">▶ Nadaljuj</button>
+          <button class="end-btn end-btn-secondary" onclick="startQuiz()">↻ Začni znova</button>
+        </div>
       </div>`;
     return;
   }
@@ -513,8 +548,13 @@ function renderQuizQ() {
     btn.addEventListener('click', function() {
       area.querySelectorAll('.quiz-opt-btn').forEach(b=>b.disabled=true);
       const isCorrect = this.dataset.val === correctAns;
-      if (isCorrect) { SFX.correct(); this.classList.add('correct'); qOk++; qStreak++; }
-      else {
+      let earnedRank = null;
+      if (isCorrect) {
+        const prevRank = getRank(qOk);
+        SFX.correct(); this.classList.add('correct'); qOk++; qStreak++;
+        const newRank = getRank(qOk);
+        if (newRank.name !== prevRank.name) earnedRank = newRank;
+      } else {
         SFX.wrong(); this.classList.add('wrong'); qStreak = 0; qNo++;
         area.querySelectorAll('.quiz-opt-btn').forEach(b => {
           if (b.dataset.val === correctAns) b.classList.add('correct');
@@ -527,7 +567,14 @@ function renderQuizQ() {
         bar.style.transition = `width ${isCorrect?'0.4s':'0.7s'} linear`;
         requestAnimationFrame(()=>requestAnimationFrame(()=>{ bar.style.width = '0%'; }));
       }
-      qTimer = setTimeout(()=>{ qIdx++; renderQuizQ(); }, isCorrect ? 400 : 700);
+      qTimer = setTimeout(() => {
+        if (earnedRank) {
+          SFX.levelUp();
+          showMedalEarnedOverlay(earnedRank, qOk, () => { qIdx++; renderQuizQ(); });
+        } else {
+          qIdx++; renderQuizQ();
+        }
+      }, isCorrect ? 400 : 700);
     });
   });
 }
@@ -541,6 +588,11 @@ function startKeypad() {
   updateScoreHUD(0,0,0);
   renderKeypadQ();
 }
+function continueKeypad() {
+  kQueue = shuffle(cards); kIdx = 0;
+  kInput = ''; kAnswered = false;
+  renderKeypadQ();
+}
 function renderKeypadQ() {
   const area = document.getElementById('keypadArea');
   if (!kQueue.length) {
@@ -548,19 +600,24 @@ function renderKeypadQ() {
     return;
   }
   if (kIdx >= kQueue.length) {
-    const pct = Math.round(kOk / kQueue.length * 100);
+    const total = kOk + kNo;
+    const pct = total ? Math.round(kOk / total * 100) : 0;
     const rank = getRank(kOk);
     const next = getNextRank(kOk);
     area.innerHTML = `
       <div class="end-card">
+        <div class="end-card-title">🏁 Konec kroga</div>
         <div class="end-medal-svg medal-clickable" title="Klikni za seznam medalj">${getMedalSVG(rank.name,80)}</div>
-        <h2 style="color:${rank.glow}">${rank.name}!</h2>
-        <p>Pravilno: <strong>${kOk}</strong> / ${kQueue.length}</p>
+        <h2 style="color:${rank.glow}">${rank.name}</h2>
+        <p>Pravilno: <strong>${kOk}</strong> / ${total}</p>
         <p>Točnost: <strong>${pct}%</strong></p>
         ${next
           ? `<p class="end-next">Naslednja: <strong style="color:${next.glow}">${next.name}</strong> pri ${next.minScore} točkah</p>`
           : '<p class="end-next" style="color:#ffe033">🏆 Najvišji rang dosežen!</p>'}
-        <button class="restart-btn" onclick="startKeypad()">Znova ↻</button>
+        <div class="end-btn-row">
+          <button class="end-btn end-btn-primary" onclick="continueKeypad()">▶ Nadaljuj</button>
+          <button class="end-btn end-btn-secondary" onclick="startKeypad()">↻ Začni znova</button>
+        </div>
       </div>`;
     return;
   }
@@ -620,11 +677,15 @@ function checkKeypadAnswer() {
   const correctAns = cur.answer;
   const isCorrect = kInput === correctAns;
   const display = document.getElementById('keypadDisplay');
+  let earnedRank = null;
 
   if (isCorrect) {
+    const prevRank = getRank(kOk);
     SFX.correct();
     if (display) display.classList.add('correct');
     kOk++; kStreak++;
+    const newRank = getRank(kOk);
+    if (newRank.name !== prevRank.name) earnedRank = newRank;
   } else {
     SFX.wrong();
     if (display) {
@@ -648,8 +709,16 @@ function checkKeypadAnswer() {
   }
 
   kTimer = setTimeout(() => {
-    kIdx++; kInput = ''; kAnswered = false;
-    renderKeypadQ();
+    if (earnedRank) {
+      SFX.levelUp();
+      showMedalEarnedOverlay(earnedRank, kOk, () => {
+        kIdx++; kInput = ''; kAnswered = false;
+        renderKeypadQ();
+      });
+    } else {
+      kIdx++; kInput = ''; kAnswered = false;
+      renderKeypadQ();
+    }
   }, isCorrect ? 400 : 700);
 }
 
