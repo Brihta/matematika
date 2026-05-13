@@ -230,10 +230,11 @@ function parseQuestion(q) {
   return null;
 }
 
-/* FIXED FILTER:
-   - For a × b: both a AND b must be in selected tables
-   - For c : b = a: divisor b AND quotient a must be in selected tables
-     (the dividend c is the product, can be anything) */
+/* FILTER:
+   Show every problem that involves at least one selected table.
+   - a × b: included if a OR b is in tables (problem belongs to table a AND table b)
+   - c : b = a: included if divisor b OR quotient a is in tables
+     (the dividend c is the product — its "tables" are a and b) */
 function getFilteredCards() {
   return allCards.filter(card => {
     const p = parseQuestion(card.question);
@@ -241,10 +242,10 @@ function getFilteredCards() {
     if (opType==='multiply' && p.op!=='multiply') return false;
     if (opType==='divide'   && p.op!=='divide')   return false;
     if (p.op === 'multiply') {
-      return tables.has(p.a) && tables.has(p.b);
+      return tables.has(p.a) || tables.has(p.b);
     } else {
       const quotient = parseInt(card.answer);
-      return tables.has(p.b) && tables.has(quotient);
+      return tables.has(p.b) || tables.has(quotient);
     }
   });
 }
@@ -499,10 +500,6 @@ function startQuiz() {
   updateScoreHUD(0,0,0);
   renderQuizQ();
 }
-function continueQuiz() {
-  qQueue = shuffle(cards); qIdx = 0;
-  renderQuizQ();
-}
 function renderQuizQ() {
   const area = document.getElementById('quizArea');
   if (!qQueue.length) {
@@ -510,26 +507,8 @@ function renderQuizQ() {
     return;
   }
   if (qIdx >= qQueue.length) {
-    const total = qOk + qNo;
-    const pct = total ? Math.round(qOk / total * 100) : 0;
-    const rank = getRank(qOk);
-    const next = getNextRank(qOk);
-    area.innerHTML = `
-      <div class="end-card">
-        <div class="end-card-title">🏁 Konec kroga</div>
-        <div class="end-medal-svg medal-clickable" title="Klikni za seznam medalj">${getMedalSVG(rank.name,80)}</div>
-        <h2 style="color:${rank.glow}">${rank.name}</h2>
-        <p>Pravilno: <strong>${qOk}</strong> / ${total}</p>
-        <p>Točnost: <strong>${pct}%</strong></p>
-        ${next
-          ? `<p class="end-next">Naslednja: <strong style="color:${next.glow}">${next.name}</strong> pri ${next.minScore} točkah</p>`
-          : '<p class="end-next" style="color:#ffe033">🏆 Najvišji rang dosežen!</p>'}
-        <div class="end-btn-row">
-          <button class="end-btn end-btn-primary" onclick="continueQuiz()">▶ Nadaljuj</button>
-          <button class="end-btn end-btn-secondary" onclick="startQuiz()">↻ Začni znova</button>
-        </div>
-      </div>`;
-    return;
+    qQueue = shuffle(qQueue);
+    qIdx = 0;
   }
   const cur = qQueue[qIdx];
   const correctAns = cur.answer;
@@ -588,11 +567,6 @@ function startKeypad() {
   updateScoreHUD(0,0,0);
   renderKeypadQ();
 }
-function continueKeypad() {
-  kQueue = shuffle(cards); kIdx = 0;
-  kInput = ''; kAnswered = false;
-  renderKeypadQ();
-}
 function renderKeypadQ() {
   const area = document.getElementById('keypadArea');
   if (!kQueue.length) {
@@ -600,26 +574,8 @@ function renderKeypadQ() {
     return;
   }
   if (kIdx >= kQueue.length) {
-    const total = kOk + kNo;
-    const pct = total ? Math.round(kOk / total * 100) : 0;
-    const rank = getRank(kOk);
-    const next = getNextRank(kOk);
-    area.innerHTML = `
-      <div class="end-card">
-        <div class="end-card-title">🏁 Konec kroga</div>
-        <div class="end-medal-svg medal-clickable" title="Klikni za seznam medalj">${getMedalSVG(rank.name,80)}</div>
-        <h2 style="color:${rank.glow}">${rank.name}</h2>
-        <p>Pravilno: <strong>${kOk}</strong> / ${total}</p>
-        <p>Točnost: <strong>${pct}%</strong></p>
-        ${next
-          ? `<p class="end-next">Naslednja: <strong style="color:${next.glow}">${next.name}</strong> pri ${next.minScore} točkah</p>`
-          : '<p class="end-next" style="color:#ffe033">🏆 Najvišji rang dosežen!</p>'}
-        <div class="end-btn-row">
-          <button class="end-btn end-btn-primary" onclick="continueKeypad()">▶ Nadaljuj</button>
-          <button class="end-btn end-btn-secondary" onclick="startKeypad()">↻ Začni znova</button>
-        </div>
-      </div>`;
-    return;
+    kQueue = shuffle(kQueue);
+    kIdx = 0;
   }
   const cur = kQueue[kIdx];
   const mult = getMultiplier(kStreak);
