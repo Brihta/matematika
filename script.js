@@ -165,10 +165,10 @@ let kQueue = [], kIdx = 0, kOk = 0, kNo = 0, kStreak = 0;
 let kInput = '', kAnswered = false, kTimer = null;
 
 /* Competition (Tekmovanje) state */
-let cQueue = [], cIdx = 0, cScore = 0, cStreak = 0, cTimeLeft = 45;
+let cQueue = [], cIdx = 0, cScore = 0, cStreak = 0, cTimeLeft = 60;
 let cCorrect = 0, cWrong = 0;
 let cInput = '', cAnswered = false, cTimer = null, cActive = false, cAdvanceTimer = null;
-const COMP_DURATION   = 45;   // seconds
+const COMP_DURATION   = 60;   // seconds
 const COMP_OPEN_HOUR  = 7;    // 07:00 Slovenia
 const COMP_CLOSE_HOUR = 19;   // 19:00 Slovenia
 
@@ -749,7 +749,7 @@ document.addEventListener('keydown', e => {
 
 /* ══════════════════════════════════════════
    TEKMOVANJE (COMPETITION) MODE
-   45 s keypad sprint · daily leaderboard
+   60 s keypad sprint · daily leaderboard
 ══════════════════════════════════════════ */
 
 /* ── Leaderboard backend config ──
@@ -1532,7 +1532,7 @@ function showTekmovanjePanel() {
       <div class="comp-intro">
         <div class="comp-trophy">🏆</div>
         <h2>Dnevno tekmovanje</h2>
-        <p class="comp-rules">45 sekund · vse poštevanke · × in ÷</p>
+        <p class="comp-rules">60 sekund · vse poštevanke · × in ÷</p>
         <p class="comp-sub">Reši čim več računov in pridi na dnevno lestvico!</p>
         <button class="comp-btn comp-btn-start" id="compStartBtn">▶ Začni tekmovanje</button>
         <button class="comp-btn comp-btn-ghost" id="compBoardBtn">🏆 Dnevna lestvica</button>
@@ -1580,10 +1580,11 @@ function runCountdown(done) {
   setTimeout(step, 700);
 }
 
-/* ── Start a 45 s competition round ── */
+/* ── Start a competition round ── */
 function startCompetition() {
   if (!isCompetitionOpen()) { showTekmovanjePanel(); return; }
   if (!allCards.length)     { showTekmovanjePanel(); return; }
+  collapseToolbar();   // get the settings panel out of the way — every second counts
   cQueue = shuffle(allCards.slice());   // full deck — ignores filters
   cIdx = 0; cScore = 0; cStreak = 0; cTimeLeft = COMP_DURATION;
   cCorrect = 0; cWrong = 0;
