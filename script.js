@@ -231,22 +231,17 @@ function parseQuestion(q) {
 }
 
 /* FILTER:
-   Show every problem that involves at least one selected table.
-   - a × b: included if a OR b is in tables (problem belongs to table a AND table b)
-   - c : b = a: included if divisor b OR quotient a is in tables
-     (the dividend c is the product — its "tables" are a and b) */
+   A problem belongs to the multiplication table of its SECOND operand.
+   - a × b  →  table b   (e.g. 3 × 8 is in the 8-times table, 8 × 3 in the 3-times table)
+   - c : b  →  table b   (e.g. 24 : 8 is in the 8-times table, 24 : 3 in the 3-times table)
+   So in both cases the relevant table is p.b — show only if that table is selected. */
 function getFilteredCards() {
   return allCards.filter(card => {
     const p = parseQuestion(card.question);
     if (!p) return false;
     if (opType==='multiply' && p.op!=='multiply') return false;
     if (opType==='divide'   && p.op!=='divide')   return false;
-    if (p.op === 'multiply') {
-      return tables.has(p.a) || tables.has(p.b);
-    } else {
-      const quotient = parseInt(card.answer);
-      return tables.has(p.b) || tables.has(quotient);
-    }
+    return tables.has(p.b);
   });
 }
 
