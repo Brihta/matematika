@@ -177,7 +177,9 @@ let restartDebounce = null;
 
 /* Student profile + stats logging */
 let profile = null;                 // { id, username, emoji, display_name } or null
+let teacherSession = null;          // { id, username } or null
 let pendingStats = {};              // { mode: {correct,wrong,points,seconds} }
+let pendingTableStats = {};         // { "t_op": {t,op,c,w} }
 let pendingAnswerCount = 0;
 let lastAnswerTs = 0;               // for estimating practice time in quiz/keypad
 
@@ -213,18 +215,27 @@ function saveSettings() {
 
 /* Profile session persistence */
 const PROFILE_KEY = 'brihta_profile_v1';
+const TEACHER_KEY = 'brihta_teacher_v1';
 function loadProfile() {
   try {
     const raw = localStorage.getItem(PROFILE_KEY);
-    if (!raw) return;
-    const p = JSON.parse(raw);
-    if (p && p.id && p.username) profile = p;
+    if (raw) { const p = JSON.parse(raw); if (p && p.id && p.username) profile = p; }
+  } catch(e) {}
+  try {
+    const raw = localStorage.getItem(TEACHER_KEY);
+    if (raw) { const t = JSON.parse(raw); if (t && t.id && t.username) teacherSession = t; }
   } catch(e) {}
 }
 function saveProfile() {
   try {
     if (profile) localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
     else localStorage.removeItem(PROFILE_KEY);
+  } catch(e) {}
+}
+function saveTeacher() {
+  try {
+    if (teacherSession) localStorage.setItem(TEACHER_KEY, JSON.stringify(teacherSession));
+    else localStorage.removeItem(TEACHER_KEY);
   } catch(e) {}
 }
 
@@ -573,6 +584,7 @@ function renderQuizQ() {
           if (b.dataset.val === correctAns) b.classList.add('correct');
         });
       }
+      recordTableStat(cur.question, isCorrect);
       recordStat('quiz', isCorrect?1:0, isCorrect?0:1, isCorrect?1:0, answerSeconds());
       updateScoreHUD(qOk, qNo, qStreak);
       const wrap = document.getElementById('advWrap'), bar = document.getElementById('advBar');
@@ -688,6 +700,7 @@ function checkKeypadAnswer() {
     }
     kStreak = 0; kNo++;
   }
+  recordTableStat(cur.question, isCorrect);
   recordStat('keypad', isCorrect?1:0, isCorrect?0:1, isCorrect?1:0, answerSeconds());
   updateScoreHUD(kOk, kNo, kStreak);
 
@@ -890,6 +903,26 @@ function logoutStudent() {
   updateProfileButton();
 }
 
+/* ── Teacher auth ── */
+async function loginTeacher(username, pin) {
+  const rows = await supabaseRPC('login_teacher', {
+    p_username: username.toLowerCase().trim(), p_pin: pin
+  });
+  if (rows && rows.length) {
+    teacherSession = { id: rows[0].id, username: rows[0].username };
+    profile = null; saveProfile();
+    saveTeacher();
+    updateProfileButton();
+    return teacherSession;
+  }
+  return null;
+}
+function logoutTeacher() {
+  teacherSession = null;
+  saveTeacher();
+  updateProfileButton();
+}
+
 /* ── Stats logging ── */
 function recordStat(modeKey, correct, wrong, points, seconds) {
   if (!profile) return;
@@ -898,6 +931,16 @@ function recordStat(modeKey, correct, wrong, points, seconds) {
   s.correct += correct; s.wrong += wrong; s.points += points; s.seconds += seconds;
   pendingAnswerCount++;
   if (pendingAnswerCount >= 10) flushStats();
+}
+/* per-times-table logging — a question belongs to the table of its 2nd operand */
+function recordTableStat(question, isCorrect) {
+  if (!profile) return;
+  const p = parseQuestion(question);
+  if (!p || !(p.b >= 1 && p.b <= 10)) return;
+  const op = p.op === 'multiply' ? 'x' : 'd';
+  const key = p.b + '_' + op;
+  if (!pendingTableStats[key]) pendingTableStats[key] = { t: p.b, op, c: 0, w: 0 };
+  if (isCorrect) pendingTableStats[key].c++; else pendingTableStats[key].w++;
 }
 /* time since the previous answer, capped so idle time doesn't inflate it */
 function answerSeconds() {
@@ -908,11 +951,14 @@ function answerSeconds() {
   return dt;
 }
 function flushStats(useKeepalive) {
-  if (!profile) { pendingStats = {}; pendingAnswerCount = 0; return; }
+  if (!profile) { pendingStats = {}; pendingTableStats = {}; pendingAnswerCount = 0; return; }
   const toSend = pendingStats;
+  const toSendTables = pendingTableStats;
   pendingStats = {};
+  pendingTableStats = {};
   pendingAnswerCount = 0;
   const day = getTodayKey();
+  const extra = useKeepalive ? { keepalive: true } : undefined;
   for (const modeKey of Object.keys(toSend)) {
     const s = toSend[modeKey];
     if (!s.correct && !s.wrong && !s.points && !s.seconds) continue;
@@ -920,20 +966,55 @@ function flushStats(useKeepalive) {
       p_student: profile.id, p_mode: modeKey, p_day: day,
       p_correct: s.correct, p_wrong: s.wrong,
       p_points: s.points, p_seconds: Math.round(s.seconds)
-    }, useKeepalive ? { keepalive: true } : undefined);
+    }, extra);
+  }
+  const tableData = Object.keys(toSendTables).map(k => toSendTables[k]);
+  if (tableData.length) {
+    supabaseRPC('add_table_stats', {
+      p_student: profile.id, p_day: day, p_data: tableData
+    }, extra);
   }
 }
-async function fetchStudentStats() {
-  if (!profile || !leaderboardEnabled()) return [];
+async function supabaseSelect(path) {
+  if (!leaderboardEnabled()) return [];
   try {
-    const res = await fetch(
-      `${LEADERBOARD.supabaseUrl}/rest/v1/stats?student_id=eq.${profile.id}`,
-      { headers: { apikey: LEADERBOARD.supabaseKey,
-                   Authorization: `Bearer ${LEADERBOARD.supabaseKey}` } }
-    );
+    const res = await fetch(`${LEADERBOARD.supabaseUrl}/rest/v1/${path}`, {
+      headers: { apikey: LEADERBOARD.supabaseKey,
+                 Authorization: `Bearer ${LEADERBOARD.supabaseKey}` }
+    });
     if (res.ok) return await res.json();
   } catch(e) {}
   return [];
+}
+async function fetchStudentStats() {
+  if (!profile) return [];
+  return supabaseSelect(`stats?student_id=eq.${profile.id}`);
+}
+async function fetchStudentTableStats() {
+  if (!profile) return [];
+  return supabaseSelect(`table_stats?student_id=eq.${profile.id}`);
+}
+
+/* date 14 days ago (Slovenia), as YYYY-MM-DD — start of the "recent" window */
+function getRecentSinceKey() {
+  const p = sloveniaParts();
+  const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day));
+  d.setUTCDate(d.getUTCDate() - 13);
+  return d.toISOString().slice(0, 10);
+}
+
+/* ── Mastery classification (shared by child + teacher views) ── */
+function masteryClass(correct, wrong) {
+  const total = (correct || 0) + (wrong || 0);
+  if (total < 5) return 'm-none';
+  const pct = correct / total * 100;
+  if (pct >= 85) return 'm-good';
+  if (pct >= 60) return 'm-mid';
+  return 'm-bad';
+}
+function masteryPct(correct, wrong) {
+  const total = (correct || 0) + (wrong || 0);
+  return total ? Math.round(correct / total * 100) : null;
 }
 
 /* ══════════════════════════
@@ -942,7 +1023,11 @@ async function fetchStudentStats() {
 function updateProfileButton() {
   const btn = document.getElementById('profileBtn');
   if (!btn) return;
-  if (profile) {
+  if (teacherSession) {
+    btn.innerHTML = `<span class="profile-emoji">👨‍🏫</span>`
+      + `<span class="profile-name">${teacherSession.username}</span>`;
+    btn.classList.add('logged-in');
+  } else if (profile) {
     btn.innerHTML = `<span class="profile-emoji">${profile.emoji || '🦉'}</span>`
       + `<span class="profile-name">${profile.username}</span>`;
     btn.classList.add('logged-in');
@@ -951,6 +1036,11 @@ function updateProfileButton() {
       + `<span class="profile-name">Prijava</span>`;
     btn.classList.remove('logged-in');
   }
+}
+function handleProfileButton() {
+  if (teacherSession) openTeacherDashboard();
+  else if (profile)   openStatsOverlay();
+  else                openAuthOverlay('login');
 }
 
 /* Reusable 4-animal code picker. Returns an element; read `.getSeq()` for the code. */
@@ -1032,11 +1122,13 @@ function renderAuthView(view) {
       <button class="overlay-btn overlay-btn-next" id="authLoginBtn">Prijava ✓</button>
       <div class="auth-msg" id="authMsg"></div>
       <button class="auth-switch" id="authToRegister">Nimaš računa? Ustvari ga</button>
+      <button class="auth-switch" id="authToTeacher">👨‍🏫 Prijava za učitelje</button>
       <button class="auth-switch auth-close" id="authClose">Zapri</button>`;
     const picker = buildAnimalPicker();
     box.querySelector('#authPickerSlot').appendChild(picker);
     box.querySelector('#authClose').addEventListener('click', removeOverlay);
     box.querySelector('#authToRegister').addEventListener('click', () => renderAuthView('register'));
+    box.querySelector('#authToTeacher').addEventListener('click', () => renderAuthView('teacher'));
     box.querySelector('#authLoginBtn').addEventListener('click', async () => {
       const user = box.querySelector('#authUser').value.trim();
       const seq = picker.getSeq();
@@ -1051,6 +1143,41 @@ function renderAuthView(view) {
         btn.disabled = false; btn.textContent = 'Prijava ✓';
         msg.textContent = '❌ Napačno uporabniško ime ali geslo.';
       }
+    });
+    return;
+  }
+
+  if (view === 'teacher') {
+    box.innerHTML = `
+      <div class="overlay-title" style="color:#f0a500">👨‍🏫 Prijava za učitelje</div>
+      <div class="overlay-divider"></div>
+      <label class="auth-label">Uporabniško ime</label>
+      <input id="tUser" class="auth-input" autocomplete="off" autocapitalize="none" />
+      <label class="auth-label">Geslo</label>
+      <input id="tPin" class="auth-input" type="password" autocomplete="off" />
+      <button class="overlay-btn overlay-btn-next" id="tLoginBtn">Prijava ✓</button>
+      <div class="auth-msg" id="tMsg"></div>
+      <button class="auth-switch" id="tToLogin">← Nazaj na prijavo učencev</button>
+      <button class="auth-switch auth-close" id="tClose">Zapri</button>`;
+    box.querySelector('#tClose').addEventListener('click', removeOverlay);
+    box.querySelector('#tToLogin').addEventListener('click', () => renderAuthView('login'));
+    const doTeacherLogin = async () => {
+      const user = box.querySelector('#tUser').value.trim();
+      const pin = box.querySelector('#tPin').value;
+      const msg = box.querySelector('#tMsg');
+      if (!user || !pin) { msg.textContent = 'Vpiši uporabniško ime in geslo.'; return; }
+      const btn = box.querySelector('#tLoginBtn');
+      btn.disabled = true; btn.textContent = 'Preverjam …';
+      const ok = await loginTeacher(user, pin);
+      if (ok) { removeOverlay(); openTeacherDashboard(); }
+      else {
+        btn.disabled = false; btn.textContent = 'Prijava ✓';
+        msg.textContent = '❌ Napačno uporabniško ime ali geslo.';
+      }
+    };
+    box.querySelector('#tLoginBtn').addEventListener('click', doTeacherLogin);
+    box.querySelector('#tPin').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); doTeacherLogin(); }
     });
     return;
   }
@@ -1176,6 +1303,15 @@ async function openStatsOverlay() {
       <div class="stats-body" id="statsBody">
         <div class="comp-board-empty">Nalagam statistiko …</div>
       </div>
+      <div class="stats-section-title">📚 Poštevanke</div>
+      <div class="ptable-toggle" id="ptableToggle">
+        <button class="ptable-tog-btn active" data-w="recent">Zadnja 2 tedna</button>
+        <button class="ptable-tog-btn" data-w="all">Ves čas</button>
+      </div>
+      <div class="ptable-list" id="ptableList">
+        <div class="comp-board-empty">Nalagam …</div>
+      </div>
+      <div class="ptable-tip" id="ptableTip"></div>
       <button class="overlay-btn overlay-btn-ghost" id="statsLogout">Odjava</button>
     </div>`;
   document.body.appendChild(div);
@@ -1213,6 +1349,175 @@ async function openStatsOverlay() {
           </div>`).join('')}
       </div>
     </div>`).join('');
+
+  /* ── Poštevanke section ── */
+  const tableRows = await fetchStudentTableStats();
+  const recentSince = getRecentSinceKey();
+
+  function aggTables(window) {
+    // window: 'recent' | 'all' → { "t_op": {c,w} }
+    const agg = {};
+    for (const r of tableRows) {
+      if (window === 'recent' && r.day < recentSince) continue;
+      const k = r.table_n + '_' + r.op;
+      if (!agg[k]) agg[k] = { c: 0, w: 0 };
+      agg[k].c += r.correct || 0;
+      agg[k].w += r.wrong || 0;
+    }
+    return agg;
+  }
+  function chip(cell) {
+    const c = cell ? cell.c : 0, w = cell ? cell.w : 0;
+    const pct = masteryPct(c, w);
+    const cls = masteryClass(c, w);
+    const txt = pct === null ? '—' : pct + '%';
+    return `<span class="ptable-chip ${cls}">${txt}</span>`;
+  }
+  function renderPtable(window) {
+    const agg = aggTables(window);
+    const list = div.querySelector('#ptableList');
+    let worst = null, worstPct = 101;
+    list.innerHTML = '';
+    for (let t = 1; t <= 10; t++) {
+      const x = agg[t + '_x'], d = agg[t + '_d'];
+      [x, d].forEach(cell => {
+        if (cell) {
+          const tot = cell.c + cell.w;
+          if (tot >= 5) {
+            const p = cell.c / tot * 100;
+            if (p < worstPct) { worstPct = p; worst = t; }
+          }
+        }
+      });
+      list.insertAdjacentHTML('beforeend', `
+        <div class="ptable-row">
+          <span class="ptable-num">${t}</span>
+          <span class="ptable-ops">
+            <span class="ptable-op">× ${chip(x)}</span>
+            <span class="ptable-op">÷ ${chip(d)}</span>
+          </span>
+        </div>`);
+    }
+    const tip = div.querySelector('#ptableTip');
+    if (worst !== null && worstPct < 85) {
+      tip.textContent = `💡 Največ napak: poštevanka ${worst}. Tam še vadi!`;
+    } else if (worst !== null) {
+      tip.textContent = '🎉 Odlično — vse poštevanke dobro obvladaš!';
+    } else {
+      tip.textContent = 'Igraj nekaj računov, da se pokaže napredek.';
+    }
+  }
+  renderPtable('recent');
+  div.querySelectorAll('#ptableToggle .ptable-tog-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      div.querySelectorAll('#ptableToggle .ptable-tog-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      renderPtable(b.dataset.w);
+    });
+  });
+}
+
+/* ══════════════════════════
+   TEACHER DASHBOARD
+══════════════════════════ */
+async function openTeacherDashboard() {
+  if (!teacherSession) { openAuthOverlay('teacher'); return; }
+  removeOverlay();
+  const div = document.createElement('div');
+  div.className = 'timed-overlay';
+  div.innerHTML = `
+    <div class="timed-overlay-box teacher-box">
+      <button class="medal-modal-close" id="tdClose" title="Zapri">✕</button>
+      <div class="overlay-title" style="color:#f0a500">👨‍🏫 Učiteljski pregled</div>
+      <div class="td-controls">
+        <div class="ptable-toggle" id="tdOpToggle">
+          <button class="ptable-tog-btn active" data-op="x">Množenje ×</button>
+          <button class="ptable-tog-btn" data-op="d">Deljenje ÷</button>
+        </div>
+        <div class="ptable-toggle" id="tdWinToggle">
+          <button class="ptable-tog-btn active" data-w="recent">Zadnja 2 tedna</button>
+          <button class="ptable-tog-btn" data-w="all">Ves čas</button>
+        </div>
+      </div>
+      <div class="td-legend">
+        <span><span class="ptable-chip m-good"></span> obvlada</span>
+        <span><span class="ptable-chip m-mid"></span> še vadi</span>
+        <span><span class="ptable-chip m-bad"></span> potrebuje vajo</span>
+        <span><span class="ptable-chip m-none"></span> ni podatkov</span>
+      </div>
+      <div class="td-grid-wrap" id="tdGridWrap">
+        <div class="comp-board-empty">Nalagam …</div>
+      </div>
+      <button class="overlay-btn overlay-btn-ghost" id="tdLogout">Odjava</button>
+    </div>`;
+  document.body.appendChild(div);
+  activeOverlay = div;
+  div.addEventListener('click', e => { if (e.target === div) removeOverlay(); });
+  div.querySelector('#tdClose').addEventListener('click', removeOverlay);
+  div.querySelector('#tdLogout').addEventListener('click', () => {
+    logoutTeacher();
+    removeOverlay();
+  });
+
+  const rows = await supabaseRPC('get_class_overview', {
+    p_teacher_id: teacherSession.id,
+    p_recent_since: getRecentSinceKey()
+  });
+  const wrap = div.querySelector('#tdGridWrap');
+  if (!rows || !rows.length) {
+    wrap.innerHTML = '<div class="comp-board-empty">Še ni podatkov o učencih.</div>';
+    return;
+  }
+  // group by student
+  const students = {};
+  for (const r of rows) {
+    if (!students[r.username]) {
+      students[r.username] = { username: r.username, emoji: r.emoji,
+                               display_name: r.display_name, cells: {} };
+    }
+    if (r.table_n != null) {
+      students[r.username].cells[r.table_n + '_' + r.op] = {
+        all: { c: +r.correct_all, w: +r.wrong_all },
+        recent: { c: +r.correct_recent, w: +r.wrong_recent }
+      };
+    }
+  }
+  const list = Object.values(students).sort((a, b) =>
+    a.username.localeCompare(b.username));
+
+  let curOp = 'x', curWin = 'recent';
+  function renderGrid() {
+    let head = '<div class="td-row td-head"><span class="td-name"></span>';
+    for (let t = 1; t <= 10; t++) head += `<span class="td-cell td-th">${t}</span>`;
+    head += '</div>';
+    const body = list.map(s => {
+      let row = `<div class="td-row"><span class="td-name">${s.emoji || '🦉'} ${s.username}</span>`;
+      for (let t = 1; t <= 10; t++) {
+        const cell = s.cells[t + '_' + curOp];
+        const v = cell ? cell[curWin] : null;
+        const c = v ? v.c : 0, w = v ? v.w : 0;
+        const cls = masteryClass(c, w);
+        const pct = masteryPct(c, w);
+        row += `<span class="td-cell ${cls}" title="Poštevanka ${t}: ${c}✓ / ${w}✗">`
+          + `${pct === null ? '' : pct}</span>`;
+      }
+      return row + '</div>';
+    }).join('');
+    wrap.innerHTML = head + body;
+  }
+  renderGrid();
+  div.querySelectorAll('#tdOpToggle .ptable-tog-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      div.querySelectorAll('#tdOpToggle .ptable-tog-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active'); curOp = b.dataset.op; renderGrid();
+    });
+  });
+  div.querySelectorAll('#tdWinToggle .ptable-tog-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      div.querySelectorAll('#tdWinToggle .ptable-tog-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active'); curWin = b.dataset.w; renderGrid();
+    });
+  });
 }
 
 /* ── Panel: intro / locked ── */
@@ -1383,6 +1688,7 @@ function checkCompAnswer() {
     cStreak = 0;   // no point penalty — just reset streak
     cWrong++;
   }
+  recordTableStat(cur.question, isCorrect);
   document.querySelectorAll('#compGrid .keypad-btn').forEach(b => b.disabled = true);
 
   cAdvanceTimer = setTimeout(() => {
@@ -1530,10 +1836,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ── Profile button + stats flush on leave ── */
-document.getElementById('profileBtn').addEventListener('click', () => {
-  if (profile) openStatsOverlay();
-  else         openAuthOverlay('login');
-});
+document.getElementById('profileBtn').addEventListener('click', handleProfileButton);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushStats(true);
 });

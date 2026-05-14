@@ -751,6 +751,90 @@ body.competition {
 .stat-ico { font-size: 0.72rem; }
 .stat-pct { color: rgba(255,255,255,0.45); font-size: 0.72rem; }
 
+/* ── Mastery colours (shared: child view + teacher heatmap) ── */
+.m-good { background: #1e7d34; color: #d6ffdb; }
+.m-mid  { background: #b07d12; color: #fff2cf; }
+.m-bad  { background: #a82b2b; color: #ffdada; }
+.m-none { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); }
+
+/* ── Per-child "Poštevanke" section ── */
+.stats-section-title {
+  font-size: 0.95rem; font-weight: 700; color: #fff;
+  margin-top: 6px; align-self: flex-start;
+}
+.ptable-toggle {
+  display: flex; gap: 4px; width: 100%;
+  background: rgba(0,0,0,0.25); border-radius: 8px; padding: 3px;
+}
+.ptable-tog-btn {
+  flex: 1; background: transparent; border: none;
+  border-radius: 6px; padding: 6px 8px;
+  font-size: 0.76rem; font-weight: 600; color: #aaa;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.ptable-tog-btn.active { background: #f0a500; color: #000; }
+.ptable-list { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.ptable-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(0,0,0,0.28); border-radius: 8px; padding: 5px 10px;
+}
+.ptable-num {
+  font-size: 1.15rem; font-weight: 800; color: #f0a500;
+  min-width: 24px; text-align: center;
+}
+.ptable-ops { display: flex; gap: 8px; flex: 1; }
+.ptable-op {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.85rem; color: #bbb; flex: 1;
+}
+.ptable-chip {
+  display: inline-block; min-width: 44px; text-align: center;
+  padding: 3px 6px; border-radius: 6px;
+  font-size: 0.78rem; font-weight: 700;
+}
+.ptable-tip {
+  font-size: 0.8rem; color: rgba(255,255,255,0.75);
+  text-align: center; min-height: 1.1em; margin-top: 2px;
+}
+
+/* ── Teacher dashboard ── */
+.teacher-box {
+  max-width: 92vw; width: 620px;
+  max-height: 88vh; overflow-y: auto;
+  position: relative; align-items: stretch !important;
+}
+.td-controls { display: flex; gap: 8px; width: 100%; flex-wrap: wrap; }
+.td-controls .ptable-toggle { flex: 1; min-width: 150px; }
+.td-legend {
+  display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  font-size: 0.7rem; color: rgba(255,255,255,0.6);
+}
+.td-legend span { display: flex; align-items: center; gap: 4px; }
+.td-legend .ptable-chip {
+  min-width: 16px; width: 16px; height: 16px; padding: 0;
+}
+.td-grid-wrap {
+  width: 100%; overflow-x: auto;
+  display: flex; flex-direction: column; gap: 3px;
+  padding-bottom: 4px;
+}
+.td-row { display: flex; gap: 3px; align-items: stretch; }
+.td-name {
+  min-width: 100px; width: 100px; flex-shrink: 0;
+  font-size: 0.78rem; font-weight: 600; color: #ddd;
+  display: flex; align-items: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.td-cell {
+  width: 34px; min-width: 34px; height: 34px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; font-size: 0.72rem; font-weight: 700;
+}
+.td-th {
+  background: transparent !important;
+  color: rgba(255,255,255,0.5) !important;
+}
+
 /* ══════════════════════════
    RESPONSIVE
 ══════════════════════════ */
