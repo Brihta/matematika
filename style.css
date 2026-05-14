@@ -834,6 +834,20 @@ body.competition {
   background: transparent !important;
   color: rgba(255,255,255,0.5) !important;
 }
+.td-name[data-username] { cursor: pointer; }
+.td-name[data-username]:hover { color: #f0a500; text-decoration: underline; }
+.td-hint {
+  font-size: 0.72rem; color: rgba(255,255,255,0.5);
+  text-align: center; margin-top: 2px;
+}
+
+/* Teacher: reset student password */
+.reset-student { font-size: 1.3rem; }
+.reset-animals {
+  font-size: 2.4rem; letter-spacing: 0.15em;
+  background: rgba(0,0,0,0.35); border: 2px solid #f0a500;
+  border-radius: 14px; padding: 12px 18px; text-align: center;
+}
 
 /* ══════════════════════════
    RESPONSIVE

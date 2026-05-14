@@ -1448,6 +1448,7 @@ async function openTeacherDashboard() {
       <div class="td-grid-wrap" id="tdGridWrap">
         <div class="comp-board-empty">Nalagam …</div>
       </div>
+      <div class="td-hint">💡 Klikni na ime učenca za ponastavitev gesla.</div>
       <button class="overlay-btn overlay-btn-ghost" id="tdLogout">Odjava</button>
     </div>`;
   document.body.appendChild(div);
@@ -1491,7 +1492,8 @@ async function openTeacherDashboard() {
     for (let t = 1; t <= 10; t++) head += `<span class="td-cell td-th">${t}</span>`;
     head += '</div>';
     const body = list.map(s => {
-      let row = `<div class="td-row"><span class="td-name">${s.emoji || '🦉'} ${s.username}</span>`;
+      let row = `<div class="td-row"><span class="td-name" data-username="${s.username}"`
+        + ` title="Klikni za ponastavitev gesla">${s.emoji || '🦉'} ${s.username}</span>`;
       for (let t = 1; t <= 10; t++) {
         const cell = s.cells[t + '_' + curOp];
         const v = cell ? cell[curWin] : null;
@@ -1506,6 +1508,12 @@ async function openTeacherDashboard() {
     wrap.innerHTML = head + body;
   }
   renderGrid();
+  wrap.addEventListener('click', e => {
+    const nameEl = e.target.closest('.td-name[data-username]');
+    if (!nameEl) return;
+    const s = list.find(x => x.username === nameEl.dataset.username);
+    if (s) openResetPin(s);
+  });
   div.querySelectorAll('#tdOpToggle .ptable-tog-btn').forEach(b => {
     b.addEventListener('click', () => {
       div.querySelectorAll('#tdOpToggle .ptable-tog-btn').forEach(x => x.classList.remove('active'));
@@ -1517,6 +1525,54 @@ async function openTeacherDashboard() {
       div.querySelectorAll('#tdWinToggle .ptable-tog-btn').forEach(x => x.classList.remove('active'));
       b.classList.add('active'); curWin = b.dataset.w; renderGrid();
     });
+  });
+}
+
+/* ── Teacher: reset a student's password ── */
+function openResetPin(student) {
+  removeOverlay();
+  const div = document.createElement('div');
+  div.className = 'timed-overlay';
+  div.innerHTML = `
+    <div class="timed-overlay-box auth-box">
+      <div class="overlay-title" style="color:#f0a500">🔑 Ponastavi geslo</div>
+      <div class="overlay-divider"></div>
+      <div class="reset-student">${student.emoji || '🦉'} <strong>${student.username}</strong></div>
+      <label class="auth-label">Izberi novo geslo — 4 živali</label>
+      <div id="resetPickerSlot"></div>
+      <button class="overlay-btn overlay-btn-next" id="resetBtn">Ponastavi geslo ✓</button>
+      <div class="auth-msg" id="resetMsg"></div>
+      <button class="auth-switch auth-close" id="resetCancel">← Nazaj na pregled</button>
+    </div>`;
+  document.body.appendChild(div);
+  activeOverlay = div;
+  div.addEventListener('click', e => { if (e.target === div) openTeacherDashboard(); });
+  const picker = buildAnimalPicker();
+  div.querySelector('#resetPickerSlot').appendChild(picker);
+  div.querySelector('#resetCancel').addEventListener('click', () => openTeacherDashboard());
+  div.querySelector('#resetBtn').addEventListener('click', async () => {
+    const seq = picker.getSeq();
+    const msg = div.querySelector('#resetMsg');
+    if (!seq) { msg.textContent = 'Izberi vse 4 živali.'; return; }
+    const btn = div.querySelector('#resetBtn');
+    btn.disabled = true; btn.textContent = 'Ponastavljam …';
+    const res = await supabaseRPC('reset_student_pin', {
+      p_teacher_id: teacherSession.id, p_username: student.username, p_pin: seq
+    });
+    if (res && res.length) {
+      const animals = seq.split(',').map(i => ANIMALS[+i]).join(' ');
+      div.querySelector('.timed-overlay-box').innerHTML = `
+        <div class="overlay-title" style="color:#4caf50">✅ Geslo ponastavljeno</div>
+        <div class="overlay-divider"></div>
+        <div class="reset-student">${student.emoji || '🦉'} <strong>${student.username}</strong></div>
+        <label class="auth-label">Novo geslo — povej učencu:</label>
+        <div class="reset-animals">${animals}</div>
+        <button class="overlay-btn overlay-btn-next" id="resetDone">Nazaj na pregled</button>`;
+      div.querySelector('#resetDone').addEventListener('click', () => openTeacherDashboard());
+    } else {
+      btn.disabled = false; btn.textContent = 'Ponastavi geslo ✓';
+      msg.textContent = '❌ Napaka pri ponastavitvi. Poskusi znova.';
+    }
   });
 }
 
