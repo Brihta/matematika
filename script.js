@@ -718,8 +718,8 @@ document.addEventListener('keydown', e => {
    Vpiši Supabase podatka spodaj za skupno lestvico med napravami.
    Če sta prazna, lestvica deluje lokalno (localStorage) na tej napravi. */
 const LEADERBOARD = {
-  supabaseUrl: '',   // npr. 'https://abcdefgh.supabase.co'
-  supabaseKey: '',   // anon public key
+  supabaseUrl: 'https://ldczgbajbarlgwqzcggh.supabase.co',
+  supabaseKey: 'sb_publishable_888IYcEb-nSmGO0d67hEwA_rBFuXnv8',
 };
 function leaderboardEnabled() {
   return !!(LEADERBOARD.supabaseUrl && LEADERBOARD.supabaseKey);
