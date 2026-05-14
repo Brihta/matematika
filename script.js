@@ -268,13 +268,16 @@ document.getElementById('brandImg').onerror = function() {
 ══════════════════════════ */
 const toolbar = document.getElementById('toolbar');
 const summaryArrow = document.getElementById('summaryArrow');
+const summaryLabel = document.getElementById('summaryLabel');
 function collapseToolbar() {
   toolbar.classList.add('collapsed');
   if (summaryArrow) summaryArrow.textContent = '▾';
+  if (summaryLabel) summaryLabel.textContent = 'Nastavitve';
 }
 function expandToolbar() {
   toolbar.classList.remove('collapsed');
   if (summaryArrow) summaryArrow.textContent = '▴';
+  if (summaryLabel) summaryLabel.textContent = 'Skrij nastavitve';
 }
 document.getElementById('summaryChip').addEventListener('click', () => {
   toolbar.classList.contains('collapsed') ? expandToolbar() : collapseToolbar();
@@ -363,20 +366,9 @@ function showPanel(m) {
   document.body.classList.toggle('competition', m==='tekmovanje');
 }
 
-function updateSummary() {
-  const mm = { quiz:'🎯 Kviz', keypad:'⌨️ Tipkovnica', tekmovanje:'🏆 Tekmovanje' };
-  const om = { both:'× ÷', multiply:'×', divide:'÷' };
-  document.getElementById('summaryMode').textContent = mm[mode] || mode;
-  if (mode === 'tekmovanje') {
-    document.getElementById('summaryOp').textContent = '× ÷';
-    document.getElementById('summaryFilter').textContent = 'vse';
-  } else {
-    document.getElementById('summaryOp').textContent = om[opType];
-    const sel = [...tables].sort((a,b)=>a-b);
-    document.getElementById('summaryFilter').textContent =
-      sel.length===10 ? 'Vse' : sel.length===0 ? 'Nič' : sel.join(', ');
-  }
-}
+/* The chip now shows a static "Nastavitve" / "Skrij nastavitve" label
+   (set by collapse/expandToolbar), so there is nothing to update here. */
+function updateSummary() {}
 
 /* ══════════════════════════
    RESTART
