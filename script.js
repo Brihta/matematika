@@ -166,6 +166,7 @@ let kInput = '', kAnswered = false, kTimer = null;
 
 /* Competition (Tekmovanje) state */
 let cQueue = [], cIdx = 0, cScore = 0, cStreak = 0, cTimeLeft = 45;
+let cCorrect = 0, cWrong = 0;
 let cInput = '', cAnswered = false, cTimer = null, cActive = false, cAdvanceTimer = null;
 const COMP_DURATION   = 45;   // seconds
 const COMP_OPEN_HOUR  = 7;    // 07:00 Slovenia
@@ -173,6 +174,17 @@ const COMP_CLOSE_HOUR = 19;   // 19:00 Slovenia
 
 let activeOverlay = null;
 let restartDebounce = null;
+
+/* Student profile + stats logging */
+let profile = null;                 // { id, username, emoji, display_name } or null
+let pendingStats = {};              // { mode: {correct,wrong,points,seconds} }
+let pendingAnswerCount = 0;
+let lastAnswerTs = 0;               // for estimating practice time in quiz/keypad
+
+/* 12 animal icons — the password is a sequence of 4 of these (order matters) */
+const ANIMALS = ['🐘','🦁','🦊','🐊','🐬','🦉','🐸','🐢','🦒','🐧','🐝','🐙'];
+/* Emoji choices for the profile badge */
+const PROFILE_EMOJIS = ['🦉','🚀','🦄','🐉','🌟','⚡','🎮','🍕','🦖','🐱','🐶','🦁','🌈','🎨','⚽','🦋'];
 
 /* ══════════════════════════
    SETTINGS PERSISTENCE
@@ -196,6 +208,23 @@ function saveSettings() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       mode, op: opType, tables: [...tables]
     }));
+  } catch(e) {}
+}
+
+/* Profile session persistence */
+const PROFILE_KEY = 'brihta_profile_v1';
+function loadProfile() {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (p && p.id && p.username) profile = p;
+  } catch(e) {}
+}
+function saveProfile() {
+  try {
+    if (profile) localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    else localStorage.removeItem(PROFILE_KEY);
   } catch(e) {}
 }
 
@@ -388,6 +417,8 @@ function doRestart() {
   if (cTimer) { clearInterval(cTimer); cTimer = null; }
   if (cAdvanceTimer) { clearTimeout(cAdvanceTimer); cAdvanceTimer = null; }
   cActive = false;
+  flushStats();          // persist any answers from the mode we are leaving
+  lastAnswerTs = 0;
   removeOverlay();
   cards = shuffle(getFilteredCards());
   if      (mode === 'quiz')   startQuiz();
@@ -542,6 +573,7 @@ function renderQuizQ() {
           if (b.dataset.val === correctAns) b.classList.add('correct');
         });
       }
+      recordStat('quiz', isCorrect?1:0, isCorrect?0:1, isCorrect?1:0, answerSeconds());
       updateScoreHUD(qOk, qNo, qStreak);
       const wrap = document.getElementById('advWrap'), bar = document.getElementById('advBar');
       if (wrap && bar) {
@@ -656,6 +688,7 @@ function checkKeypadAnswer() {
     }
     kStreak = 0; kNo++;
   }
+  recordStat('keypad', isCorrect?1:0, isCorrect?0:1, isCorrect?1:0, answerSeconds());
   updateScoreHUD(kOk, kNo, kStreak);
 
   document.querySelectorAll('.keypad-btn').forEach(b => b.disabled = true);
@@ -792,6 +825,396 @@ async function submitScore(name, score) {
   }
 }
 
+/* ══════════════════════════
+   SUPABASE RPC + STUDENT PROFILES
+══════════════════════════ */
+async function supabaseRPC(fn, params, extra) {
+  if (!leaderboardEnabled()) return null;
+  try {
+    const res = await fetch(`${LEADERBOARD.supabaseUrl}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: {
+        apikey: LEADERBOARD.supabaseKey,
+        Authorization: `Bearer ${LEADERBOARD.supabaseKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params || {}),
+      ...(extra || {})
+    });
+    if (!res.ok) return null;
+    const txt = await res.text();
+    return txt ? JSON.parse(txt) : null;
+  } catch(e) { return null; }
+}
+
+/* Monday (Slovenia) of the current week, as YYYY-MM-DD */
+function getWeekStartKey() {
+  const p = sloveniaParts();
+  const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day));
+  const dow = d.getUTCDay();              // 0 = Sun … 6 = Sat
+  d.setUTCDate(d.getUTCDate() - (dow === 0 ? 6 : dow - 1));
+  return d.toISOString().slice(0, 10);
+}
+
+/* ── Auth ── */
+async function registerStudent(name, number, emoji, pinSeq) {
+  const rows = await supabaseRPC('register_student', {
+    p_name: name, p_number: String(number), p_emoji: emoji, p_pin: pinSeq
+  });
+  if (rows && rows.length) {
+    profile = { id: rows[0].id, username: rows[0].username,
+                emoji: rows[0].emoji, display_name: rows[0].display_name };
+    saveProfile();
+    updateProfileButton();
+    return profile;
+  }
+  return null;
+}
+async function loginStudent(username, pinSeq) {
+  const rows = await supabaseRPC('login_student', {
+    p_username: username.toLowerCase().trim(), p_pin: pinSeq
+  });
+  if (rows && rows.length) {
+    profile = { id: rows[0].id, username: rows[0].username,
+                emoji: rows[0].emoji, display_name: rows[0].display_name };
+    saveProfile();
+    updateProfileButton();
+    return profile;
+  }
+  return null;
+}
+function logoutStudent() {
+  flushStats();
+  profile = null;
+  saveProfile();
+  updateProfileButton();
+}
+
+/* ── Stats logging ── */
+function recordStat(modeKey, correct, wrong, points, seconds) {
+  if (!profile) return;
+  if (!pendingStats[modeKey]) pendingStats[modeKey] = { correct:0, wrong:0, points:0, seconds:0 };
+  const s = pendingStats[modeKey];
+  s.correct += correct; s.wrong += wrong; s.points += points; s.seconds += seconds;
+  pendingAnswerCount++;
+  if (pendingAnswerCount >= 10) flushStats();
+}
+/* time since the previous answer, capped so idle time doesn't inflate it */
+function answerSeconds() {
+  const now = Date.now();
+  let dt = lastAnswerTs ? (now - lastAnswerTs) / 1000 : 0;
+  lastAnswerTs = now;
+  if (dt < 0 || dt > 20) dt = dt > 20 ? 20 : 0;
+  return dt;
+}
+function flushStats(useKeepalive) {
+  if (!profile) { pendingStats = {}; pendingAnswerCount = 0; return; }
+  const toSend = pendingStats;
+  pendingStats = {};
+  pendingAnswerCount = 0;
+  const day = getTodayKey();
+  for (const modeKey of Object.keys(toSend)) {
+    const s = toSend[modeKey];
+    if (!s.correct && !s.wrong && !s.points && !s.seconds) continue;
+    supabaseRPC('add_stats', {
+      p_student: profile.id, p_mode: modeKey, p_day: day,
+      p_correct: s.correct, p_wrong: s.wrong,
+      p_points: s.points, p_seconds: Math.round(s.seconds)
+    }, useKeepalive ? { keepalive: true } : undefined);
+  }
+}
+async function fetchStudentStats() {
+  if (!profile || !leaderboardEnabled()) return [];
+  try {
+    const res = await fetch(
+      `${LEADERBOARD.supabaseUrl}/rest/v1/stats?student_id=eq.${profile.id}`,
+      { headers: { apikey: LEADERBOARD.supabaseKey,
+                   Authorization: `Bearer ${LEADERBOARD.supabaseKey}` } }
+    );
+    if (res.ok) return await res.json();
+  } catch(e) {}
+  return [];
+}
+
+/* ══════════════════════════
+   PROFILE UI
+══════════════════════════ */
+function updateProfileButton() {
+  const btn = document.getElementById('profileBtn');
+  if (!btn) return;
+  if (profile) {
+    btn.innerHTML = `<span class="profile-emoji">${profile.emoji || '🦉'}</span>`
+      + `<span class="profile-name">${profile.username}</span>`;
+    btn.classList.add('logged-in');
+  } else {
+    btn.innerHTML = `<span class="profile-emoji">👤</span>`
+      + `<span class="profile-name">Prijava</span>`;
+    btn.classList.remove('logged-in');
+  }
+}
+
+/* Reusable 4-animal code picker. Returns an element; read `.getSeq()` for the code. */
+function buildAnimalPicker() {
+  const wrap = document.createElement('div');
+  wrap.className = 'animal-picker';
+  let seq = [];
+  const slots = document.createElement('div');
+  slots.className = 'animal-slots';
+  const grid = document.createElement('div');
+  grid.className = 'animal-grid';
+  const hint = document.createElement('div');
+  hint.className = 'animal-hint';
+
+  function render() {
+    slots.innerHTML = '';
+    for (let i = 0; i < 4; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'animal-slot' + (seq[i] != null ? ' filled' : '');
+      slot.textContent = seq[i] != null ? ANIMALS[seq[i]] : '';
+      slots.appendChild(slot);
+    }
+    hint.textContent = seq.length < 4
+      ? `Izberi še ${4 - seq.length} ${seq.length === 3 ? 'žival' : 'živali'}`
+      : '✓ Geslo izbrano';
+  }
+  ANIMALS.forEach((a, idx) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'animal-btn';
+    b.textContent = a;
+    b.addEventListener('click', () => {
+      if (seq.length >= 4) return;
+      seq.push(idx);
+      SFX.click();
+      render();
+    });
+    grid.appendChild(b);
+  });
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'animal-clear';
+  clearBtn.textContent = '⌫ Počisti';
+  clearBtn.addEventListener('click', () => { seq = []; render(); });
+
+  wrap.appendChild(slots);
+  wrap.appendChild(grid);
+  wrap.appendChild(hint);
+  wrap.appendChild(clearBtn);
+  render();
+  wrap.getSeq = () => (seq.length === 4 ? seq.join(',') : null);
+  return wrap;
+}
+
+function openAuthOverlay(startView) {
+  removeOverlay();
+  const div = document.createElement('div');
+  div.className = 'timed-overlay';
+  div.innerHTML = `<div class="timed-overlay-box auth-box" id="authBox"></div>`;
+  document.body.appendChild(div);
+  activeOverlay = div;
+  div.addEventListener('click', e => { if (e.target === div) removeOverlay(); });
+  renderAuthView(startView || 'login');
+}
+
+function renderAuthView(view) {
+  const box = document.getElementById('authBox');
+  if (!box) return;
+
+  if (view === 'login') {
+    box.innerHTML = `
+      <div class="overlay-title" style="color:#f0a500">👤 Prijava</div>
+      <div class="overlay-divider"></div>
+      <label class="auth-label">Uporabniško ime</label>
+      <input id="authUser" class="auth-input" autocomplete="off"
+             autocapitalize="none" placeholder="npr. nin4" />
+      <label class="auth-label">Geslo — poklikaj svoje 4 živali</label>
+      <div id="authPickerSlot"></div>
+      <button class="overlay-btn overlay-btn-next" id="authLoginBtn">Prijava ✓</button>
+      <div class="auth-msg" id="authMsg"></div>
+      <button class="auth-switch" id="authToRegister">Nimaš računa? Ustvari ga</button>
+      <button class="auth-switch auth-close" id="authClose">Zapri</button>`;
+    const picker = buildAnimalPicker();
+    box.querySelector('#authPickerSlot').appendChild(picker);
+    box.querySelector('#authClose').addEventListener('click', removeOverlay);
+    box.querySelector('#authToRegister').addEventListener('click', () => renderAuthView('register'));
+    box.querySelector('#authLoginBtn').addEventListener('click', async () => {
+      const user = box.querySelector('#authUser').value.trim();
+      const seq = picker.getSeq();
+      const msg = box.querySelector('#authMsg');
+      if (!user) { msg.textContent = 'Vpiši uporabniško ime.'; return; }
+      if (!seq)  { msg.textContent = 'Izberi vse 4 živali.'; return; }
+      const btn = box.querySelector('#authLoginBtn');
+      btn.disabled = true; btn.textContent = 'Preverjam …';
+      const ok = await loginStudent(user, seq);
+      if (ok) { removeOverlay(); openStatsOverlay(); }
+      else {
+        btn.disabled = false; btn.textContent = 'Prijava ✓';
+        msg.textContent = '❌ Napačno uporabniško ime ali geslo.';
+      }
+    });
+    return;
+  }
+
+  /* register */
+  box.innerHTML = `
+    <div class="overlay-title" style="color:#f0a500">✨ Nov račun</div>
+    <div class="overlay-divider"></div>
+    <label class="auth-label">Tvoje ime</label>
+    <input id="regName" class="auth-input" autocomplete="off" placeholder="npr. Nino" />
+    <label class="auth-label">Tvoja najljubša številka</label>
+    <input id="regNumber" class="auth-input" inputmode="numeric"
+           autocomplete="off" placeholder="npr. 4" />
+    <label class="auth-label">Izberi svoj emoji</label>
+    <div class="emoji-grid" id="regEmojiGrid"></div>
+    <label class="auth-label">Geslo — izberi 4 živali (zapomni si vrstni red!)</label>
+    <div id="regPickerSlot"></div>
+    <button class="overlay-btn overlay-btn-next" id="regBtn">Ustvari račun ✓</button>
+    <div class="auth-msg" id="regMsg"></div>
+    <button class="auth-switch" id="regToLogin">Že imaš račun? Prijavi se</button>
+    <button class="auth-switch auth-close" id="regClose">Zapri</button>`;
+
+  let chosenEmoji = PROFILE_EMOJIS[0];
+  const eg = box.querySelector('#regEmojiGrid');
+  PROFILE_EMOJIS.forEach((em, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'emoji-btn' + (i === 0 ? ' active' : '');
+    b.textContent = em;
+    b.addEventListener('click', () => {
+      eg.querySelectorAll('.emoji-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      chosenEmoji = em;
+    });
+    eg.appendChild(b);
+  });
+  const picker = buildAnimalPicker();
+  box.querySelector('#regPickerSlot').appendChild(picker);
+  box.querySelector('#regClose').addEventListener('click', removeOverlay);
+  box.querySelector('#regToLogin').addEventListener('click', () => renderAuthView('login'));
+  box.querySelector('#regBtn').addEventListener('click', async () => {
+    const name = box.querySelector('#regName').value.trim();
+    const number = box.querySelector('#regNumber').value.replace(/[^0-9]/g, '').slice(0, 3);
+    const seq = picker.getSeq();
+    const msg = box.querySelector('#regMsg');
+    if (name.length < 1)   { msg.textContent = 'Vpiši svoje ime.'; return; }
+    if (!number)           { msg.textContent = 'Vpiši svojo najljubšo številko.'; return; }
+    if (!seq)              { msg.textContent = 'Izberi vse 4 živali za geslo.'; return; }
+    const btn = box.querySelector('#regBtn');
+    btn.disabled = true; btn.textContent = 'Ustvarjam …';
+    const ok = await registerStudent(name, number, chosenEmoji, seq);
+    if (ok) {
+      box.innerHTML = `
+        <div class="overlay-title" style="color:#4caf50">✅ Račun ustvarjen!</div>
+        <div class="overlay-divider"></div>
+        <div class="reg-done-emoji">${ok.emoji}</div>
+        <div class="reg-done-label">Tvoje uporabniško ime je</div>
+        <div class="reg-done-user">${ok.username}</div>
+        <div class="auth-msg">📌 Dobro si ga zapomni — rabil ga boš za prijavo!</div>
+        <button class="overlay-btn overlay-btn-next" id="regDoneBtn">Naprej ➡️</button>`;
+      box.querySelector('#regDoneBtn').addEventListener('click', () => {
+        removeOverlay();
+        openStatsOverlay();
+      });
+    } else {
+      btn.disabled = false; btn.textContent = 'Ustvari račun ✓';
+      msg.textContent = '❌ Napaka pri ustvarjanju računa. Poskusi znova.';
+    }
+  });
+}
+
+/* ── Stats dashboard ── */
+function aggregateStats(rows, since) {
+  // since = null → all-time, else only rows with day >= since
+  const byMode = {};
+  for (const r of rows) {
+    if (since && r.day < since) continue;
+    if (!byMode[r.mode]) byMode[r.mode] = { correct:0, wrong:0, points:0, seconds:0 };
+    const m = byMode[r.mode];
+    m.correct += r.correct || 0;
+    m.wrong   += r.wrong   || 0;
+    m.points  += r.points  || 0;
+    m.seconds += r.seconds || 0;
+  }
+  return byMode;
+}
+function fmtDuration(sec) {
+  sec = Math.round(sec || 0);
+  if (sec < 60) return sec + ' s';
+  const m = Math.floor(sec / 60);
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60);
+  return h + ' h ' + (m % 60) + ' min';
+}
+function statCell(s) {
+  if (!s || (!s.correct && !s.wrong)) {
+    return '<div class="stat-cell empty">—</div>';
+  }
+  const total = s.correct + s.wrong;
+  const pct = total ? Math.round(s.correct / total * 100) : 0;
+  return `<div class="stat-cell">
+    <div class="stat-line"><span class="stat-ico">✅</span> ${s.correct}</div>
+    <div class="stat-line"><span class="stat-ico">❌</span> ${s.wrong} <span class="stat-pct">${pct}%</span></div>
+    <div class="stat-line"><span class="stat-ico">⭐</span> ${s.points}</div>
+    <div class="stat-line"><span class="stat-ico">⏱️</span> ${fmtDuration(s.seconds)}</div>
+  </div>`;
+}
+async function openStatsOverlay() {
+  if (!profile) { openAuthOverlay('login'); return; }
+  removeOverlay();
+  const div = document.createElement('div');
+  div.className = 'timed-overlay';
+  div.innerHTML = `
+    <div class="timed-overlay-box stats-box">
+      <button class="medal-modal-close" id="statsClose" title="Zapri">✕</button>
+      <div class="stats-header">
+        <span class="stats-emoji">${profile.emoji || '🦉'}</span>
+        <div>
+          <div class="stats-username">${profile.username}</div>
+          <div class="stats-subname">${profile.display_name || ''}</div>
+        </div>
+      </div>
+      <div class="stats-body" id="statsBody">
+        <div class="comp-board-empty">Nalagam statistiko …</div>
+      </div>
+      <button class="overlay-btn overlay-btn-ghost" id="statsLogout">Odjava</button>
+    </div>`;
+  document.body.appendChild(div);
+  activeOverlay = div;
+  div.addEventListener('click', e => { if (e.target === div) removeOverlay(); });
+  div.querySelector('#statsClose').addEventListener('click', removeOverlay);
+  div.querySelector('#statsLogout').addEventListener('click', () => {
+    logoutStudent();
+    removeOverlay();
+  });
+
+  await flushStats();           // make sure latest answers are counted
+  const rows = await fetchStudentStats();
+  const today = getTodayKey();
+  const weekStart = getWeekStartKey();
+  const scopes = [
+    { label: 'Danes',    data: aggregateStats(rows, today) },
+    { label: 'Ta teden', data: aggregateStats(rows, weekStart) },
+    { label: 'Ves čas',  data: aggregateStats(rows, null) },
+  ];
+  const modeList = [
+    { key: 'keypad',     label: '⌨️ Tipkovnica' },
+    { key: 'quiz',       label: '🎯 Kviz' },
+    { key: 'tekmovanje', label: '🏆 Tekmovanje' },
+  ];
+  const body = div.querySelector('#statsBody');
+  body.innerHTML = modeList.map(m => `
+    <div class="stats-mode-card">
+      <div class="stats-mode-title">${m.label}</div>
+      <div class="stats-grid">
+        ${scopes.map(sc => `
+          <div class="stats-col">
+            <div class="stats-col-label">${sc.label}</div>
+            ${statCell(sc.data[m.key])}
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
 /* ── Panel: intro / locked ── */
 function showTekmovanjePanel() {
   const area = document.getElementById('tekmovanjeArea');
@@ -858,6 +1281,7 @@ function startCompetition() {
   if (!allCards.length)     { showTekmovanjePanel(); return; }
   cQueue = shuffle(allCards.slice());   // full deck — ignores filters
   cIdx = 0; cScore = 0; cStreak = 0; cTimeLeft = COMP_DURATION;
+  cCorrect = 0; cWrong = 0;
   cInput = ''; cAnswered = false; cActive = false;
   if (cTimer) { clearInterval(cTimer); cTimer = null; }
   if (cAdvanceTimer) { clearTimeout(cAdvanceTimer); cAdvanceTimer = null; }
@@ -945,6 +1369,7 @@ function checkCompAnswer() {
     if (display) display.classList.add('correct');
     cStreak++;
     cScore += getMultiplier(cStreak);
+    cCorrect++;
     bumpCompScore();
   } else {
     SFX.wrong();
@@ -956,6 +1381,7 @@ function checkCompAnswer() {
         <span class="keypad-display-correct">${correctAns}</span>`;
     }
     cStreak = 0;   // no point penalty — just reset streak
+    cWrong++;
   }
   document.querySelectorAll('#compGrid .keypad-btn').forEach(b => b.disabled = true);
 
@@ -999,6 +1425,9 @@ function compTick() {
 function endCompetition() {
   removeOverlay();
   SFX.victory();
+  // log this round into the student's profile stats (if logged in)
+  recordStat('tekmovanje', cCorrect, cWrong, cScore, COMP_DURATION);
+  flushStats();
   const div = document.createElement('div');
   div.className = 'timed-overlay';
   div.innerHTML = `
@@ -1100,13 +1529,25 @@ document.addEventListener('keydown', e => {
   }
 });
 
+/* ── Profile button + stats flush on leave ── */
+document.getElementById('profileBtn').addEventListener('click', () => {
+  if (profile) openStatsOverlay();
+  else         openAuthOverlay('login');
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushStats(true);
+});
+window.addEventListener('pagehide', () => flushStats(true));
+
 /* ══════════════════════════
    INIT
 ══════════════════════════ */
 loadSettings();
+loadProfile();
 applyUIFromState();
 updateControlLock();
 updateSummary();
+updateProfileButton();
 showPanel(mode);
 loadData(() => {
   cards = shuffle(getFilteredCards());

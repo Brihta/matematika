@@ -622,6 +622,136 @@ body.competition {
 .overlay-btn-ghost:hover { background: rgba(255,255,255,0.14); }
 
 /* ══════════════════════════
+   STUDENT PROFILE
+══════════════════════════ */
+.profile-btn {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 6px 12px;
+  color: #ccc; font-size: 0.78rem; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s;
+}
+.profile-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(240,165,0,0.35); }
+.profile-btn.logged-in { border-color: rgba(76,175,80,0.45); color: #bce5bc; }
+.profile-emoji { font-size: 1rem; line-height: 1; }
+
+/* Auth overlay (login / register) */
+.auth-box, .stats-box {
+  max-width: 400px; width: 100%;
+  max-height: 88vh; overflow-y: auto;
+}
+.auth-label {
+  align-self: flex-start;
+  font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,0.6);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+.auth-input {
+  width: 100%;
+  background: rgba(0,0,0,0.35);
+  border: 2px solid #444; border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 1.1rem; color: #fff; font-family: inherit;
+}
+.auth-input:focus { outline: none; border-color: #f0a500; }
+.auth-msg { font-size: 0.82rem; color: #ff9090; min-height: 1.1em; text-align: center; }
+.auth-switch {
+  background: none; border: none; color: #7fb3ff;
+  font-size: 0.82rem; cursor: pointer; font-family: inherit;
+  text-decoration: underline; padding: 2px;
+}
+.auth-switch:hover { color: #a9ccff; }
+.auth-close { color: rgba(255,255,255,0.4); }
+
+/* Animal-code picker */
+.animal-picker { width: 100%; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.animal-slots { display: flex; gap: 8px; }
+.animal-slot {
+  width: 46px; height: 46px;
+  border: 2px dashed rgba(255,255,255,0.25);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem;
+}
+.animal-slot.filled { border-style: solid; border-color: #f0a500; background: rgba(240,165,0,0.12); }
+.animal-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+  width: 100%;
+}
+.animal-btn {
+  background: rgba(0,0,0,0.3);
+  border: 2px solid #334; border-radius: 10px;
+  padding: 8px 0; font-size: 1.5rem; cursor: pointer;
+  transition: transform .1s, border-color .1s, background .1s;
+}
+.animal-btn:hover { background: #1a4a8a; border-color: #f0a500; transform: translateY(-1px); }
+.animal-btn:active { transform: scale(0.92); }
+.animal-hint { font-size: 0.78rem; color: rgba(255,255,255,0.55); }
+.animal-clear {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px; padding: 5px 14px;
+  color: #ccc; font-size: 0.78rem; cursor: pointer; font-family: inherit;
+}
+.animal-clear:hover { background: rgba(255,255,255,0.12); }
+
+/* Emoji picker */
+.emoji-grid {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px;
+  width: 100%;
+}
+.emoji-btn {
+  background: rgba(0,0,0,0.3); border: 2px solid #334;
+  border-radius: 8px; padding: 5px 0;
+  font-size: 1.3rem; cursor: pointer; transition: all .1s;
+}
+.emoji-btn:hover { border-color: #f0a500; }
+.emoji-btn.active { border-color: #f0a500; background: rgba(240,165,0,0.2); transform: scale(1.05); }
+
+/* Registration success */
+.reg-done-emoji { font-size: 3.5rem; }
+.reg-done-label { font-size: 0.85rem; color: rgba(255,255,255,0.6); }
+.reg-done-user {
+  font-size: 2.4rem; font-weight: 800; color: #f0a500; letter-spacing: 0.06em;
+}
+
+/* Stats dashboard */
+.stats-box { position: relative; align-items: stretch !important; text-align: left !important; }
+.stats-header { display: flex; align-items: center; gap: 12px; }
+.stats-emoji { font-size: 2.6rem; line-height: 1; }
+.stats-username { font-size: 1.4rem; font-weight: 800; color: #f0a500; }
+.stats-subname { font-size: 0.85rem; color: rgba(255,255,255,0.5); }
+.stats-body { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+.stats-mode-card {
+  background: rgba(0,0,0,0.28);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px; padding: 12px;
+}
+.stats-mode-title { font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stats-col { text-align: center; }
+.stats-col-label {
+  font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: rgba(255,255,255,0.45); margin-bottom: 5px;
+}
+.stat-cell {
+  background: rgba(0,0,0,0.3); border-radius: 10px;
+  padding: 8px 6px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.stat-cell.empty {
+  align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.25); font-size: 1.2rem; min-height: 64px;
+}
+.stat-line { font-size: 0.82rem; font-weight: 600; color: #ddd; }
+.stat-ico { font-size: 0.72rem; }
+.stat-pct { color: rgba(255,255,255,0.45); font-size: 0.72rem; }
+
+/* ══════════════════════════
    RESPONSIVE
 ══════════════════════════ */
 @media (max-width: 600px) {
@@ -642,6 +772,10 @@ body.competition {
   .score-hud { gap: 8px; padding: 8px 10px; }
   .score-val { font-size: 1.25rem; }
   .score-sep { height: 32px; }
+  .profile-btn .profile-name { display: none; }
+  .animal-btn { font-size: 1.3rem; }
+  .animal-slot { width: 40px; height: 40px; font-size: 1.3rem; }
+  .stat-line { font-size: 0.75rem; }
 }
 @media (max-width: 360px) {
   .quiz-options { grid-template-columns: 1fr; }
