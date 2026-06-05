@@ -1430,12 +1430,9 @@ async function openTeacherDashboard() {
       <button class="medal-modal-close" id="tdClose" title="Zapri">✕</button>
       <div class="overlay-title" style="color:#f0a500">👨‍🏫 Učiteljski pregled</div>
       <div class="td-controls">
-        <div class="ptable-toggle" id="tdOpToggle">
-          <button class="ptable-tog-btn active" data-op="x">Množenje ×</button>
-          <button class="ptable-tog-btn" data-op="d">Deljenje ÷</button>
-        </div>
         <div class="ptable-toggle" id="tdWinToggle">
-          <button class="ptable-tog-btn active" data-w="recent">Zadnja 2 tedna</button>
+          <button class="ptable-tog-btn active" data-w="today">Danes</button>
+          <button class="ptable-tog-btn" data-w="recent">Zadnja 2 tedna</button>
           <button class="ptable-tog-btn" data-w="all">Ves čas</button>
         </div>
       </div>
@@ -1444,6 +1441,7 @@ async function openTeacherDashboard() {
         <span><span class="ptable-chip m-mid"></span> še vadi</span>
         <span><span class="ptable-chip m-bad"></span> potrebuje vajo</span>
         <span><span class="ptable-chip m-none"></span> ni podatkov</span>
+        <span class="td-legend-ops">levo × · desno ÷</span>
       </div>
       <div class="td-grid-wrap" id="tdGridWrap">
         <div class="comp-board-empty">Nalagam …</div>
@@ -1460,72 +1458,125 @@ async function openTeacherDashboard() {
     removeOverlay();
   });
 
-  const rows = await supabaseRPC('get_class_overview', {
-    p_teacher_id: teacherSession.id,
-    p_recent_since: getRecentSinceKey()
-  });
   const wrap = div.querySelector('#tdGridWrap');
-  if (!rows || !rows.length) {
-    wrap.innerHTML = '<div class="comp-board-empty">Še ni podatkov o učencih.</div>';
-    return;
-  }
-  // group by student
-  const students = {};
-  for (const r of rows) {
-    if (!students[r.username]) {
-      students[r.username] = { username: r.username, emoji: r.emoji,
-                               display_name: r.display_name, cells: {} };
-    }
-    if (r.table_n != null) {
-      students[r.username].cells[r.table_n + '_' + r.op] = {
-        all: { c: +r.correct_all, w: +r.wrong_all },
-        recent: { c: +r.correct_recent, w: +r.wrong_recent }
-      };
-    }
-  }
-  const list = Object.values(students).sort((a, b) =>
-    a.username.localeCompare(b.username));
+  const cache = { today: null, recent: null };
+  let curWin = 'today';
 
-  let curOp = 'x', curWin = 'recent';
+  function buildStudents(rows) {
+    const students = {};
+    for (const r of rows || []) {
+      if (!students[r.username]) {
+        students[r.username] = { username: r.username, emoji: r.emoji,
+                                 display_name: r.display_name, cells: {} };
+      }
+      if (r.table_n != null) {
+        students[r.username].cells[r.table_n + '_' + r.op] = {
+          all:    { c: +r.correct_all,    w: +r.wrong_all },
+          recent: { c: +r.correct_recent, w: +r.wrong_recent }
+        };
+      }
+    }
+    return Object.values(students).sort((a, b) =>
+      a.username.localeCompare(b.username));
+  }
+
+  async function ensureWindow(win) {
+    if (win === 'all') {
+      if (!cache.today && !cache.recent) {
+        const rows = await supabaseRPC('get_class_overview', {
+          p_teacher_id: teacherSession.id, p_recent_since: getTodayKey()
+        });
+        cache.today = buildStudents(rows);
+      }
+      return;
+    }
+    if (cache[win]) return;
+    const since = win === 'today' ? getTodayKey() : getRecentSinceKey();
+    const rows = await supabaseRPC('get_class_overview', {
+      p_teacher_id: teacherSession.id, p_recent_since: since
+    });
+    cache[win] = buildStudents(rows);
+  }
+
+  function activeList() {
+    if (curWin === 'all') return cache.today || cache.recent || [];
+    return cache[curWin] || [];
+  }
+
   function renderGrid() {
+    const list = activeList();
+    const slot = curWin === 'all' ? 'all' : 'recent';
+    let filtered = list;
+    if (curWin === 'today') {
+      filtered = list.filter(s => Object.values(s.cells).some(c => {
+        const r = c.recent || { c: 0, w: 0 };
+        return (r.c + r.w) > 0;
+      }));
+    }
+    if (!filtered.length) {
+      const msg = curWin === 'today'
+        ? 'Nihče še ni vadil danes.'
+        : 'Še ni podatkov o učencih.';
+      wrap.innerHTML = `<div class="comp-board-empty">${msg}</div>`;
+      return;
+    }
     let head = '<div class="td-row td-head"><span class="td-name"></span>';
     for (let t = 1; t <= 10; t++) head += `<span class="td-cell td-th">${t}</span>`;
     head += '</div>';
-    const body = list.map(s => {
+    const body = filtered.map(s => {
       let row = `<div class="td-row"><span class="td-name" data-username="${s.username}"`
         + ` title="Klikni za ponastavitev gesla">${s.emoji || '🦉'} ${s.username}</span>`;
       for (let t = 1; t <= 10; t++) {
-        const cell = s.cells[t + '_' + curOp];
-        const v = cell ? cell[curWin] : null;
-        const c = v ? v.c : 0, w = v ? v.w : 0;
-        const cls = masteryClass(c, w);
-        const pct = masteryPct(c, w);
-        row += `<span class="td-cell ${cls}" title="Poštevanka ${t}: ${c}✓ / ${w}✗">`
-          + `${pct === null ? '' : pct}</span>`;
+        const cx = s.cells[t + '_x'];
+        const cd = s.cells[t + '_d'];
+        const vx = cx ? cx[slot] : null;
+        const vd = cd ? cd[slot] : null;
+        const xc = vx ? vx.c : 0, xw = vx ? vx.w : 0;
+        const dc = vd ? vd.c : 0, dw = vd ? vd.w : 0;
+        const xCls = masteryClass(xc, xw);
+        const dCls = masteryClass(dc, dw);
+        const xPct = masteryPct(xc, xw);
+        const dPct = masteryPct(dc, dw);
+        const xTxt = xPct === null ? '–' : xPct;
+        const dTxt = dPct === null ? '–' : dPct;
+        const tip = `Poštevanka ${t} — × ${xc}✓/${xw}✗ · ÷ ${dc}✓/${dw}✗`;
+        if (xCls === 'm-none' && dCls === 'm-none') {
+          row += `<span class="td-cell m-none" title="${tip}"></span>`;
+        } else {
+          row += `<span class="td-cell td-cell-split" title="${tip}">`
+            + `<span class="td-half ${xCls}">${xTxt}</span>`
+            + `<span class="td-sep">/</span>`
+            + `<span class="td-half ${dCls}">${dTxt}</span>`
+            + `</span>`;
+        }
       }
       return row + '</div>';
     }).join('');
     wrap.innerHTML = head + body;
   }
-  renderGrid();
+
+  async function switchWindow(win) {
+    curWin = win;
+    wrap.innerHTML = '<div class="comp-board-empty">Nalagam …</div>';
+    await ensureWindow(win);
+    renderGrid();
+  }
+
   wrap.addEventListener('click', e => {
     const nameEl = e.target.closest('.td-name[data-username]');
     if (!nameEl) return;
-    const s = list.find(x => x.username === nameEl.dataset.username);
+    const s = activeList().find(x => x.username === nameEl.dataset.username);
     if (s) openResetPin(s);
-  });
-  div.querySelectorAll('#tdOpToggle .ptable-tog-btn').forEach(b => {
-    b.addEventListener('click', () => {
-      div.querySelectorAll('#tdOpToggle .ptable-tog-btn').forEach(x => x.classList.remove('active'));
-      b.classList.add('active'); curOp = b.dataset.op; renderGrid();
-    });
   });
   div.querySelectorAll('#tdWinToggle .ptable-tog-btn').forEach(b => {
     b.addEventListener('click', () => {
       div.querySelectorAll('#tdWinToggle .ptable-tog-btn').forEach(x => x.classList.remove('active'));
-      b.classList.add('active'); curWin = b.dataset.w; renderGrid();
+      b.classList.add('active');
+      switchWindow(b.dataset.w);
     });
   });
+
+  await switchWindow('today');
 }
 
 /* ── Teacher: reset a student's password ── */

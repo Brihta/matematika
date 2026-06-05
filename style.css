@@ -799,7 +799,7 @@ body.competition {
 
 /* ── Teacher dashboard ── */
 .teacher-box {
-  max-width: 92vw; width: 620px;
+  max-width: 92vw; width: 740px;
   max-height: 88vh; overflow-y: auto;
   position: relative; align-items: stretch !important;
 }
@@ -813,6 +813,7 @@ body.competition {
 .td-legend .ptable-chip {
   min-width: 16px; width: 16px; height: 16px; padding: 0;
 }
+.td-legend-ops { font-style: italic; color: rgba(255,255,255,0.5); }
 .td-grid-wrap {
   width: 100%; overflow-x: auto;
   display: flex; flex-direction: column; gap: 3px;
@@ -826,10 +827,21 @@ body.competition {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .td-cell {
-  width: 34px; min-width: 34px; height: 34px; flex-shrink: 0;
+  width: 58px; min-width: 58px; height: 34px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   border-radius: 6px; font-size: 0.72rem; font-weight: 700;
 }
+.td-cell-split {
+  background: transparent !important;
+  padding: 0; gap: 2px;
+}
+.td-half {
+  flex: 1; min-width: 0; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 5px;
+  font-size: 0.66rem; font-weight: 700;
+}
+.td-sep { color: rgba(255,255,255,0.35); font-weight: 600; font-size: 0.7rem; }
 .td-th {
   background: transparent !important;
   color: rgba(255,255,255,0.5) !important;
