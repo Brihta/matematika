@@ -803,8 +803,16 @@ body.competition {
   max-height: 88vh; overflow-y: auto;
   position: relative; align-items: stretch !important;
 }
-.td-controls { display: flex; gap: 8px; width: 100%; flex-wrap: wrap; }
+.td-controls { display: flex; gap: 8px; width: 100%; flex-wrap: wrap; align-items: stretch; }
 .td-controls .ptable-toggle { flex: 1; min-width: 150px; }
+.td-razred-select {
+  flex: 0 0 auto; min-width: 130px;
+  background: rgba(0,0,0,0.25); color: #eee;
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+  padding: 6px 10px; font-size: 0.78rem; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.td-razred-select option { background: #2a2342; color: #eee; }
 .td-legend {
   display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
   font-size: 0.7rem; color: rgba(255,255,255,0.6);
@@ -821,10 +829,16 @@ body.competition {
 }
 .td-row { display: flex; gap: 3px; align-items: stretch; }
 .td-name {
-  min-width: 100px; width: 100px; flex-shrink: 0;
+  min-width: 124px; width: 124px; flex-shrink: 0;
   font-size: 0.78rem; font-weight: 600; color: #ddd;
-  display: flex; align-items: center;
+  display: flex; align-items: center; gap: 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.td-razred {
+  flex-shrink: 0;
+  background: rgba(240,165,0,0.18); color: #f0a500;
+  border-radius: 5px; padding: 1px 5px;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.02em;
 }
 .td-cell {
   width: 44px; min-width: 44px; height: 40px; flex-shrink: 0;
@@ -853,6 +867,23 @@ body.competition {
   font-size: 0.72rem; color: rgba(255,255,255,0.5);
   text-align: center; margin-top: 2px;
 }
+
+/* ── Student class (razred) prompt ── */
+.razred-box { max-width: 92vw; width: 420px; }
+.razred-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  gap: 8px; width: 100%; margin-top: 6px;
+}
+.razred-btn {
+  background: rgba(0,0,0,0.28); border: 1.5px solid rgba(255,255,255,0.12);
+  border-radius: 10px; padding: 12px 0;
+  font-size: 1rem; font-weight: 800; color: #eee;
+  cursor: pointer; font-family: inherit;
+  transition: transform 0.08s, background 0.12s, border-color 0.12s;
+}
+.razred-btn:hover { background: rgba(240,165,0,0.18); border-color: #f0a500; }
+.razred-btn:active { transform: scale(0.94); }
+.razred-btn.active { background: #f0a500; color: #000; border-color: #f0a500; }
 
 /* Teacher: reset student password */
 .reset-student { font-size: 1.3rem; }

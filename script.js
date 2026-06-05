@@ -923,6 +923,59 @@ function logoutTeacher() {
   updateProfileButton();
 }
 
+/* ── Student class (razred) ── */
+const RAZREDI = ['1A','1B','2A','2B','3A','3B','4A','4B','5A','5B',
+                 '6A','6B','7A','7B','8A','8B','9A','9B'];
+async function getStudentRazred(id) {
+  return supabaseRPC('get_student_razred', { p_student: id });
+}
+async function setStudentRazred(id, razred) {
+  return supabaseRPC('set_student_razred', { p_student: id, p_razred: razred });
+}
+async function getClassRazreds(teacherId) {
+  return supabaseRPC('get_class_razreds', { p_teacher_id: teacherId });
+}
+/* If the logged-in student has no class yet, ask once; then run onDone. */
+async function ensureRazred(onDone) {
+  if (!profile) { onDone && onDone(); return; }
+  if (profile.razred) { onDone && onDone(); return; }
+  const r = await getStudentRazred(profile.id);
+  if (r) {
+    profile.razred = r; saveProfile();
+    onDone && onDone();
+  } else {
+    openRazredPrompt(onDone);
+  }
+}
+function openRazredPrompt(onDone) {
+  removeOverlay();
+  const div = document.createElement('div');
+  div.className = 'timed-overlay';
+  div.innerHTML = `
+    <div class="timed-overlay-box razred-box">
+      <div class="overlay-title" style="color:#f0a500">🏫 V kateri razred hodiš?</div>
+      <div class="overlay-divider"></div>
+      <div class="razred-grid">
+        ${RAZREDI.map(r => `<button class="razred-btn" data-r="${r}">${r}</button>`).join('')}
+      </div>
+    </div>`;
+  document.body.appendChild(div);
+  activeOverlay = div;
+  div.querySelectorAll('.razred-btn').forEach(b => {
+    b.addEventListener('click', async () => {
+      const r = b.dataset.r;
+      div.querySelectorAll('.razred-btn').forEach(x => x.disabled = true);
+      b.classList.add('active');
+      if (profile) {
+        profile.razred = r; saveProfile();
+        await setStudentRazred(profile.id, r);
+      }
+      removeOverlay();
+      onDone && onDone();
+    });
+  });
+}
+
 /* ── Stats logging ── */
 function recordStat(modeKey, correct, wrong, points, seconds) {
   if (!profile) return;
@@ -1138,7 +1191,7 @@ function renderAuthView(view) {
       const btn = box.querySelector('#authLoginBtn');
       btn.disabled = true; btn.textContent = 'Preverjam …';
       const ok = await loginStudent(user, seq);
-      if (ok) { removeOverlay(); openStatsOverlay(); }
+      if (ok) { removeOverlay(); ensureRazred(openStatsOverlay); }
       else {
         btn.disabled = false; btn.textContent = 'Prijava ✓';
         msg.textContent = '❌ Napačno uporabniško ime ali geslo.';
@@ -1240,7 +1293,7 @@ function renderAuthView(view) {
         <button class="overlay-btn overlay-btn-next" id="regDoneBtn">Naprej ➡️</button>`;
       box.querySelector('#regDoneBtn').addEventListener('click', () => {
         removeOverlay();
-        openStatsOverlay();
+        ensureRazred(openStatsOverlay);
       });
     } else {
       btn.disabled = false; btn.textContent = 'Ustvari račun ✓';
@@ -1435,6 +1488,9 @@ async function openTeacherDashboard() {
           <button class="ptable-tog-btn" data-w="recent">Zadnja 2 tedna</button>
           <button class="ptable-tog-btn" data-w="all">Ves čas</button>
         </div>
+        <select class="td-razred-select" id="tdRazredSelect" title="Filtriraj po razredu">
+          <option value="">Vsi razredi</option>
+        </select>
       </div>
       <div class="td-legend">
         <span><span class="ptable-chip m-good"></span> obvlada</span>
@@ -1461,6 +1517,8 @@ async function openTeacherDashboard() {
   const wrap = div.querySelector('#tdGridWrap');
   const cache = { today: null, recent: null };
   let curWin = 'today';
+  let curRazred = '';
+  const razredMap = {};   // username → razred
 
   function buildStudents(rows) {
     const students = {};
@@ -1513,10 +1571,13 @@ async function openTeacherDashboard() {
         return (r.c + r.w) > 0;
       }));
     }
+    if (curRazred) {
+      filtered = filtered.filter(s => razredMap[s.username] === curRazred);
+    }
     if (!filtered.length) {
-      const msg = curWin === 'today'
-        ? 'Nihče še ni vadil danes.'
-        : 'Še ni podatkov o učencih.';
+      const msg = curRazred
+        ? `V razredu ${curRazred} ${curWin === 'today' ? 'še nihče ni vadil danes' : 'ni podatkov'}.`
+        : (curWin === 'today' ? 'Nihče še ni vadil danes.' : 'Še ni podatkov o učencih.');
       wrap.innerHTML = `<div class="comp-board-empty">${msg}</div>`;
       return;
     }
@@ -1524,8 +1585,10 @@ async function openTeacherDashboard() {
     for (let t = 1; t <= 10; t++) head += `<span class="td-cell td-th">${t}</span>`;
     head += '</div>';
     const body = filtered.map(s => {
+      const rz = razredMap[s.username];
+      const rzTag = rz ? `<span class="td-razred">${rz}</span>` : '';
       let row = `<div class="td-row"><span class="td-name" data-username="${s.username}"`
-        + ` title="Klikni za ponastavitev gesla">${s.emoji || '🦉'} ${s.username}</span>`;
+        + ` title="Klikni za ponastavitev gesla">${s.emoji || '🦉'} ${s.username}${rzTag}</span>`;
       for (let t = 1; t <= 10; t++) {
         const cx = s.cells[t + '_x'];
         const cd = s.cells[t + '_d'];
@@ -1574,6 +1637,21 @@ async function openTeacherDashboard() {
       switchWindow(b.dataset.w);
     });
   });
+
+  const razSelect = div.querySelector('#tdRazredSelect');
+  razSelect.addEventListener('change', () => { curRazred = razSelect.value; renderGrid(); });
+
+  // class map for labels + filter (independent of the time window)
+  const razRows = await getClassRazreds(teacherSession.id);
+  for (const r of razRows || []) {
+    if (r.razred) razredMap[r.username] = r.razred;
+  }
+  const present = RAZREDI.filter(r => Object.values(razredMap).includes(r));
+  for (const r of present) {
+    const opt = document.createElement('option');
+    opt.value = r; opt.textContent = r;
+    razSelect.appendChild(opt);
+  }
 
   await switchWindow('today');
 }
@@ -1959,6 +2037,8 @@ updateControlLock();
 updateSummary();
 updateProfileButton();
 showPanel(mode);
+// persisted student with no class yet → ask once
+if (profile && !profile.razred && leaderboardEnabled()) ensureRazred();
 loadData(() => {
   cards = shuffle(getFilteredCards());
   if      (mode === 'quiz')   startQuiz();
