@@ -1441,7 +1441,7 @@ async function openTeacherDashboard() {
         <span><span class="ptable-chip m-mid"></span> še vadi</span>
         <span><span class="ptable-chip m-bad"></span> potrebuje vajo</span>
         <span><span class="ptable-chip m-none"></span> ni podatkov</span>
-        <span class="td-legend-ops">levo × · desno ÷</span>
+        <span class="td-legend-ops">zgoraj × · spodaj ÷</span>
       </div>
       <div class="td-grid-wrap" id="tdGridWrap">
         <div class="comp-board-empty">Nalagam …</div>
@@ -1545,7 +1545,6 @@ async function openTeacherDashboard() {
         } else {
           row += `<span class="td-cell td-cell-split" title="${tip}">`
             + `<span class="td-half ${xCls}">${xTxt}</span>`
-            + `<span class="td-sep">/</span>`
             + `<span class="td-half ${dCls}">${dTxt}</span>`
             + `</span>`;
         }

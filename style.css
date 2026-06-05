@@ -799,7 +799,7 @@ body.competition {
 
 /* ── Teacher dashboard ── */
 .teacher-box {
-  max-width: 92vw; width: 740px;
+  max-width: 92vw; width: 660px;
   max-height: 88vh; overflow-y: auto;
   position: relative; align-items: stretch !important;
 }
@@ -827,24 +827,25 @@ body.competition {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .td-cell {
-  width: 58px; min-width: 58px; height: 34px; flex-shrink: 0;
+  width: 44px; min-width: 44px; height: 40px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   border-radius: 6px; font-size: 0.72rem; font-weight: 700;
 }
 .td-cell-split {
+  flex-direction: column;
   background: transparent !important;
   padding: 0; gap: 2px;
 }
 .td-half {
-  flex: 1; min-width: 0; height: 100%;
+  flex: 1; width: 100%; min-height: 0;
   display: flex; align-items: center; justify-content: center;
   border-radius: 5px;
-  font-size: 0.66rem; font-weight: 700;
+  font-size: 0.68rem; font-weight: 700; line-height: 1;
 }
-.td-sep { color: rgba(255,255,255,0.35); font-weight: 600; font-size: 0.7rem; }
 .td-th {
   background: transparent !important;
   color: rgba(255,255,255,0.5) !important;
+  height: auto !important;
 }
 .td-name[data-username] { cursor: pointer; }
 .td-name[data-username]:hover { color: #f0a500; text-decoration: underline; }
