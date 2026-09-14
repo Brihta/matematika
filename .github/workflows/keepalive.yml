@@ -1,0 +1,44 @@
+name: Keep Supabase awake
+
+# Supabase pauses free-tier projects after 7 days without activity, which is
+# what happened over the last break: student login, the teacher overview and
+# all stats went down until the project was restored by hand. A read every
+# three days keeps it active through school holidays.
+#
+# CAVEAT WORTH KNOWING: GitHub disables scheduled workflows in a repository
+# after 60 days with no commits. Over a long summer break this cron can be
+# switched off on GitHub's side, and then Supabase pauses anyway. If the repo
+# has been quiet for two months, open the Actions tab and check this workflow
+# is still enabled — GitHub shows a banner with a re-enable button.
+
+on:
+  schedule:
+    # 06:17 UTC every third day — well inside the 7-day pause window.
+    - cron: '17 6 */3 * *'
+  workflow_dispatch:   # also runnable by hand from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read one row from the leaderboard
+        env:
+          # This is the publishable (anon) key. It is already public in
+          # script.js, so keeping it here exposes nothing new. If you ever
+          # rotate it, move it to a repo secret and read it from there.
+          SUPABASE_URL: https://ldczgbajbarlgwqzcggh.supabase.co
+          SUPABASE_KEY: sb_publishable_888IYcEb-nSmGO0d67hEwA_rBFuXnv8
+        run: |
+          set -u
+          code=$(curl -sS -o /tmp/body -w '%{http_code}' --max-time 30 \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            "${SUPABASE_URL}/rest/v1/scores?select=*&limit=1") || code=000
+          echo "HTTP ${code}"
+          head -c 300 /tmp/body || true
+          echo
+          if [ "${code}" != "200" ]; then
+            echo "::error::Supabase ni odgovoril (HTTP ${code}) - projekt je morda ustavljen."
+            exit 1
+          fi
+          echo "Projekt je aktiven."
