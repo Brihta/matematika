@@ -813,6 +813,20 @@ body.competition {
   font-family: inherit; cursor: pointer;
 }
 .td-razred-select option { background: #2a2342; color: #eee; }
+.td-refresh {
+  flex: 0 0 auto;
+  background: rgba(255,255,255,0.06); color: #eee;
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+  padding: 6px 12px; font-size: 0.78rem; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.td-refresh:hover { background: rgba(255,255,255,0.12); }
+.td-refresh:disabled { opacity: 0.5; cursor: default; }
+.td-updated-row {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; gap: 8px;
+}
+.td-updated { font-size: 0.68rem; color: rgba(255,255,255,0.45); }
 .td-legend {
   display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
   font-size: 0.7rem; color: rgba(255,255,255,0.6);

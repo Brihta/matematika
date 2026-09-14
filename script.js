@@ -174,6 +174,10 @@ const COMP_CLOSE_HOUR = 19;   // 19:00 Slovenia
 
 let activeOverlay = null;
 let restartDebounce = null;
+let tdRefreshTimer = null;          // teacher dashboard auto-refresh
+let tdRefreshFn = null;             // its refresh(), so returning to the tab can fire it
+const TD_REFRESH_MS = 30000;        // how often an open dashboard re-reads
+const STATS_FLUSH_MS = 15000;       // how often pending answers are pushed
 
 /* Student profile + stats logging */
 let profile = null;                 // { id, username, emoji, display_name } or null
@@ -242,6 +246,16 @@ function saveTeacher() {
 /* ══════════════════════════
    UTILS
 ══════════════════════════ */
+/* Anything that came from the database gets escaped before it goes into
+   innerHTML — usernames, display names and leaderboard names are typed by
+   kids, and the leaderboard POST endpoint is reachable with the publishable
+   key, so its contents cannot be trusted to be 3 safe letters. */
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length-1; i>0; i--) {
@@ -292,8 +306,23 @@ function getWrongAnswers(correct) {
 
 /* ── LOAD JSON ── */
 function loadData(cb) {
-  fetch('postevanka.json').then(r=>r.json()).then(d=>{allCards=d; if(cb) cb();})
-    .catch(e=>console.error('Napaka pri nalaganju JSON:', e));
+  fetch('postevanka.json')
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(d => { allCards = d; if (cb) cb(); })
+    .catch(e => {
+      console.error('Napaka pri nalaganju JSON:', e);
+      showLoadError();
+    });
+}
+/* Without the question deck there is nothing to show, so say so instead of
+   leaving the panel on its "začni!" placeholder forever. */
+function showLoadError() {
+  const html = '<div class="quiz-empty">⚠️ Računov ni bilo mogoče naložiti.<br>'
+             + 'Preveri internetno povezavo in osveži stran.</div>';
+  ['quizArea','keypadArea','tekmovanjeArea'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+  });
 }
 
 /* ── BRAND FALLBACK ── */
@@ -491,6 +520,8 @@ function closeMedalModal() {
    GENERIC OVERLAY HELPER
 ══════════════════════════ */
 function removeOverlay() {
+  if (tdRefreshTimer) { clearInterval(tdRefreshTimer); tdRefreshTimer = null; }
+  tdRefreshFn = null;
   if (activeOverlay && activeOverlay.parentNode) activeOverlay.parentNode.removeChild(activeOverlay);
   activeOverlay = null;
 }
@@ -841,8 +872,19 @@ async function submitScore(name, score) {
 /* ══════════════════════════
    SUPABASE RPC + STUDENT PROFILES
 ══════════════════════════ */
+/* Returned when the backend could not be reached or answered with a server
+   error — offline, DNS failure, project paused. Deliberately distinct from
+   null, which means the server answered and turned the request down (e.g. a
+   wrong password). Has no .length, so existing `rows && rows.length` checks
+   still treat it as "no data". */
+const RPC_UNREACHABLE = { unreachable: true };
+const OFFLINE_MSG = '⚠️ Strežnik trenutno ni dosegljiv. Preveri internetno povezavo '
+                  + 'in poskusi znova — geslo je najbrž pravilno.';
+/* Rows from an RPC that may have failed — always safe to iterate. */
+function asRows(v) { return Array.isArray(v) ? v : []; }
+
 async function supabaseRPC(fn, params, extra) {
-  if (!leaderboardEnabled()) return null;
+  if (!leaderboardEnabled()) return RPC_UNREACHABLE;
   try {
     const res = await fetch(`${LEADERBOARD.supabaseUrl}/rest/v1/rpc/${fn}`, {
       method: 'POST',
@@ -854,10 +896,11 @@ async function supabaseRPC(fn, params, extra) {
       body: JSON.stringify(params || {}),
       ...(extra || {})
     });
+    if (res.status >= 500) return RPC_UNREACHABLE;
     if (!res.ok) return null;
     const txt = await res.text();
     return txt ? JSON.parse(txt) : null;
-  } catch(e) { return null; }
+  } catch(e) { return RPC_UNREACHABLE; }
 }
 
 /* Monday (Slovenia) of the current week, as YYYY-MM-DD */
@@ -874,6 +917,7 @@ async function registerStudent(name, number, emoji, pinSeq) {
   const rows = await supabaseRPC('register_student', {
     p_name: name, p_number: String(number), p_emoji: emoji, p_pin: pinSeq
   });
+  if (rows === RPC_UNREACHABLE) return RPC_UNREACHABLE;
   if (rows && rows.length) {
     profile = { id: rows[0].id, username: rows[0].username,
                 emoji: rows[0].emoji, display_name: rows[0].display_name };
@@ -887,6 +931,7 @@ async function loginStudent(username, pinSeq) {
   const rows = await supabaseRPC('login_student', {
     p_username: username.toLowerCase().trim(), p_pin: pinSeq
   });
+  if (rows === RPC_UNREACHABLE) return RPC_UNREACHABLE;
   if (rows && rows.length) {
     profile = { id: rows[0].id, username: rows[0].username,
                 emoji: rows[0].emoji, display_name: rows[0].display_name };
@@ -908,6 +953,7 @@ async function loginTeacher(username, pin) {
   const rows = await supabaseRPC('login_teacher', {
     p_username: username.toLowerCase().trim(), p_pin: pin
   });
+  if (rows === RPC_UNREACHABLE) return RPC_UNREACHABLE;
   if (rows && rows.length) {
     teacherSession = { id: rows[0].id, username: rows[0].username };
     profile = null; saveProfile();
@@ -940,7 +986,8 @@ async function ensureRazred(onDone) {
   if (!profile) { onDone && onDone(); return; }
   if (profile.razred) { onDone && onDone(); return; }
   const r = await getStudentRazred(profile.id);
-  if (r) {
+  if (r === RPC_UNREACHABLE) { onDone && onDone(); return; }  // ask again next time
+  if (typeof r === 'string' && r) {
     profile.razred = r; saveProfile();
     onDone && onDone();
   } else {
@@ -1003,8 +1050,13 @@ function answerSeconds() {
   if (dt < 0 || dt > 20) dt = dt > 20 ? 20 : 0;
   return dt;
 }
+/* Returns a promise that settles once every write has landed, so callers that
+   read the stats back (openStatsOverlay) can await it instead of racing it. */
 function flushStats(useKeepalive) {
-  if (!profile) { pendingStats = {}; pendingTableStats = {}; pendingAnswerCount = 0; return; }
+  if (!profile) {
+    pendingStats = {}; pendingTableStats = {}; pendingAnswerCount = 0;
+    return Promise.resolve();
+  }
   const toSend = pendingStats;
   const toSendTables = pendingTableStats;
   pendingStats = {};
@@ -1012,21 +1064,23 @@ function flushStats(useKeepalive) {
   pendingAnswerCount = 0;
   const day = getTodayKey();
   const extra = useKeepalive ? { keepalive: true } : undefined;
+  const writes = [];
   for (const modeKey of Object.keys(toSend)) {
     const s = toSend[modeKey];
     if (!s.correct && !s.wrong && !s.points && !s.seconds) continue;
-    supabaseRPC('add_stats', {
+    writes.push(supabaseRPC('add_stats', {
       p_student: profile.id, p_mode: modeKey, p_day: day,
       p_correct: s.correct, p_wrong: s.wrong,
       p_points: s.points, p_seconds: Math.round(s.seconds)
-    }, extra);
+    }, extra));
   }
   const tableData = Object.keys(toSendTables).map(k => toSendTables[k]);
   if (tableData.length) {
-    supabaseRPC('add_table_stats', {
+    writes.push(supabaseRPC('add_table_stats', {
       p_student: profile.id, p_day: day, p_data: tableData
-    }, extra);
+    }, extra));
   }
+  return Promise.all(writes);
 }
 async function supabaseSelect(path) {
   if (!leaderboardEnabled()) return [];
@@ -1078,11 +1132,11 @@ function updateProfileButton() {
   if (!btn) return;
   if (teacherSession) {
     btn.innerHTML = `<span class="profile-emoji">👨‍🏫</span>`
-      + `<span class="profile-name">${teacherSession.username}</span>`;
+      + `<span class="profile-name">${esc(teacherSession.username)}</span>`;
     btn.classList.add('logged-in');
   } else if (profile) {
-    btn.innerHTML = `<span class="profile-emoji">${profile.emoji || '🦉'}</span>`
-      + `<span class="profile-name">${profile.username}</span>`;
+    btn.innerHTML = `<span class="profile-emoji">${esc(profile.emoji || '🦉')}</span>`
+      + `<span class="profile-name">${esc(profile.username)}</span>`;
     btn.classList.add('logged-in');
   } else {
     btn.innerHTML = `<span class="profile-emoji">👤</span>`
@@ -1191,7 +1245,10 @@ function renderAuthView(view) {
       const btn = box.querySelector('#authLoginBtn');
       btn.disabled = true; btn.textContent = 'Preverjam …';
       const ok = await loginStudent(user, seq);
-      if (ok) { removeOverlay(); ensureRazred(openStatsOverlay); }
+      if (ok === RPC_UNREACHABLE) {
+        btn.disabled = false; btn.textContent = 'Prijava ✓';
+        msg.textContent = OFFLINE_MSG;
+      } else if (ok) { removeOverlay(); ensureRazred(openStatsOverlay); }
       else {
         btn.disabled = false; btn.textContent = 'Prijava ✓';
         msg.textContent = '❌ Napačno uporabniško ime ali geslo.';
@@ -1222,7 +1279,10 @@ function renderAuthView(view) {
       const btn = box.querySelector('#tLoginBtn');
       btn.disabled = true; btn.textContent = 'Preverjam …';
       const ok = await loginTeacher(user, pin);
-      if (ok) { removeOverlay(); openTeacherDashboard(); }
+      if (ok === RPC_UNREACHABLE) {
+        btn.disabled = false; btn.textContent = 'Prijava ✓';
+        msg.textContent = OFFLINE_MSG;
+      } else if (ok) { removeOverlay(); openTeacherDashboard(); }
       else {
         btn.disabled = false; btn.textContent = 'Prijava ✓';
         msg.textContent = '❌ Napačno uporabniško ime ali geslo.';
@@ -1240,7 +1300,8 @@ function renderAuthView(view) {
     <div class="overlay-title" style="color:#f0a500">✨ Nov račun</div>
     <div class="overlay-divider"></div>
     <label class="auth-label">Tvoje ime</label>
-    <input id="regName" class="auth-input" autocomplete="off" placeholder="npr. Nino" />
+    <input id="regName" class="auth-input" autocomplete="off" maxlength="20"
+           placeholder="npr. Nino" />
     <label class="auth-label">Tvoja najljubša številka</label>
     <input id="regNumber" class="auth-input" inputmode="numeric"
            autocomplete="off" placeholder="npr. 4" />
@@ -1272,7 +1333,7 @@ function renderAuthView(view) {
   box.querySelector('#regClose').addEventListener('click', removeOverlay);
   box.querySelector('#regToLogin').addEventListener('click', () => renderAuthView('login'));
   box.querySelector('#regBtn').addEventListener('click', async () => {
-    const name = box.querySelector('#regName').value.trim();
+    const name = box.querySelector('#regName').value.trim().slice(0, 20);
     const number = box.querySelector('#regNumber').value.replace(/[^0-9]/g, '').slice(0, 3);
     const seq = picker.getSeq();
     const msg = box.querySelector('#regMsg');
@@ -1282,13 +1343,16 @@ function renderAuthView(view) {
     const btn = box.querySelector('#regBtn');
     btn.disabled = true; btn.textContent = 'Ustvarjam …';
     const ok = await registerStudent(name, number, chosenEmoji, seq);
-    if (ok) {
+    if (ok === RPC_UNREACHABLE) {
+      btn.disabled = false; btn.textContent = 'Ustvari račun ✓';
+      msg.textContent = OFFLINE_MSG;
+    } else if (ok) {
       box.innerHTML = `
         <div class="overlay-title" style="color:#4caf50">✅ Račun ustvarjen!</div>
         <div class="overlay-divider"></div>
-        <div class="reg-done-emoji">${ok.emoji}</div>
+        <div class="reg-done-emoji">${esc(ok.emoji)}</div>
         <div class="reg-done-label">Tvoje uporabniško ime je</div>
-        <div class="reg-done-user">${ok.username}</div>
+        <div class="reg-done-user">${esc(ok.username)}</div>
         <div class="auth-msg">📌 Dobro si ga zapomni — rabil ga boš za prijavo!</div>
         <button class="overlay-btn overlay-btn-next" id="regDoneBtn">Naprej ➡️</button>`;
       box.querySelector('#regDoneBtn').addEventListener('click', () => {
@@ -1347,10 +1411,10 @@ async function openStatsOverlay() {
     <div class="timed-overlay-box stats-box">
       <button class="medal-modal-close" id="statsClose" title="Zapri">✕</button>
       <div class="stats-header">
-        <span class="stats-emoji">${profile.emoji || '🦉'}</span>
+        <span class="stats-emoji">${esc(profile.emoji || '🦉')}</span>
         <div>
-          <div class="stats-username">${profile.username}</div>
-          <div class="stats-subname">${profile.display_name || ''}</div>
+          <div class="stats-username">${esc(profile.username)}</div>
+          <div class="stats-subname">${esc(profile.display_name || '')}</div>
         </div>
       </div>
       <div class="stats-body" id="statsBody">
@@ -1492,6 +1556,10 @@ async function openTeacherDashboard() {
           <option value="">Vsi razredi</option>
         </select>
       </div>
+      <div class="td-updated-row">
+        <span class="td-updated" id="tdUpdated"></span>
+        <button class="td-refresh" id="tdRefresh" title="Osveži podatke">⟳ Osveži</button>
+      </div>
       <div class="td-legend">
         <span><span class="ptable-chip m-good"></span> obvlada</span>
         <span><span class="ptable-chip m-mid"></span> še vadi</span>
@@ -1518,11 +1586,13 @@ async function openTeacherDashboard() {
   const cache = { today: null, recent: null };
   let curWin = 'today';
   let curRazred = '';
+  let lastFetchClock = null;
+  let refreshing = false;
   const razredMap = {};   // username → razred
 
   function buildStudents(rows) {
     const students = {};
-    for (const r of rows || []) {
+    for (const r of asRows(rows)) {
       if (!students[r.username]) {
         students[r.username] = { username: r.username, emoji: r.emoji,
                                  display_name: r.display_name, cells: {} };
@@ -1545,6 +1615,7 @@ async function openTeacherDashboard() {
           p_teacher_id: teacherSession.id, p_recent_since: getTodayKey()
         });
         cache.today = buildStudents(rows);
+        lastFetchClock = getSloveniaClock();
       }
       return;
     }
@@ -1554,6 +1625,33 @@ async function openTeacherDashboard() {
       p_teacher_id: teacherSession.id, p_recent_since: since
     });
     cache[win] = buildStudents(rows);
+    lastFetchClock = getSloveniaClock();
+  }
+
+  /* Throw the cache away and pull again. Children push their answers every
+     few seconds, so a dashboard left open all lesson has to re-ask — without
+     this it shows whatever the class had done at the moment it was opened. */
+  async function refresh(silent) {
+    if (refreshing) return;
+    refreshing = true;
+    const btn = div.querySelector('#tdRefresh');
+    if (btn) btn.disabled = true;
+    if (!silent) wrap.innerHTML = '<div class="comp-board-empty">Nalagam …</div>';
+    cache.today = null;
+    cache.recent = null;
+    try {
+      await ensureWindow(curWin);
+      renderGrid();
+    } finally {
+      refreshing = false;
+      if (btn) btn.disabled = false;
+      markUpdated();
+    }
+  }
+
+  function markUpdated() {
+    const el = div.querySelector('#tdUpdated');
+    if (el) el.textContent = lastFetchClock ? `osveženo ob ${lastFetchClock}` : '';
   }
 
   function activeList() {
@@ -1587,8 +1685,8 @@ async function openTeacherDashboard() {
     const body = filtered.map(s => {
       const rz = razredMap[s.username];
       const rzTag = rz ? `<span class="td-razred">${rz}</span>` : '';
-      let row = `<div class="td-row"><span class="td-name" data-username="${s.username}"`
-        + ` title="Klikni za ponastavitev gesla">${s.emoji || '🦉'} ${s.username}${rzTag}</span>`;
+      let row = `<div class="td-row"><span class="td-name" data-username="${esc(s.username)}"`
+        + ` title="Klikni za ponastavitev gesla">${esc(s.emoji || '🦉')} ${esc(s.username)}${rzTag}</span>`;
       for (let t = 1; t <= 10; t++) {
         const cx = s.cells[t + '_x'];
         const cd = s.cells[t + '_d'];
@@ -1622,6 +1720,7 @@ async function openTeacherDashboard() {
     wrap.innerHTML = '<div class="comp-board-empty">Nalagam …</div>';
     await ensureWindow(win);
     renderGrid();
+    markUpdated();
   }
 
   wrap.addEventListener('click', e => {
@@ -1640,10 +1739,19 @@ async function openTeacherDashboard() {
 
   const razSelect = div.querySelector('#tdRazredSelect');
   razSelect.addEventListener('change', () => { curRazred = razSelect.value; renderGrid(); });
+  div.querySelector('#tdRefresh').addEventListener('click', () => refresh(false));
+
+  /* Keep the board live while the teacher watches the class work. Cleared by
+     removeOverlay() whenever the dashboard closes. */
+  if (tdRefreshTimer) clearInterval(tdRefreshTimer);
+  tdRefreshFn = refresh;
+  tdRefreshTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') refresh(true);
+  }, TD_REFRESH_MS);
 
   // class map for labels + filter (independent of the time window)
   const razRows = await getClassRazreds(teacherSession.id);
-  for (const r of razRows || []) {
+  for (const r of asRows(razRows)) {
     if (r.razred) razredMap[r.username] = r.razred;
   }
   const present = RAZREDI.filter(r => Object.values(razredMap).includes(r));
@@ -1665,7 +1773,7 @@ function openResetPin(student) {
     <div class="timed-overlay-box auth-box">
       <div class="overlay-title" style="color:#f0a500">🔑 Ponastavi geslo</div>
       <div class="overlay-divider"></div>
-      <div class="reset-student">${student.emoji || '🦉'} <strong>${student.username}</strong></div>
+      <div class="reset-student">${esc(student.emoji || '🦉')} <strong>${esc(student.username)}</strong></div>
       <label class="auth-label">Izberi novo geslo — 4 živali</label>
       <div id="resetPickerSlot"></div>
       <button class="overlay-btn overlay-btn-next" id="resetBtn">Ponastavi geslo ✓</button>
@@ -1692,7 +1800,7 @@ function openResetPin(student) {
       div.querySelector('.timed-overlay-box').innerHTML = `
         <div class="overlay-title" style="color:#4caf50">✅ Geslo ponastavljeno</div>
         <div class="overlay-divider"></div>
-        <div class="reset-student">${student.emoji || '🦉'} <strong>${student.username}</strong></div>
+        <div class="reset-student">${esc(student.emoji || '🦉')} <strong>${esc(student.username)}</strong></div>
         <label class="auth-label">Novo geslo — povej učencu:</label>
         <div class="reset-animals">${animals}</div>
         <button class="overlay-btn overlay-btn-next" id="resetDone">Nazaj na pregled</button>`;
@@ -2000,8 +2108,8 @@ async function openLeaderboard(highlightName, highlightScore) {
     const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
     return `<div class="comp-board-row${isMe ? ' me' : ''}">
       <span class="cb-rank">${rank}</span>
-      <span class="cb-name">${r.name}</span>
-      <span class="cb-score">${r.score}</span>
+      <span class="cb-name">${esc(r.name)}</span>
+      <span class="cb-score">${esc(r.score)}</span>
     </div>`;
   }).join('');
 }
@@ -2023,9 +2131,22 @@ document.addEventListener('keydown', e => {
 /* ── Profile button + stats flush on leave ── */
 document.getElementById('profileBtn').addEventListener('click', handleProfileButton);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushStats(true);
+  if (document.visibilityState === 'hidden') { flushStats(true); return; }
+  // Back on screen: don't make the teacher wait out the rest of the interval.
+  if (tdRefreshFn) tdRefreshFn(true);
 });
 window.addEventListener('pagehide', () => flushStats(true));
+
+/* The every-10-answers rule alone leaves a child who stops after 7 invisible
+   to the teacher until they close the tab. This pushes whatever is pending on
+   a timer instead. Skipped while hidden — visibilitychange already flushed,
+   and nothing new accumulates when nobody is answering. */
+setInterval(() => {
+  if (!profile) return;
+  if (document.visibilityState !== 'visible') return;
+  if (!pendingAnswerCount && !Object.keys(pendingTableStats).length) return;
+  flushStats();
+}, STATS_FLUSH_MS);
 
 /* ══════════════════════════
    INIT
