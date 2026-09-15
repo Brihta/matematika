@@ -756,6 +756,8 @@ body.competition {
 .m-mid  { background: #b07d12; color: #fff2cf; }
 .m-bad  { background: #a82b2b; color: #ffdada; }
 .m-none { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); }
+.m-early { background: rgba(255,255,255,0.16); color: rgba(255,255,255,0.8);
+           box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); }
 
 /* ── Per-child "Poštevanke" section ── */
 .stats-section-title {
@@ -799,7 +801,7 @@ body.competition {
 
 /* ── Teacher dashboard ── */
 .teacher-box {
-  max-width: 92vw; width: 660px;
+  max-width: 96vw; width: 780px;
   max-height: 88vh; overflow-y: auto;
   position: relative; align-items: stretch !important;
 }
@@ -822,11 +824,50 @@ body.competition {
 }
 .td-refresh:hover { background: rgba(255,255,255,0.12); }
 .td-refresh:disabled { opacity: 0.5; cursor: default; }
-.td-updated-row {
+.td-statusline {
   display: flex; align-items: center; justify-content: space-between;
   width: 100%; gap: 8px;
+  font-size: 0.7rem; color: rgba(255,255,255,0.5);
 }
-.td-updated { font-size: 0.68rem; color: rgba(255,255,255,0.45); }
+.td-live { display: flex; align-items: center; gap: 6px; }
+.td-classsum { color: rgba(255,255,255,0.45); }
+
+/* ── Lesson view: one row per student ── */
+.td-lesson { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.tl-row {
+  display: grid; grid-template-columns: 1fr 76px 76px 104px;
+  gap: 8px; align-items: center;
+  padding: 8px 12px; border-radius: 9px;
+  background: rgba(255,255,255,0.04);
+}
+.tl-head {
+  background: transparent; padding-top: 0; padding-bottom: 0;
+  font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: rgba(255,255,255,0.4); font-weight: 700;
+}
+.tl-name {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.85rem; font-weight: 600; color: #eee;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer;
+}
+.tl-name:hover { color: #f0a500; }
+.tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tl-dot.on   { background: #4caf50; box-shadow: 0 0 6px rgba(76,175,80,0.7); }
+.tl-dot.off  { background: rgba(255,255,255,0.18); }
+.tl-dot.warn { background: #e6a817; box-shadow: 0 0 6px rgba(230,168,23,0.7); }
+.tl-num, .tl-weak {
+  text-align: right; font-weight: 700; font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+.tl-weak { color: rgba(255,255,255,0.75); }
+/* accuracy reads as coloured text, not as a filled chip */
+.tl-num.m-good  { background: transparent; color: #5fd97a; }
+.tl-num.m-mid   { background: transparent; color: #e6b84a; }
+.tl-num.m-bad   { background: transparent; color: #ff7a7a; }
+.tl-num.m-early { background: transparent; box-shadow: none; color: rgba(255,255,255,0.6); }
+.tl-num.m-none  { background: transparent; color: rgba(255,255,255,0.35); }
+.tl-idle { opacity: 0.5; }
 .td-legend {
   display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
   font-size: 0.7rem; color: rgba(255,255,255,0.6);
@@ -843,7 +884,7 @@ body.competition {
 }
 .td-row { display: flex; gap: 3px; align-items: stretch; }
 .td-name {
-  min-width: 124px; width: 124px; flex-shrink: 0;
+  min-width: 100px; width: 100px; flex-shrink: 0;
   font-size: 0.78rem; font-weight: 600; color: #ddd;
   display: flex; align-items: center; gap: 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -855,7 +896,7 @@ body.competition {
   font-size: 0.66rem; font-weight: 700; letter-spacing: 0.02em;
 }
 .td-cell {
-  width: 44px; min-width: 44px; height: 40px; flex-shrink: 0;
+  width: 48px; min-width: 48px; height: 42px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   border-radius: 6px; font-size: 0.72rem; font-weight: 700;
 }

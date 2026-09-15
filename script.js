@@ -176,7 +176,7 @@ let activeOverlay = null;
 let restartDebounce = null;
 let tdRefreshTimer = null;          // teacher dashboard auto-refresh
 let tdRefreshFn = null;             // its refresh(), so returning to the tab can fire it
-const TD_REFRESH_MS = 30000;        // how often an open dashboard re-reads
+const TD_REFRESH_MS = 15000;        // how often an open dashboard re-reads
 const STATS_FLUSH_MS = 15000;       // how often pending answers are pushed
 
 /* Student profile + stats logging */
@@ -1119,6 +1119,15 @@ function masteryClass(correct, wrong) {
   if (pct >= 60) return 'm-mid';
   return 'm-bad';
 }
+/* Like masteryClass, but keeps "a few answers so far" visually distinct from
+   "never touched". The old code called both m-none, so a child's first
+   handful of answers on a table was indistinguishable from no work at all. */
+function cellClass(correct, wrong) {
+  const total = (correct || 0) + (wrong || 0);
+  if (!total) return 'm-none';
+  if (total < 5) return 'm-early';
+  return masteryClass(correct, wrong);
+}
 function masteryPct(correct, wrong) {
   const total = (correct || 0) + (wrong || 0);
   return total ? Math.round(correct / total * 100) : null;
@@ -1552,18 +1561,25 @@ async function openTeacherDashboard() {
           <button class="ptable-tog-btn" data-w="recent">Zadnja 2 tedna</button>
           <button class="ptable-tog-btn" data-w="all">Ves čas</button>
         </div>
+      </div>
+      <div class="td-controls">
+        <div class="ptable-toggle" id="tdViewToggle">
+          <button class="ptable-tog-btn active" data-v="lesson">👥 Učenci</button>
+          <button class="ptable-tog-btn" data-v="matrix">📚 Poštevanke</button>
+        </div>
         <select class="td-razred-select" id="tdRazredSelect" title="Filtriraj po razredu">
           <option value="">Vsi razredi</option>
         </select>
       </div>
-      <div class="td-updated-row">
-        <span class="td-updated" id="tdUpdated"></span>
-        <button class="td-refresh" id="tdRefresh" title="Osveži podatke">⟳ Osveži</button>
+      <div class="td-statusline">
+        <span class="td-live" id="tdLive"></span>
+        <span class="td-classsum" id="tdClassSum"></span>
       </div>
-      <div class="td-legend">
+      <div class="td-legend" id="tdLegend">
         <span><span class="ptable-chip m-good"></span> obvlada</span>
         <span><span class="ptable-chip m-mid"></span> še vadi</span>
         <span><span class="ptable-chip m-bad"></span> potrebuje vajo</span>
+        <span><span class="ptable-chip m-early"></span> premalo odgovorov</span>
         <span><span class="ptable-chip m-none"></span> ni podatkov</span>
         <span class="td-legend-ops">zgoraj × · spodaj ÷</span>
       </div>
@@ -1586,7 +1602,9 @@ async function openTeacherDashboard() {
   const cache = { today: null, recent: null };
   let curWin = 'today';
   let curRazred = '';
-  let lastFetchClock = null;
+  let curView = 'lesson';
+  let lastFetchTs = 0;
+  let offline = false;
   let refreshing = false;
   const razredMap = {};   // username → razred
 
@@ -1608,74 +1626,169 @@ async function openTeacherDashboard() {
       a.username.localeCompare(b.username));
   }
 
-  async function ensureWindow(win) {
-    if (win === 'all') {
-      if (!cache.today && !cache.recent) {
-        const rows = await supabaseRPC('get_class_overview', {
-          p_teacher_id: teacherSession.id, p_recent_since: getTodayKey()
-        });
-        cache.today = buildStudents(rows);
-        lastFetchClock = getSloveniaClock();
-      }
-      return;
-    }
-    if (cache[win]) return;
-    const since = win === 'today' ? getTodayKey() : getRecentSinceKey();
+  /* 'all' reads its numbers from the correct_all columns, which do not depend
+     on p_recent_since, so it can share whatever the 'today' fetch returned. */
+  function cacheKeyFor(win) { return win === 'recent' ? 'recent' : 'today'; }
+
+  async function fetchWindow(key) {
+    const since = key === 'recent' ? getRecentSinceKey() : getTodayKey();
     const rows = await supabaseRPC('get_class_overview', {
       p_teacher_id: teacherSession.id, p_recent_since: since
     });
-    cache[win] = buildStudents(rows);
-    lastFetchClock = getSloveniaClock();
+    return rows === RPC_UNREACHABLE ? null : buildStudents(rows);
   }
 
-  /* Throw the cache away and pull again. Children push their answers every
-     few seconds, so a dashboard left open all lesson has to re-ask — without
-     this it shows whatever the class had done at the moment it was opened. */
-  async function refresh(silent) {
+  async function ensureWindow(win) {
+    const key = cacheKeyFor(win);
+    if (cache[key]) return;
+    const built = await fetchWindow(key);
+    if (built) { cache[key] = built; lastFetchTs = Date.now(); offline = false; }
+    else offline = true;
+  }
+
+  /* Pull again without destroying what is on screen: a failed poll keeps the
+     last good board and flags it, rather than blanking the class mid-lesson. */
+  async function refresh() {
     if (refreshing) return;
     refreshing = true;
-    const btn = div.querySelector('#tdRefresh');
-    if (btn) btn.disabled = true;
-    if (!silent) wrap.innerHTML = '<div class="comp-board-empty">Nalagam …</div>';
-    cache.today = null;
-    cache.recent = null;
+    updateLive();
     try {
-      await ensureWindow(curWin);
-      renderGrid();
+      const key = cacheKeyFor(curWin);
+      const built = await fetchWindow(key);
+      if (built) {
+        cache[key] = built;
+        lastFetchTs = Date.now();
+        offline = false;
+        renderGrid();
+      } else {
+        offline = true;
+      }
     } finally {
       refreshing = false;
-      if (btn) btn.disabled = false;
-      markUpdated();
+      updateLive();
     }
   }
 
-  function markUpdated() {
-    const el = div.querySelector('#tdUpdated');
-    if (el) el.textContent = lastFetchClock ? `osveženo ob ${lastFetchClock}` : '';
+  function updateLive() {
+    const el = div.querySelector('#tdLive');
+    if (!el) return;
+    if (offline) { el.innerHTML = '<span class="tl-dot warn"></span> ni povezave'; return; }
+    if (refreshing) { el.innerHTML = '<span class="tl-dot on"></span> osvežujem …'; return; }
+    const age = lastFetchTs ? Math.round((Date.now() - lastFetchTs) / 1000) : null;
+    el.innerHTML = '<span class="tl-dot on"></span> v živo'
+      + (age === null ? '' : ` · osveženo pred ${age} s`);
   }
 
   function activeList() {
-    if (curWin === 'all') return cache.today || cache.recent || [];
-    return cache[curWin] || [];
+    return cache[cacheKeyFor(curWin)] || [];
+  }
+
+  /* Everyone in the selected class — including those who have not started,
+     which is exactly who a teacher is looking for mid-lesson. */
+  function baseList() {
+    const list = activeList();
+    return curRazred ? list.filter(s => razredMap[s.username] === curRazred) : list;
+  }
+
+  const OP_SIGN = { x: '×', d: '÷' };
+
+  /* Roll a student's 20 table/op buckets up into the three things that
+     actually matter while a lesson is running. */
+  function summarise(s, slot) {
+    let c = 0, w = 0, worst = null, worstPct = 101;
+    for (const key of Object.keys(s.cells)) {
+      const v = s.cells[key][slot];
+      if (!v) continue;
+      c += v.c; w += v.w;
+      const tot = v.c + v.w;
+      // 3 attempts is enough to point a teacher at a table; 5 was so strict
+      // that nothing showed until the lesson was nearly over.
+      if (tot >= 3) {
+        const p = v.c / tot * 100;
+        if (p < worstPct) { worstPct = p; worst = key; }
+      }
+    }
+    const total = c + w;
+    return {
+      correct: c, wrong: w, answers: total,
+      pct: total ? Math.round(c / total * 100) : null,
+      weak: (worst && worstPct < 85) ? worst : null
+    };
+  }
+
+  function renderLesson() {
+    const slot = curWin === 'all' ? 'all' : 'recent';
+    const rows = baseList().map(s => Object.assign({ s }, summarise(s, slot)));
+    if (!rows.length) {
+      wrap.innerHTML = `<div class="comp-board-empty">${
+        curRazred ? `V razredu ${curRazred} ni učencev.` : 'Še ni podatkov o učencih.'}</div>`;
+      return;
+    }
+    /* Whoever needs help first, then whoever has not started.
+       Ranking on raw accuracy alone buries a child who has 4 answers and got
+       3 wrong beneath one sitting at 95% over 60 — the opposite of useful.
+       Ranking on it unsmoothed lets a single unlucky answer top the list. So
+       pull small samples toward 50% and sort on that: a struggling beginner
+       surfaces, a one-off mistake does not. */
+    const need = r => (r.correct + 2) / (r.answers + 4);
+    rows.sort((a, b) => {
+      if (!a.answers !== !b.answers) return a.answers ? -1 : 1;
+      if (!a.answers) return a.s.username.localeCompare(b.s.username);
+      return need(a) - need(b);
+    });
+
+    const head = `<div class="tl-row tl-head">
+        <span>Učenec</span><span class="tl-num">Odgovori</span>
+        <span class="tl-num">Točnost</span><span class="tl-weak">Najšibkejša</span>
+      </div>`;
+    const body = rows.map(r => {
+      const rz = razredMap[r.s.username];
+      const idle = r.answers === 0;
+      const pctCls = cellClass(r.correct, r.wrong);
+      const weakTxt = r.weak
+        ? `${r.weak.split('_')[0]} ${OP_SIGN[r.weak.split('_')[1]]}`
+        : '—';
+      return `<div class="tl-row${idle ? ' tl-idle' : ''}">
+        <span class="tl-name" data-username="${esc(r.s.username)}"
+              title="Klikni za ponastavitev gesla">
+          <span class="tl-dot ${idle ? 'off' : 'on'}"></span>
+          ${esc(r.s.emoji || '🦉')} ${esc(r.s.username)}${
+            !curRazred && rz ? `<span class="td-razred">${rz}</span>` : ''}
+        </span>
+        <span class="tl-num">${r.answers || '—'}</span>
+        <span class="tl-num ${pctCls}">${r.pct === null ? '—' : r.pct + '%'}</span>
+        <span class="tl-weak">${weakTxt}</span>
+      </div>`;
+    }).join('');
+    wrap.innerHTML = `<div class="td-lesson">${head}${body}</div>`;
+  }
+
+  function updateClassSum(rows) {
+    const el = div.querySelector('#tdClassSum');
+    if (!el) return;
+    const active = rows.filter(r => r.answers > 0).length;
+    const total = rows.reduce((a, r) => a + r.answers, 0);
+    el.textContent = rows.length
+      ? `${rows.length} učencev · ${active} vadi · ${total} odgovorov`
+      : '';
   }
 
   function renderGrid() {
-    const list = activeList();
+    div.querySelector('#tdLegend').style.display = curView === 'matrix' ? '' : 'none';
+    // Summary follows the class filter in both views, not just the lesson one.
     const slot = curWin === 'all' ? 'all' : 'recent';
-    let filtered = list;
-    if (curWin === 'today') {
-      filtered = list.filter(s => Object.values(s.cells).some(c => {
-        const r = c.recent || { c: 0, w: 0 };
-        return (r.c + r.w) > 0;
-      }));
-    }
-    if (curRazred) {
-      filtered = filtered.filter(s => razredMap[s.username] === curRazred);
-    }
+    updateClassSum(baseList().map(s => summarise(s, slot)));
+    if (curView === 'lesson') renderLesson();
+    else renderMatrix();
+  }
+
+  function renderMatrix() {
+    const slot = curWin === 'all' ? 'all' : 'recent';
+    const filtered = baseList();
     if (!filtered.length) {
       const msg = curRazred
-        ? `V razredu ${curRazred} ${curWin === 'today' ? 'še nihče ni vadil danes' : 'ni podatkov'}.`
-        : (curWin === 'today' ? 'Nihče še ni vadil danes.' : 'Še ni podatkov o učencih.');
+        ? `V razredu ${curRazred} ni podatkov.`
+        : 'Še ni podatkov o učencih.';
       wrap.innerHTML = `<div class="comp-board-empty">${msg}</div>`;
       return;
     }
@@ -1684,7 +1797,7 @@ async function openTeacherDashboard() {
     head += '</div>';
     const body = filtered.map(s => {
       const rz = razredMap[s.username];
-      const rzTag = rz ? `<span class="td-razred">${rz}</span>` : '';
+      const rzTag = (!curRazred && rz) ? `<span class="td-razred">${rz}</span>` : '';
       let row = `<div class="td-row"><span class="td-name" data-username="${esc(s.username)}"`
         + ` title="Klikni za ponastavitev gesla">${esc(s.emoji || '🦉')} ${esc(s.username)}${rzTag}</span>`;
       for (let t = 1; t <= 10; t++) {
@@ -1694,14 +1807,17 @@ async function openTeacherDashboard() {
         const vd = cd ? cd[slot] : null;
         const xc = vx ? vx.c : 0, xw = vx ? vx.w : 0;
         const dc = vd ? vd.c : 0, dw = vd ? vd.w : 0;
-        const xCls = masteryClass(xc, xw);
-        const dCls = masteryClass(dc, dw);
+        const xCls = cellClass(xc, xw);
+        const dCls = cellClass(dc, dw);
         const xPct = masteryPct(xc, xw);
         const dPct = masteryPct(dc, dw);
         const xTxt = xPct === null ? '–' : xPct;
         const dTxt = dPct === null ? '–' : dPct;
         const tip = `Poštevanka ${t} — × ${xc}✓/${xw}✗ · ÷ ${dc}✓/${dw}✗`;
-        if (xCls === 'm-none' && dCls === 'm-none') {
+        // Only a cell with genuinely nothing behind it renders blank. A few
+        // answers used to look identical to "never practised", which kept the
+        // board empty for most of a lesson.
+        if (!xc && !xw && !dc && !dw) {
           row += `<span class="td-cell m-none" title="${tip}"></span>`;
         } else {
           row += `<span class="td-cell td-cell-split" title="${tip}">`
@@ -1720,7 +1836,7 @@ async function openTeacherDashboard() {
     wrap.innerHTML = '<div class="comp-board-empty">Nalagam …</div>';
     await ensureWindow(win);
     renderGrid();
-    markUpdated();
+    updateLive();
   }
 
   wrap.addEventListener('click', e => {
@@ -1739,15 +1855,25 @@ async function openTeacherDashboard() {
 
   const razSelect = div.querySelector('#tdRazredSelect');
   razSelect.addEventListener('change', () => { curRazred = razSelect.value; renderGrid(); });
-  div.querySelector('#tdRefresh').addEventListener('click', () => refresh(false));
+  div.querySelectorAll('#tdViewToggle .ptable-tog-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      div.querySelectorAll('#tdViewToggle .ptable-tog-btn')
+         .forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      curView = b.dataset.v;
+      renderGrid();
+    });
+  });
 
-  /* Keep the board live while the teacher watches the class work. Cleared by
-     removeOverlay() whenever the dashboard closes. */
+  /* One tick a second: keeps the "osveženo pred N s" label honest and pulls
+     fresh data when it goes stale. Cleared by removeOverlay() on close. */
   if (tdRefreshTimer) clearInterval(tdRefreshTimer);
   tdRefreshFn = refresh;
   tdRefreshTimer = setInterval(() => {
-    if (document.visibilityState === 'visible') refresh(true);
-  }, TD_REFRESH_MS);
+    if (document.visibilityState !== 'visible') return;
+    updateLive();
+    if (!refreshing && lastFetchTs && Date.now() - lastFetchTs >= TD_REFRESH_MS) refresh();
+  }, 1000);
 
   // class map for labels + filter (independent of the time window)
   const razRows = await getClassRazreds(teacherSession.id);
