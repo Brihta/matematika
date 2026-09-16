@@ -1062,6 +1062,12 @@ body.competition {
 @media (max-width: 899px) {
   .toolbar.collapsed .topbar-ctrls { display: none; }
   .topbar-ctrls { margin-top: 10px; }
+  /* Below 900px NAČIN and VRSTA RAČUNA share one row, so each mode button
+     gets about a third of half the screen. Measured: the labels need
+     88/52/95px at 390, and still 102/101/108 at 768 — they do not fit
+     anywhere down here. Drop the words, keep the emoji. */
+  .seg-label { display: none; }
+  #modeBtnGroup .seg-btn { font-size: 1.2rem; padding: 7px 4px; line-height: 1.25; }
 }
 
 @media (min-width: 900px) {
