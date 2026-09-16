@@ -1190,10 +1190,13 @@ body.competition {
   .filter-row { grid-template-columns: repeat(10, 1fr); gap: 6px; }
   .table-btn { padding: 9px 0; font-size: 1rem; }
 
+  /* Vsebina se drži plošče na vrhu. Prej je bila navpično centrirana, kar je
+     na visokem zaslonu odprlo praznino med ploščo in rezultatom — igra je
+     lebdela na sredini, namesto da bi sledila glavi strani. */
   .stage {
     display: flex; flex-direction: column; gap: 14px;
-    min-height: calc(100vh - 305px);   /* izmerjeno: 12 + 160 plošča + 101 HUD + 14 + 18 */
-    justify-content: center;
+    justify-content: flex-start;
+    padding-top: 14px;
   }
   #scoreHUD { margin-top: 0; }
   .quiz-panel, .keypad-panel, .tekmovanje-panel { margin-top: 0; }
@@ -1216,8 +1219,8 @@ body.competition {
      nad igro 305px namesto 244 — meja, pod katero je treba igro pomanjšati,
      se je s tem dvignila. */
   @media (max-height: 980px) {
-    .container { padding-bottom: 8px; }
-    .stage { gap: 10px; }
+    .container { padding-bottom: 6px; }
+    .stage { gap: 10px; padding-top: 4px; }
     .quiz-question { font-size: 2.6rem; padding: 24px 36px; }
     .quiz-opt-btn { padding: 18px; font-size: 1.7rem; }
     .quiz-options { gap: 12px; }
