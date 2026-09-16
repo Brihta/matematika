@@ -34,9 +34,10 @@ bi prednastavitev preprosto prezrlo.
 - **Tekmovanje** — 60 sekund, vse poštevanke, dnevna lestvica.
   Odprto med 7:00 in 19:00 po slovenskem času. Brez nastavitev — namenoma.
 
-Na širokih zaslonih (nad 900 px) so nastavitve stalno vidne ob strani, zato
-jih ni treba odpirati in zapirati. Na tablicah in telefonih ostane zgornja
-zložljiva vrstica.
+Na širokih zaslonih (nad 900 px) sta **način** in **vrsta računa** stalno
+vidna v zgornji vrstici, **poštevanke** pa so v levem stolpcu, vsaka v svoji
+vrsti. Ničesar ni treba odpirati ali zapirati. Na tablicah in telefonih
+ostane zgornja zložljiva vrstica.
 
 ## Učiteljski pregled
 

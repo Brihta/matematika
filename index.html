@@ -11,7 +11,9 @@
 
   <!-- TOOLBAR -->
   <div class="toolbar collapsed" id="toolbar">
-    <div class="toolbar-top">
+
+    <!-- Always-visible bar: identity + the two controls that get used most -->
+    <div class="topbar" id="topbar">
       <button class="brand" id="brandBtn" type="button" title="Osveži stran">
         <img class="brand-icon" id="brandImg" src="Brihta.png" width="128" height="128" alt="">
         <span>Brihta</span>
@@ -24,12 +26,9 @@
         <span class="profile-emoji">👤</span>
         <span class="profile-name">Prijava</span>
       </button>
-    </div>
 
-    <div class="toolbar-controls-wrap" id="toolbarControlsWrap">
-      <div class="toolbar-controls">
-
-        <div class="ctrl-block">
+      <div class="topbar-ctrls" id="topbarCtrls">
+        <div class="ctrl-block" id="modeBlock">
           <div class="ctrl-label">Način</div>
           <div class="btn-group" id="modeBtnGroup">
             <button class="seg-btn" data-mode="keypad">⌨️ Tipkovnica</button>
@@ -37,8 +36,7 @@
             <button class="seg-btn" data-mode="tekmovanje">🏆 Tekmovanje</button>
           </div>
         </div>
-
-        <div class="ctrl-block">
+        <div class="ctrl-block" id="opBlock">
           <div class="ctrl-label">Vrsta računa</div>
           <div class="btn-group" id="opBtnGroup">
             <button class="seg-btn active" data-op="both">× ÷</button>
@@ -46,8 +44,13 @@
             <button class="seg-btn" data-op="divide">÷</button>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="ctrl-block">
+    <!-- Poštevanke: left rail on wide screens, collapsible row on phones -->
+    <div class="toolbar-controls-wrap" id="toolbarControlsWrap">
+      <div class="toolbar-controls">
+        <div class="ctrl-block tables-block">
           <div class="ctrl-label-row">
             <span class="ctrl-label">Poštevanke</span>
             <div class="quick-group">
@@ -68,7 +71,6 @@
             <button class="table-btn active" data-n="10">10</button>
           </div>
         </div>
-
       </div>
     </div>
   </div>

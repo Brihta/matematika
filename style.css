@@ -1009,71 +1009,6 @@ body.competition {
 }
 .tl-more:hover { background: rgba(255,255,255,0.08); color: #eee; }
 
-/* ══════════════════════════════════════════════════════════
-   WIDE SCREENS — settings become a permanent left pane
-   The app used a 700px centred column, so on a laptop or a
-   classroom display ~650px sat unused on each side while the
-   settings were stacked on top of the game, pushing it down.
-   Here they sit beside it instead: always visible, nothing to
-   open or close, and the game gets the freed height.
-   Below 900px nothing changes — phones and iPads keep the
-   collapsible bar exactly as before.
-══════════════════════════════════════════════════════════ */
-@media (min-width: 900px) {
-  .container {
-    max-width: 1180px;
-    display: grid;
-    grid-template-columns: 268px minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    column-gap: 24px;
-    align-items: start;
-    padding-top: 12px;
-  }
-  .toolbar {
-    grid-column: 1; grid-row: 1 / span 2;
-    border-radius: 16px;
-    position: sticky; top: 12px;
-  }
-  .toolbar-top { flex-wrap: wrap; }
-  /* Nothing to toggle when the panel never hides. */
-  .summary-chip { display: none; }
-  .toolbar.collapsed .toolbar-controls-wrap { max-height: 600px; }
-  .toolbar-controls { padding-top: 12px; }
-  #modeBtnGroup { flex-direction: column; }
-  #modeBtnGroup .seg-btn { text-align: left; padding: 10px 12px; }
-  /* the op buttons are single symbols — a row reads better than a stack */
-  #opBtnGroup .seg-btn { padding: 10px 6px; font-size: 1rem; }
-  .filter-row { grid-template-columns: repeat(5, 1fr); gap: 6px; }
-  .table-btn { padding: 11px 0; font-size: 1rem; }
-
-  #scoreHUD { grid-column: 2; grid-row: 1; margin-top: 0; }
-  .quiz-panel, .keypad-panel, .tekmovanje-panel { grid-column: 2; grid-row: 2; }
-
-  /* The game fills the height the settings used to occupy. */
-  /* Centre the game in the column it now owns, instead of letting it hug
-     the HUD with a pool of empty space underneath. */
-  .quiz-area, .keypad-area { min-height: calc(100vh - 200px); justify-content: center; }
-  .quiz-question { font-size: 3.4rem; padding: 40px 48px; }
-  .quiz-options { max-width: 560px; gap: 16px; }
-  .quiz-opt-btn { padding: 26px; font-size: 2.1rem; }
-  .quiz-advance-bar-wrap { max-width: 560px; }
-  .keypad-grid { max-width: 400px; gap: 12px; }
-  .keypad-btn { padding: 24px 0; font-size: 2rem; }
-  .keypad-display { min-height: 76px; padding: 18px 28px; }
-  .keypad-display-text { font-size: 2.4rem; }
-
-  /* Tekmovanje is untouched: no settings, centred, full focus. */
-  body.competition .container {
-    display: block; max-width: 700px; padding-top: 0;
-  }
-  body.competition .toolbar { position: sticky; top: 0; border-radius: 0 0 16px 16px; }
-  body.competition .summary-chip { display: flex; }
-  body.competition .toolbar.collapsed .toolbar-controls-wrap { max-height: 0; }
-  body.competition #modeBtnGroup { flex-direction: row; }
-  body.competition #modeBtnGroup .seg-btn { text-align: center; padding: 9px 10px; }
-  body.competition .filter-row { grid-template-columns: repeat(10, 1fr); }
-}
-
 /* When the panel is open the chip IS the close control, so it should look
    like one. A ✕ needs no reading; "Skrij nastavitve" did, which is how
    children ended up stuck inside the panel. Costs no extra height. */
@@ -1081,4 +1016,114 @@ body.competition {
   background: rgba(240,165,0,0.16);
   border-color: rgba(240,165,0,0.5);
   color: #ffd97a;
+}
+
+/* ══════════════════════════════════════════════════════════
+   LAYOUT
+
+   Phones keep the original stacked bar. Above 900px the app
+   splits into a fixed top bar (identity + the two controls
+   that get used constantly) and a left rail holding the ten
+   times-tables, one per row, beside the game.
+══════════════════════════════════════════════════════════ */
+
+/* The always-visible bar. On phones it wraps; the mode/op row
+   still hides with the chip so a collapsed phone toolbar stays
+   as short as it was. */
+.topbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.topbar-ctrls { display: flex; gap: 14px; flex-basis: 100%; }
+.topbar-ctrls .ctrl-block { flex: 1; min-width: 0; }
+
+@media (max-width: 899px) {
+  .toolbar.collapsed .topbar-ctrls { display: none; }
+  .topbar-ctrls { margin-top: 10px; }
+}
+
+@media (min-width: 900px) {
+  .container {
+    max-width: 1240px;
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    column-gap: 20px; row-gap: 14px;
+    padding-top: 12px; padding-bottom: 18px;
+    align-items: start;
+  }
+  /* the toolbar stops being a box so its two halves can take
+     their own places in the grid */
+  .toolbar { display: contents; }
+
+  .topbar {
+    grid-column: 1 / -1; grid-row: 1;
+    background: #16213e; border-radius: 16px;
+    padding: 10px 18px; gap: 20px; flex-wrap: nowrap;
+    box-shadow: 0 2px 12px rgba(0,0,0,.4);
+    position: sticky; top: 12px; z-index: 100;
+  }
+  .brand { order: 1; }
+  .topbar-ctrls { order: 2; flex: 1; flex-basis: auto; gap: 22px; margin-top: 0; }
+  .profile-btn { order: 3; }
+  .summary-chip { display: none; }          /* nothing left to collapse */
+  .topbar-ctrls .ctrl-block { flex: 0 1 auto; }
+  #modeBlock .btn-group { min-width: 330px; }
+  #opBlock .btn-group { min-width: 170px; }
+
+  /* Poštevanke rail — one number per row, beside the game */
+  /* the .toolbar.collapsed rule is more specific than a bare class, so the
+     override has to match it — otherwise the rail keeps max-height:0, its
+     content spills out visibly and the grid reserves no space for it */
+  .toolbar-controls-wrap,
+  .toolbar.collapsed .toolbar-controls-wrap {
+    grid-column: 1; grid-row: 2 / span 2;
+    max-height: none; overflow: visible;
+    position: sticky; top: 108px;
+  }
+  .toolbar-controls { padding-top: 0; }
+  .tables-block {
+    background: #16213e; border-radius: 14px;
+    padding: 10px 9px; box-shadow: 0 2px 12px rgba(0,0,0,.35);
+  }
+  .tables-block .ctrl-label-row { flex-direction: column; gap: 5px; align-items: stretch; }
+  .tables-block .quick-group { justify-content: center; }
+  .filter-row { grid-template-columns: 1fr; gap: 5px; }
+  .table-btn { padding: 9px 0; font-size: .95rem; }
+
+  #scoreHUD { grid-column: 2; grid-row: 2; margin-top: 0; }
+  .quiz-panel, .keypad-panel, .tekmovanje-panel {
+    grid-column: 2; grid-row: 3; margin-top: 0;
+  }
+
+  /* The game fills the height the settings used to occupy. */
+  /* measured chrome above the game: 12 pad + 85 bar + 14 gap + 101 HUD
+     + 14 gap + 18 pad = 244 */
+  .quiz-area, .keypad-area { min-height: calc(100vh - 252px); justify-content: center; }
+  .quiz-question { font-size: 3.4rem; padding: 40px 48px; }
+  .quiz-options { max-width: 560px; gap: 16px; }
+  .quiz-opt-btn { padding: 26px; font-size: 2.1rem; }
+  .quiz-advance-bar-wrap { max-width: 560px; }
+  .keypad-grid { max-width: 400px; gap: 12px; }
+  .keypad-btn { padding: 20px 0; font-size: 1.9rem; }
+  .keypad-display { min-height: 76px; padding: 18px 28px; }
+  .keypad-display-text { font-size: 2.4rem; }
+
+  /* Tekmovanje stays centred and uncluttered: no tables rail, no
+     operation picker — its lack of choices is why it works. */
+  body.competition .container {
+    display: block; max-width: 700px; padding-top: 0;
+  }
+  body.competition .toolbar { display: block; }
+  body.competition .topbar {
+    background: none; box-shadow: none; padding: 0;
+    position: static; flex-wrap: wrap;
+  }
+  /* must out-specify the rail rule above, which matches .toolbar.collapsed */
+  body.competition .toolbar-controls-wrap,
+  body.competition .toolbar.collapsed .toolbar-controls-wrap {
+    max-height: 0; overflow: hidden;
+  }
+  body.competition #opBlock { display: none; }
+  /* brand and profile share the first line, mode sits under them */
+  body.competition .brand { order: 1; }
+  body.competition .profile-btn { order: 2; margin-left: auto; }
+  body.competition .topbar-ctrls { order: 3; flex-basis: 100%; margin-top: 10px; }
 }
