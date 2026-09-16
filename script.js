@@ -196,24 +196,27 @@ const PROFILE_EMOJIS = ['🦉','🚀','🦄','🐉','🌟','⚡','🎮','🍕','
    SETTINGS PERSISTENCE
 ══════════════════════════ */
 const STORAGE_KEY = 'brihta_settings_v1';
+/* Only the MODE is remembered between visits.
+   The tables and the operation deliberately are not. Remembering them silently
+   narrowed what children practised: one student had 229 division answers and
+   zero multiplication on a table, because somebody once tapped ÷ and nobody
+   knew to tap it back. On a shared class iPad it is worse still — the next
+   child inherits whatever the previous one left behind.
+   Liking the keypad harms nobody; being stuck on ÷ costs half the curriculum.
+   So every visit starts on all ten tables with × and ÷, and a narrower
+   selection has to be asked for — by the child, or by a teacher's preset link,
+   which lives in the URL and therefore survives a reload. */
 function loadSettings() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const s = JSON.parse(raw);
     if (s && ['quiz','keypad','tekmovanje'].includes(s.mode)) mode = s.mode;
-    if (s && ['both','multiply','divide'].includes(s.op)) opType = s.op;
-    if (s && Array.isArray(s.tables)) {
-      const arr = s.tables.filter(n => Number.isInteger(n) && n>=1 && n<=10);
-      if (arr.length) tables = new Set(arr);
-    }
   } catch(e) {}
 }
 function saveSettings() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      mode, op: opType, tables: [...tables]
-    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode }));
   } catch(e) {}
 }
 
@@ -374,7 +377,11 @@ function showLoadError() {
    Tapping the logo to get back to a clean start is what everyone expects it
    to do. Pending answers are flushed first so a mid-session reload does not
    lose the last few questions. */
-document.getElementById('brandBtn').addEventListener('click', () => {
+/* Guarded: a browser holding a cached index.html from before this button
+   existed would otherwise throw here and take the whole init block with it,
+   leaving the child staring at a dead page. */
+const brandBtn = document.getElementById('brandBtn');
+if (brandBtn) brandBtn.addEventListener('click', () => {
   flushStats(true);
   location.reload();
 });
