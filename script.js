@@ -1102,22 +1102,40 @@ function openRazredPrompt(onDone) {
   removeOverlay();
   const div = document.createElement('div');
   div.className = 'timed-overlay';
-  div.innerHTML = `
-    <div class="timed-overlay-box razred-box">
-      <div class="overlay-title" style="color:#f0a500">🏫 V kateri razred hodiš?</div>
-      <div class="overlay-divider"></div>
-      <div class="auth-msg">Novo šolsko leto se je začelo — izberi svoj razred.</div>
-      <div class="razred-grid">
-        ${RAZREDI.map(r => `<button class="razred-btn" data-r="${r}">${r}</button>`).join('')}
-      </div>
-    </div>`;
   document.body.appendChild(div);
   activeOverlay = div;
-  div.querySelectorAll('.razred-btn').forEach(b => {
-    b.addEventListener('click', async () => {
-      const r = b.dataset.r;
-      div.querySelectorAll('.razred-btn').forEach(x => x.disabled = true);
-      b.classList.add('active');
+
+  function renderPick() {
+    div.innerHTML = `
+      <div class="timed-overlay-box razred-box">
+        <div class="overlay-title" style="color:#f0a500">🏫 V kateri razred hodiš?</div>
+        <div class="overlay-divider"></div>
+        <div class="auth-msg">Novo šolsko leto se je začelo — izberi svoj razred.</div>
+        <div class="razred-grid">
+          ${RAZREDI.map(r => `<button class="razred-btn" data-r="${r}">${r}</button>`).join('')}
+        </div>
+      </div>`;
+    div.querySelectorAll('.razred-btn').forEach(b => {
+      b.addEventListener('click', () => renderConfirm(b.dataset.r));
+    });
+  }
+
+  /* A mis-tap here is worse than no answer: it quietly files the child in
+     another teacher's class and nobody notices. Hence the confirm step. */
+  function renderConfirm(r) {
+    div.innerHTML = `
+      <div class="timed-overlay-box razred-box">
+        <div class="overlay-title" style="color:#f0a500">🏫 Je to pravi razred?</div>
+        <div class="overlay-divider"></div>
+        <div class="razred-confirm">${esc(r)}</div>
+        <div class="auth-msg">Potrdi, da hodiš v razred <strong>${esc(r)}</strong>.</div>
+        <button class="overlay-btn overlay-btn-next" id="razredOk">✓ Potrdi</button>
+        <button class="auth-switch auth-close" id="razredBack">← Nazaj</button>
+      </div>`;
+    div.querySelector('#razredBack').addEventListener('click', renderPick);
+    div.querySelector('#razredOk').addEventListener('click', async () => {
+      const btn = div.querySelector('#razredOk');
+      btn.disabled = true; btn.textContent = 'Shranjujem …';
       if (profile) {
         profile.razred = r; saveProfile();
         await setStudentRazred(profile.id, r);
@@ -1125,7 +1143,9 @@ function openRazredPrompt(onDone) {
       removeOverlay();
       onDone && onDone();
     });
-  });
+  }
+
+  renderPick();
 }
 
 /* ── Stats logging ── */

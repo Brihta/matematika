@@ -983,6 +983,14 @@ body.competition {
 
 /* ── Student class (razred) prompt ── */
 .razred-box { max-width: 92vw; width: 420px; }
+.razred-confirm {
+  font-size: 3.2rem; font-weight: 800; letter-spacing: 2px;
+  color: #f0a500;
+  background: rgba(240,165,0,0.12);
+  border: 2px solid rgba(240,165,0,0.55);
+  border-radius: 16px; padding: 12px 34px;
+  align-self: center;
+}
 .razred-grid {
   display: grid; grid-template-columns: repeat(6, 1fr);
   gap: 8px; width: 100%; margin-top: 6px;
