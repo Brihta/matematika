@@ -176,6 +176,7 @@ let activeOverlay = null;
 let restartDebounce = null;
 let tdRefreshTimer = null;          // teacher dashboard auto-refresh
 let tdRefreshFn = null;             // its refresh(), so returning to the tab can fire it
+let tdResizeHandler = null;         // re-render on rotate: labels/columns are picked at render time
 const TD_REFRESH_MS = 15000;        // how often an open dashboard re-reads
 const STATS_FLUSH_MS = 15000;       // how often pending answers are pushed
 
@@ -585,6 +586,11 @@ function closeMedalModal() {
 ══════════════════════════ */
 function removeOverlay() {
   if (tdRefreshTimer) { clearInterval(tdRefreshTimer); tdRefreshTimer = null; }
+  if (tdResizeHandler) {
+    window.removeEventListener('resize', tdResizeHandler);
+    window.removeEventListener('orientationchange', tdResizeHandler);
+    tdResizeHandler = null;
+  }
   tdRefreshFn = null;
   if (activeOverlay && activeOverlay.parentNode) activeOverlay.parentNode.removeChild(activeOverlay);
   activeOverlay = null;
@@ -1753,8 +1759,10 @@ async function openTeacherDashboard() {
         <div class="comp-board-empty">Nalagam …</div>
       </div>
       <div class="td-hint">💡 Klikni na ime učenca za ponastavitev gesla.</div>
-      <button class="overlay-btn overlay-btn-ghost" id="tdPass">🔑 Spremeni svoje geslo</button>
-      <button class="overlay-btn overlay-btn-ghost" id="tdLogout">Odjava</button>
+      <div class="td-footer">
+        <button class="overlay-btn overlay-btn-ghost" id="tdPass">🔑 Spremeni svoje geslo</button>
+        <button class="overlay-btn overlay-btn-ghost" id="tdLogout">Odjava</button>
+      </div>
     </div>`;
   document.body.appendChild(div);
   activeOverlay = div;
@@ -2068,6 +2076,18 @@ async function openTeacherDashboard() {
       renderGrid();
     });
   });
+
+  /* An iPad turned from portrait to landscape changes which column widths and
+     which header labels are right, and both are chosen when the rows are
+     built — so rebuild them. Debounced, because resize fires continuously. */
+  if (tdResizeHandler) window.removeEventListener('resize', tdResizeHandler);
+  let resizeDebounce = null;
+  tdResizeHandler = () => {
+    clearTimeout(resizeDebounce);
+    resizeDebounce = setTimeout(renderGrid, 200);
+  };
+  window.addEventListener('resize', tdResizeHandler);
+  window.addEventListener('orientationchange', tdResizeHandler);
 
   /* One tick a second: keeps the "osveženo pred N s" label honest and pulls
      fresh data when it goes stale. Cleared by removeOverlay() on close. */

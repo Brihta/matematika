@@ -807,11 +807,26 @@ body.competition {
 }
 
 /* ── Teacher dashboard ── */
+/* The teacher view is a working screen, not a notice. It used the same box
+   as "Nova medalja!", so on a classroom monitor a whole class sat in a small
+   square with black all around it. It now takes the entire screen: header and
+   footer stay put, the list scrolls inside. */
 .teacher-box {
-  max-width: 96vw; width: 980px;
-  max-height: 88vh; overflow-y: auto;
+  width: 100vw; max-width: 100vw;
+  height: 100dvh; max-height: 100dvh;
+  border-radius: 0; border: none;
+  padding: 14px clamp(14px, 3vw, 44px);
+  gap: 10px;
+  overflow: hidden;
   position: relative; align-items: stretch !important;
+  animation: none;          /* no zoom-in for something this size */
 }
+.teacher-box .td-grid-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.td-footer {
+  display: flex; gap: 10px; justify-content: center;
+  width: 100%; flex-wrap: wrap;
+}
+.td-footer .overlay-btn { flex: 0 1 240px; margin: 0; }
 .td-controls { display: flex; gap: 8px; width: 100%; flex-wrap: wrap; align-items: stretch; }
 .td-controls .ptable-toggle { flex: 1; min-width: 150px; }
 .td-razred-select {
@@ -1178,4 +1193,30 @@ body.competition {
   body.competition .brand { order: 1; }
   body.competition .profile-btn { order: 2; margin-left: auto; }
   body.competition .topbar-ctrls { order: 3; flex-basis: 100%; margin-top: 10px; }
+}
+
+/* ── Velik zaslon (šolski monitor) ───────────────────────────────────────
+   Na 1440px je mreža uporabila 613px, ostalo je bilo prazno. Tu ni šlo za
+   estetiko: učitelj gleda ta zaslon z drugega konca razreda, zato gre
+   odvečna širina v večje celice in večjo pisavo, ne v prazen prostor. */
+@media (min-width: 1200px) {
+  .teacher-box .td-grid-wrap { align-items: center; }
+
+  /* mreža poštevank */
+  .td-name { min-width: 150px; width: 150px; font-size: 0.95rem; }
+  .td-cell { width: 80px; min-width: 80px; height: 54px; font-size: 0.9rem; }
+  .td-half { font-size: 0.85rem; }
+  .td-th { font-size: 0.95rem; }
+  .td-razred { font-size: 0.72rem; }
+
+  /* seznam učencev */
+  .td-lesson { max-width: 980px; }
+  .tl-row {
+    grid-template-columns: minmax(0,1fr) 130px 120px 150px;
+    padding: 11px 18px;
+  }
+  .tl-name { font-size: 1.05rem; }
+  .tl-num, .tl-weak { font-size: 1.05rem; }
+  .tl-head { font-size: 0.68rem; }
+  .tl-dot { width: 10px; height: 10px; }
 }
