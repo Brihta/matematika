@@ -965,6 +965,20 @@ body.competition {
   .comp-countdown-num { font-size: 6.5rem; }
   .comp-countdown-num.go { font-size: 3.6rem; }
 }
+/* Phones: the settings block was eating ~37% of an iPhone screen before the
+   first question appeared. Same controls, tighter metrics. */
+@media (max-width: 600px) {
+  .toolbar { padding: 8px 10px; border-radius: 0 0 14px 14px; }
+  .toolbar-controls { gap: 9px; padding-top: 9px; }
+  .ctrl-block { gap: 4px; }
+  .ctrl-label { font-size: .6rem; letter-spacing: .04em; }
+  .btn-group { padding: 2px; gap: 3px; border-radius: 8px; }
+  .seg-btn { padding: 7px 4px; border-radius: 6px; }
+  .filter-row { gap: 4px; }
+  .table-btn { padding: 7px 0; font-size: .85rem; border-radius: 6px; }
+  .quick-btn { padding: 2px 8px; font-size: .65rem; }
+  .score-hud { margin-top: 8px; }
+}
 @media (max-width: 420px) {
   .filter-row { grid-template-columns: repeat(5, 1fr); }
   .score-hud { gap: 8px; padding: 8px 10px; }
@@ -1051,4 +1065,13 @@ body.competition {
   body.competition #modeBtnGroup { flex-direction: row; }
   body.competition #modeBtnGroup .seg-btn { text-align: center; padding: 9px 10px; }
   body.competition .filter-row { grid-template-columns: repeat(10, 1fr); }
+}
+
+/* When the panel is open the chip IS the close control, so it should look
+   like one. A ✕ needs no reading; "Skrij nastavitve" did, which is how
+   children ended up stuck inside the panel. Costs no extra height. */
+.summary-chip.is-open {
+  background: rgba(240,165,0,0.16);
+  border-color: rgba(240,165,0,0.5);
+  color: #ffd97a;
 }

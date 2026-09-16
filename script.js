@@ -383,15 +383,18 @@ document.getElementById('brandImg').onerror = function() {
 const toolbar = document.getElementById('toolbar');
 const summaryArrow = document.getElementById('summaryArrow');
 const summaryLabel = document.getElementById('summaryLabel');
+const summaryChip = document.getElementById('summaryChip');
 function collapseToolbar() {
   toolbar.classList.add('collapsed');
   if (summaryArrow) summaryArrow.textContent = '▾';
   if (summaryLabel) summaryLabel.textContent = 'Nastavitve';
+  summaryChip.classList.remove('is-open');
 }
 function expandToolbar() {
   toolbar.classList.remove('collapsed');
   if (summaryArrow) summaryArrow.textContent = '▴';
-  if (summaryLabel) summaryLabel.textContent = 'Skrij nastavitve';
+  if (summaryLabel) summaryLabel.textContent = '✕  Zapri nastavitve';
+  summaryChip.classList.add('is-open');
 }
 document.getElementById('summaryChip').addEventListener('click', () => {
   toolbar.classList.contains('collapsed') ? expandToolbar() : collapseToolbar();
