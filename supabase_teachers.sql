@@ -86,12 +86,12 @@ end; $$;
 -- "še nisi potrjen" od "napačno geslo". Račun brez potrditve ne more nič.
 create or replace function public.login_teacher_email(
   p_email text, p_password text)
-returns table(id uuid, username text, approved boolean)
+returns table(id uuid, username text, email text, approved boolean)
 language plpgsql security definer set search_path = public, extensions
 as $$
 declare r record;
 begin
-  select t.id, t.username, t.approved, t.pin_hash into r
+  select t.id, t.username, t.email, t.approved, t.pin_hash into r
     from teachers t
    where lower(t.email) = lower(trim(coalesce(p_email, '')));
 
@@ -99,7 +99,31 @@ begin
   if r.pin_hash is null then return; end if;
   if r.pin_hash <> crypt(coalesce(p_password, ''), r.pin_hash) then return; end if;
 
-  return query select r.id, r.username, r.approved;
+  return query select r.id, r.username, r.email, r.approved;
+end; $$;
+
+-- ── 4b. Učitelj si sam zamenja geslo ──────────────────────────────────────
+-- Zahteva staro geslo, zato je varno klicati iz aplikacije. Brez tega bi
+-- moral Nino menjati gesla v SQL-u vsakič, ko kdo pozabi ali želi svojega.
+create or replace function public.change_teacher_password(
+  p_email text, p_old text, p_new text)
+returns text
+language plpgsql security definer set search_path = public, extensions
+as $$
+declare r record;
+begin
+  if length(coalesce(p_new, '')) < 8 then return 'WEAK_PASSWORD'; end if;
+
+  select t.id, t.pin_hash into r
+    from teachers t
+   where lower(t.email) = lower(trim(coalesce(p_email, '')));
+
+  if not found then return 'BAD_LOGIN'; end if;
+  if r.pin_hash is null then return 'BAD_LOGIN'; end if;
+  if r.pin_hash <> crypt(coalesce(p_old, ''), r.pin_hash) then return 'BAD_LOGIN'; end if;
+
+  update teachers set pin_hash = crypt(p_new, gen_salt('bf')) where id = r.id;
+  return 'OK';
 end; $$;
 
 -- ── 5. Potrditev računa se ne da klicati iz aplikacije ────────────────────
@@ -129,6 +153,19 @@ end; $$;
 -- sicer se z njim ne bo mogoče prijaviti (prijava gre zdaj po e-naslovu):
 --
 -- select username, email, approved, created_at from teachers order by created_at;
+
+-- ── 6b. Računi, ki jih pripraviš vnaprej ─────────────────────────────────
+-- Za vsako učiteljico ena vrstica. username je le za prikaz v aplikaciji.
+-- Geslo naj bo začasno — ob prvi prijavi si ga zamenja sama (gumb
+-- "Spremeni geslo" v učiteljskem pregledu). approved = true, ker jih
+-- ustvarjaš ti, zato ni ničesar za potrjevati.
+--
+-- insert into teachers (username, email, pin_hash, approved) values
+--   ('ana',   'ana.novak@sola.si', crypt('Zacetno-geslo-01', gen_salt('bf')), true),
+--   ('marko', 'marko.kos@sola.si', crypt('Zacetno-geslo-02', gen_salt('bf')), true);
+--
+-- Pregled, kdo obstaja:
+-- select username, email, approved from teachers order by created_at;
 
 -- ── 7. Vsakodnevno: kdo čaka na potrditev, in kako ga potrdiš ─────────────
 --

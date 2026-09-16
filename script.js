@@ -1024,13 +1024,23 @@ async function loginTeacher(email, password) {
   if (rows === RPC_UNREACHABLE) return RPC_UNREACHABLE;
   if (rows && rows.length) {
     if (!rows[0].approved) return TEACHER_PENDING;
-    teacherSession = { id: rows[0].id, username: rows[0].username };
+    teacherSession = { id: rows[0].id, username: rows[0].username,
+                       email: rows[0].email };
     profile = null; saveProfile();
     saveTeacher();
     updateProfileButton();
     return teacherSession;
   }
   return null;
+}
+
+async function changeTeacherPassword(oldPass, newPass) {
+  if (!teacherSession || !teacherSession.email) return 'NO_EMAIL';
+  const res = await supabaseRPC('change_teacher_password', {
+    p_email: teacherSession.email, p_old: oldPass, p_new: newPass
+  });
+  if (res === RPC_UNREACHABLE) return RPC_UNREACHABLE;
+  return typeof res === 'string' ? res : 'ERROR';
 }
 
 /* Self-registration, gated by a school code. The account is created but
@@ -1732,6 +1742,7 @@ async function openTeacherDashboard() {
         <div class="comp-board-empty">Nalagam …</div>
       </div>
       <div class="td-hint">💡 Klikni na ime učenca za ponastavitev gesla.</div>
+      <button class="overlay-btn overlay-btn-ghost" id="tdPass">🔑 Spremeni svoje geslo</button>
       <button class="overlay-btn overlay-btn-ghost" id="tdLogout">Odjava</button>
     </div>`;
   document.body.appendChild(div);
@@ -1742,6 +1753,7 @@ async function openTeacherDashboard() {
     logoutTeacher();
     removeOverlay();
   });
+  div.querySelector('#tdPass').addEventListener('click', openTeacherPassword);
 
   const wrap = div.querySelector('#tdGridWrap');
   const cache = { today: null, recent: null };
@@ -2069,6 +2081,62 @@ async function openTeacherDashboard() {
   }
 
   await switchWindow('today');
+}
+
+/* ── Teacher: change your own password ──
+   Accounts created in bulk start on a password Nino picked, so every teacher
+   needs a way to replace it without him editing the database. */
+function openTeacherPassword() {
+  removeOverlay();
+  const div = document.createElement('div');
+  div.className = 'timed-overlay';
+  div.innerHTML = `
+    <div class="timed-overlay-box auth-box">
+      <div class="overlay-title" style="color:#f0a500">🔑 Spremeni svoje geslo</div>
+      <div class="overlay-divider"></div>
+      <div class="reset-student">${esc(teacherSession ? teacherSession.email || teacherSession.username : '')}</div>
+      <label class="auth-label">Staro geslo</label>
+      <input id="cpOld" class="auth-input" type="password" autocomplete="current-password" />
+      <label class="auth-label">Novo geslo (vsaj 8 znakov)</label>
+      <input id="cpNew" class="auth-input" type="password" autocomplete="new-password" />
+      <label class="auth-label">Ponovi novo geslo</label>
+      <input id="cpNew2" class="auth-input" type="password" autocomplete="new-password" />
+      <button class="overlay-btn overlay-btn-next" id="cpBtn">Shrani ✓</button>
+      <div class="auth-msg" id="cpMsg"></div>
+      <button class="auth-switch auth-close" id="cpCancel">← Nazaj na pregled</button>
+    </div>`;
+  document.body.appendChild(div);
+  activeOverlay = div;
+  div.querySelector('#cpCancel').addEventListener('click', () => openTeacherDashboard());
+  div.querySelector('#cpBtn').addEventListener('click', async () => {
+    const oldP = div.querySelector('#cpOld').value;
+    const n1 = div.querySelector('#cpNew').value;
+    const n2 = div.querySelector('#cpNew2').value;
+    const msg = div.querySelector('#cpMsg');
+    if (!oldP)          { msg.textContent = 'Vpiši staro geslo.'; return; }
+    if (n1.length < 8)  { msg.textContent = 'Novo geslo naj ima vsaj 8 znakov.'; return; }
+    if (n1 !== n2)      { msg.textContent = 'Novi gesli se ne ujemata.'; return; }
+    const btn = div.querySelector('#cpBtn');
+    btn.disabled = true; btn.textContent = 'Shranjujem …';
+    const res = await changeTeacherPassword(oldP, n1);
+    if (res === 'OK') {
+      div.querySelector('.timed-overlay-box').innerHTML = `
+        <div class="overlay-title" style="color:#4caf50">✅ Geslo spremenjeno</div>
+        <div class="overlay-divider"></div>
+        <div class="auth-msg">Od zdaj se prijavljaj z novim geslom.</div>
+        <button class="overlay-btn overlay-btn-next" id="cpDone">Nazaj na pregled</button>`;
+      div.querySelector('#cpDone').addEventListener('click', () => openTeacherDashboard());
+      return;
+    }
+    btn.disabled = false; btn.textContent = 'Shrani ✓';
+    const errs = {
+      BAD_LOGIN:     '❌ Staro geslo ni pravilno.',
+      WEAK_PASSWORD: '❌ Novo geslo naj ima vsaj 8 znakov.',
+      NO_EMAIL:      '❌ Ta račun nima e-naslova. Javi se Ninotu.'
+    };
+    msg.textContent = res === RPC_UNREACHABLE ? OFFLINE_MSG
+                    : (errs[res] || '❌ Napaka pri shranjevanju.');
+  });
 }
 
 /* ── Teacher: reset a student's password ── */
