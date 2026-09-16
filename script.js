@@ -1080,10 +1080,12 @@ async function setStudentRazred(id, razred) {
 async function getClassRazreds(teacherId) {
   return supabaseRPC('get_class_razreds', { p_teacher_id: teacherId });
 }
-/* If the logged-in student has no class yet, ask once; then run onDone. */
+/* Ask the server which class this child is in, and cache the answer.
+   Deliberately asks every time rather than trusting the cached value: the
+   class is now derived from the school year, so a child who was 3A in June
+   is 4A in September and the stored copy would be a year out of date. */
 async function ensureRazred(onDone) {
   if (!profile) { onDone && onDone(); return; }
-  if (profile.razred) { onDone && onDone(); return; }
   const r = await getStudentRazred(profile.id);
   if (r === RPC_UNREACHABLE) { onDone && onDone(); return; }  // ask again next time
   if (typeof r === 'string' && r) {
@@ -2580,7 +2582,7 @@ updateSummary();
 updateProfileButton();
 showPanel(mode);
 // persisted student with no class yet → ask once
-if (profile && !profile.razred && leaderboardEnabled()) ensureRazred();
+if (profile && leaderboardEnabled()) ensureRazred();   // also refreshes after the summer
 loadData(() => {
   cards = shuffle(getFilteredCards());
   if      (mode === 'quiz')   startQuiz();
