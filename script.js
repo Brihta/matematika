@@ -370,6 +370,15 @@ function showLoadError() {
   });
 }
 
+/* ── BRAND = reload ──
+   Tapping the logo to get back to a clean start is what everyone expects it
+   to do. Pending answers are flushed first so a mid-session reload does not
+   lose the last few questions. */
+document.getElementById('brandBtn').addEventListener('click', () => {
+  flushStats(true);
+  location.reload();
+});
+
 /* ── BRAND FALLBACK ── */
 document.getElementById('brandImg').onerror = function() {
   this.style.display='none';
