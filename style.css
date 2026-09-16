@@ -1030,6 +1030,11 @@ body.competition {
 /* The always-visible bar. On phones it wraps; the mode/op row
    still hides with the chip so a collapsed phone toolbar stays
    as short as it was. */
+/* On phones the stage is transparent — the HUD and panels behave exactly as
+   they always did. On wide screens it becomes one block so the score row and
+   the game centre together instead of drifting apart. */
+.stage { display: contents; }
+
 .topbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .topbar-ctrls { display: flex; gap: 14px; flex-basis: 100%; }
 .topbar-ctrls .ctrl-block { flex: 1; min-width: 0; }
@@ -1064,9 +1069,13 @@ body.competition {
   .topbar-ctrls { order: 2; flex: 1; flex-basis: auto; gap: 22px; margin-top: 0; }
   .profile-btn { order: 3; }
   .summary-chip { display: none; }          /* nothing left to collapse */
-  .topbar-ctrls .ctrl-block { flex: 0 1 auto; }
-  #modeBlock .btn-group { min-width: 330px; }
-  #opBlock .btn-group { min-width: 170px; }
+  /* Size the buttons to their labels. A fixed group width forced
+     "Tipkovnica" and "Tekmovanje" into boxes narrower than their own text,
+     so they clipped and overlapped. */
+  .topbar-ctrls .ctrl-block { flex: 0 0 auto; }
+  .topbar-ctrls .btn-group { width: max-content; }
+  .topbar-ctrls .seg-btn { flex: 0 0 auto; padding: 9px 16px; }
+  #opBlock .seg-btn { min-width: 52px; text-align: center; }
 
   /* Poštevanke rail — one number per row, beside the game */
   /* the .toolbar.collapsed rule is more specific than a bare class, so the
@@ -1088,15 +1097,17 @@ body.competition {
   .filter-row { grid-template-columns: 1fr; gap: 5px; }
   .table-btn { padding: 9px 0; font-size: .95rem; }
 
-  #scoreHUD { grid-column: 2; grid-row: 2; margin-top: 0; }
-  .quiz-panel, .keypad-panel, .tekmovanje-panel {
-    grid-column: 2; grid-row: 3; margin-top: 0;
+  .stage {
+    display: flex; flex-direction: column; gap: 14px;
+    grid-column: 2; grid-row: 2 / span 2;
+    min-height: calc(100vh - 145px);
+    justify-content: center;
   }
+  #scoreHUD { margin-top: 0; }
+  .quiz-panel, .keypad-panel, .tekmovanje-panel { margin-top: 0; }
 
   /* The game fills the height the settings used to occupy. */
-  /* measured chrome above the game: 12 pad + 85 bar + 14 gap + 101 HUD
-     + 14 gap + 18 pad = 244 */
-  .quiz-area, .keypad-area { min-height: calc(100vh - 252px); justify-content: center; }
+  .quiz-area, .keypad-area { justify-content: flex-start; }
   .quiz-question { font-size: 3.4rem; padding: 40px 48px; }
   .quiz-options { max-width: 560px; gap: 16px; }
   .quiz-opt-btn { padding: 26px; font-size: 2.1rem; }
@@ -1106,11 +1117,26 @@ body.competition {
   .keypad-display { min-height: 76px; padding: 18px 28px; }
   .keypad-display-text { font-size: 2.4rem; }
 
+  /* Short laptops: the wide-screen sizes above are tuned for ~900px of
+     height. On a 1280x720 or 1000x800 screen they push the ✓ row off the
+     bottom, so scale the game down by height as well as width. */
+  @media (max-height: 870px) {
+    .quiz-question { font-size: 2.6rem; padding: 24px 36px; }
+    .quiz-opt-btn { padding: 18px; font-size: 1.7rem; }
+    .quiz-options { gap: 12px; }
+    .keypad-grid { gap: 9px; max-width: 360px; }
+    .keypad-btn { padding: 14px 0; font-size: 1.6rem; }
+    .keypad-display { min-height: 56px; padding: 12px 20px; }
+    .keypad-display-text { font-size: 1.9rem; }
+    .stage { gap: 10px; }
+  }
+
   /* Tekmovanje stays centred and uncluttered: no tables rail, no
      operation picker — its lack of choices is why it works. */
   body.competition .container {
     display: block; max-width: 700px; padding-top: 0;
   }
+  body.competition .stage { display: contents; }
   body.competition .toolbar { display: block; }
   body.competition .topbar {
     background: none; box-shadow: none; padding: 0;
