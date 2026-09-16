@@ -84,6 +84,10 @@ end; $$;
 -- ── 4. Prijava z e-naslovom ───────────────────────────────────────────────
 -- Vrne vrstico tudi, kadar račun še ni potrjen, da aplikacija loči
 -- "še nisi potrjen" od "napačno geslo". Račun brez potrditve ne more nič.
+-- Postgres ne dovoli, da bi obstoječi funkciji s "create or replace"
+-- spremenil, kaj vrača — zato jo prej odstranimo.
+drop function if exists public.login_teacher_email(text, text);
+
 create or replace function public.login_teacher_email(
   p_email text, p_password text)
 returns table(id uuid, username text, email text, approved boolean)
