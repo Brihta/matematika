@@ -2044,14 +2044,19 @@ async function openTeacherDashboard() {
       wrap.innerHTML = `<div class="comp-board-empty">${msg}</div>`;
       return;
     }
-    let head = '<div class="td-row td-head"><span class="td-name"></span>';
+    let head = '<div class="td-row td-head"><span class="td-name"></span>'
+             + '<span class="td-ops td-ops-head"></span>';
     for (let t = 1; t <= 10; t++) head += `<span class="td-cell td-th">${t}</span>`;
     head += '</div>';
     const body = filtered.map(s => {
       const rz = razredMap[s.username];
       const rzTag = (!curRazred && rz) ? `<span class="td-razred">${rz}</span>` : '';
       let row = `<div class="td-row"><span class="td-name" data-username="${esc(s.username)}"`
-        + ` title="Klikni za ponastavitev gesla">${esc(s.emoji || '🦉')} ${esc(s.username)}${rzTag}</span>`;
+        + ` title="Klikni za ponastavitev gesla">${esc(s.emoji || '🦉')} ${esc(s.username)}${rzTag}</span>`
+        // Oznaka ob vsaki vrstici. Na tablici ni prehoda z miško, zato se
+        // namig nikoli ne pokaže — brez tega na dotik nihče ne izve, katera
+        // polovica je množenje.
+        + `<span class="td-ops"><span>×</span><span>÷</span></span>`;
       for (let t = 1; t <= 10; t++) {
         const cx = s.cells[t + '_x'];
         const cd = s.cells[t + '_d'];
@@ -2065,7 +2070,8 @@ async function openTeacherDashboard() {
         const dPct = masteryPct(dc, dw);
         const xTxt = xPct === null ? '–' : xPct;
         const dTxt = dPct === null ? '–' : dPct;
-        const tip = `Poštevanka ${t} — × ${xc}✓/${xw}✗ · ÷ ${dc}✓/${dw}✗`;
+        // Dve vrstici, brez "Poštevanka N" — številka je že v glavi stolpca.
+        const tip = `× ${xc}✓/${xw}✗\n÷ ${dc}✓/${dw}✗`;
         // Only a cell with genuinely nothing behind it renders blank. A few
         // answers used to look identical to "never practised", which kept the
         // board empty for most of a lesson.
