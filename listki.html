@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<title>Brihta — listki za zvezek</title>
+<style>
+  @page { size: A4 portrait; margin: 9mm; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: #16213e;
+    background: #fff;
+  }
+
+  /* 2 × 4 = 8 listkov na stran */
+  .stran {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(4, 1fr);
+    gap: 4mm;
+    width: 192mm;
+    height: 279mm;
+    margin: 0 auto;
+  }
+
+  .listek {
+    border: 1.6px dashed #9aa3b8;
+    border-radius: 3mm;
+    padding: 4.5mm 5mm;
+    display: flex;
+    flex-direction: column;
+    gap: 2.6mm;
+    break-inside: avoid;
+  }
+
+  /* ── glava listka ── */
+  /* naslov in spletni naslov v dveh vrsticah — v eni se je "Poštevanka"
+     lomila na drugo vrsto in glava je bila neurejena */
+  .glava {
+    display: flex; flex-direction: column; gap: .4mm;
+    border-bottom: 1.2px solid #f0a500;
+    padding-bottom: 1.6mm;
+  }
+  .ime {
+    font-size: 11pt; font-weight: 800; color: #f0a500;
+    letter-spacing: -.2px; white-space: nowrap;
+  }
+  .ime span { color: #16213e; font-weight: 700; }
+  .naslov { font-size: 7.2pt; font-weight: 600; color: #5a6480; letter-spacing: .1px; }
+
+  /* ── uporabniško ime ── */
+  .oznaka {
+    font-size: 7.6pt; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .6px; color: #5a6480;
+  }
+  .vrstica {
+    height: 9mm;
+    border: 1.2px solid #c3cada;
+    border-radius: 2mm;
+    background:
+      repeating-linear-gradient(90deg,
+        transparent 0 3.4mm, #e8ebf2 3.4mm 3.42mm);
+  }
+
+  /* ── geslo: štiri okenca za živali ── */
+  .zivali { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2.4mm; }
+  .okence {
+    height: 13mm;
+    border: 1.2px solid #c3cada;
+    border-radius: 2mm;
+    position: relative;
+    background: #fbfcfe;
+  }
+  .okence::after {
+    content: attr(data-n);
+    position: absolute; top: .6mm; left: 1.4mm;
+    font-size: 6.6pt; font-weight: 800; color: #b9c0d0;
+  }
+
+  .namig {
+    font-size: 6.8pt; color: #7b849c; line-height: 1.35; margin-top: auto;
+  }
+  .namig b { color: #c0392b; }
+
+  @media screen {
+    body { background: #e9ecf2; padding: 8mm; }
+    .stran { background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.18); padding: 4mm; }
+  }
+</style>
+</head>
+<body>
+  <div class="stran">
+    <!-- 8 enakih listkov -->
+    <div class="listek">
+      <div class="glava">
+        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="naslov">brihta.github.io/matematika</div>
+      </div>
+
+      <div>
+        <div class="oznaka">Uporabniško ime</div>
+        <div class="vrstica"></div>
+      </div>
+
+      <div>
+        <div class="oznaka">Geslo — 4 živali po vrsti</div>
+        <div class="zivali">
+          <div class="okence" data-n="1"></div>
+          <div class="okence" data-n="2"></div>
+          <div class="okence" data-n="3"></div>
+          <div class="okence" data-n="4"></div>
+        </div>
+      </div>
+
+      <div class="namig">Nariši ali napiši žival v <b>pravem vrstnem redu</b>.
+        Listek nalepi v zvezek za matematiko.</div>
+    </div>
+    <div class="listek">
+      <div class="glava">
+        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="naslov">brihta.github.io/matematika</div>
+      </div>
+
+      <div>
+        <div class="oznaka">Uporabniško ime</div>
+        <div class="vrstica"></div>
+      </div>
+
+      <div>
+        <div class="oznaka">Geslo — 4 živali po vrsti</div>
+        <div class="zivali">
+          <div class="okence" data-n="1"></div>
+          <div class="okence" data-n="2"></div>
+          <div class="okence" data-n="3"></div>
+          <div class="okence" data-n="4"></div>
+        </div>
+      </div>
+
+      <div class="namig">Nariši ali napiši žival v <b>pravem vrstnem redu</b>.
+        Listek nalepi v zvezek za matematiko.</div>
+    </div>
+    <div class="listek">
+      <div class="glava">
+        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="naslov">brihta.github.io/matematika</div>
+      </div>
+
+      <div>
+        <div class="oznaka">Uporabniško ime</div>
+        <div class="vrstica"></div>
+      </div>
+
+      <div>
+        <div class="oznaka">Geslo — 4 živali po vrsti</div>
+        <div class="zivali">
+          <div class="okence" data-n="1"></div>
+          <div class="okence" data-n="2"></div>
+          <div class="okence" data-n="3"></div>
+          <div class="okence" data-n="4"></div>
+        </div>
+      </div>
+
+      <div class="namig">Nariši ali napiši žival v <b>pravem vrstnem redu</b>.
+        Listek nalepi v zvezek za matematiko.</div>
+    </div>
+    <div class="listek">
+      <div class="glava">
+        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="naslov">brihta.github.io/matematika</div>
+      </div>
+
+      <div>
+        <div class="oznaka">Uporabniško ime</div>
+        <div class="vrstica"></div>
+      </div>
+
+      <div>
+        <div class="oznaka">Geslo — 4 živali po vrsti</div>
+        <div class="zivali">
+          <div class="okence" data-n="1"></div>
+          <div class="okence" data-n="2"></div>
+          <div class="okence" data-n="3"></div>
+          <div class="okence" data-n="4"></div>
+        </div>
+      </div>
+
+      <div class="namig">Nariši ali napiši žival v <b>pravem vrstnem redu</b>.
+        Listek nalepi v zvezek za matematiko.</div>
+    </div>
+    <div class="listek">
+      <div class="glava">
+        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="naslov">brihta.github.io/matematika</div>
+      </div>
+
+      <div>
+        <div class="oznaka">Uporabniško ime</div>
+        <div class="vrstica"></div>
+      </div>
+
+      <div>
+        <div class="oznaka">Geslo — 4 živali po vrsti</div>
+        <div class="zivali">
+          <div class="okence" data-n="1"></div>
+          <div class="okence" data-n="2"></div>
+          <div class="okence" data-n="3"></div>
+          <div class="okence" data-n="4"></div>
+        </div>
+      </div>
+
+      <div class="namig">Nariši ali napiši žival v <b>pravem vrstnem redu</b>.
+        Listek nalepi v zvezek za matematiko.</div>
+    </div>
+    <div class="listek">
+      <div class="glava">
+        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="naslov">brihta.github.io/matematika</div>
+      </div>
+
+      <div>
+        <div class="oznaka">Uporabniško ime</div>
+        <div class="vrstica"></div>
+      </div>
+
+      <div>
+        <div class="oznaka">Geslo — 4 živali po vrsti</div>
+        <div class="zivali">
+          <div class="okence" data-n="1"></div>
+          <div class="okence" data-n="2"></div>
+          <div class="okence" data-n="3"></div>
+          <div class="okence" data-n="4"></div>
+        </div>
+      </div>
+
+      <div class="namig">Nariši ali napiši žival v <b>pravem vrstnem redu</b>.
+        Listek nalepi v zvezek za matematiko.</div>
+    </div>
+    <div class="listek">
+      <div class="glava">
+        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="naslov">brihta.github.io/matematika</div>
+      </div>
+
+      <div>
+        <div class="oznaka">Uporabniško ime</div>
+        <div class="vrstica"></div>
+      </div>
+
+      <div>
+        <div class="oznaka">Geslo — 4 živali po vrsti</div>
+        <div class="zivali">
+          <div class="okence" data-n="1"></div>
+          <div class="okence" data-n="2"></div>
+          <div class="okence" data-n="3"></div>
+          <div class="okence" data-n="4"></div>
+        </div>
+      </div>
+
+      <div class="namig">Nariši ali napiši žival v <b>pravem vrstnem redu</b>.
+        Listek nalepi v zvezek za matematiko.</div>
+    </div>
+    <div class="listek">
+      <div class="glava">
+        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="naslov">brihta.github.io/matematika</div>
+      </div>
+
+      <div>
+        <div class="oznaka">Uporabniško ime</div>
+        <div class="vrstica"></div>
+      </div>
+
+      <div>
+        <div class="oznaka">Geslo — 4 živali po vrsti</div>
+        <div class="zivali">
+          <div class="okence" data-n="1"></div>
+          <div class="okence" data-n="2"></div>
+          <div class="okence" data-n="3"></div>
+          <div class="okence" data-n="4"></div>
+        </div>
+      </div>
+
+      <div class="namig">Nariši ali napiši žival v <b>pravem vrstnem redu</b>.
+        Listek nalepi v zvezek za matematiko.</div>
+    </div>
+  </div>
+</body>
+</html>
