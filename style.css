@@ -987,3 +987,68 @@ body.competition {
   font-family: inherit; cursor: pointer;
 }
 .tl-more:hover { background: rgba(255,255,255,0.08); color: #eee; }
+
+/* ══════════════════════════════════════════════════════════
+   WIDE SCREENS — settings become a permanent left pane
+   The app used a 700px centred column, so on a laptop or a
+   classroom display ~650px sat unused on each side while the
+   settings were stacked on top of the game, pushing it down.
+   Here they sit beside it instead: always visible, nothing to
+   open or close, and the game gets the freed height.
+   Below 900px nothing changes — phones and iPads keep the
+   collapsible bar exactly as before.
+══════════════════════════════════════════════════════════ */
+@media (min-width: 900px) {
+  .container {
+    max-width: 1180px;
+    display: grid;
+    grid-template-columns: 268px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 24px;
+    align-items: start;
+    padding-top: 12px;
+  }
+  .toolbar {
+    grid-column: 1; grid-row: 1 / span 2;
+    border-radius: 16px;
+    position: sticky; top: 12px;
+  }
+  .toolbar-top { flex-wrap: wrap; }
+  /* Nothing to toggle when the panel never hides. */
+  .summary-chip { display: none; }
+  .toolbar.collapsed .toolbar-controls-wrap { max-height: 600px; }
+  .toolbar-controls { padding-top: 12px; }
+  #modeBtnGroup { flex-direction: column; }
+  #modeBtnGroup .seg-btn { text-align: left; padding: 10px 12px; }
+  /* the op buttons are single symbols — a row reads better than a stack */
+  #opBtnGroup .seg-btn { padding: 10px 6px; font-size: 1rem; }
+  .filter-row { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .table-btn { padding: 11px 0; font-size: 1rem; }
+
+  #scoreHUD { grid-column: 2; grid-row: 1; margin-top: 0; }
+  .quiz-panel, .keypad-panel, .tekmovanje-panel { grid-column: 2; grid-row: 2; }
+
+  /* The game fills the height the settings used to occupy. */
+  /* Centre the game in the column it now owns, instead of letting it hug
+     the HUD with a pool of empty space underneath. */
+  .quiz-area, .keypad-area { min-height: calc(100vh - 200px); justify-content: center; }
+  .quiz-question { font-size: 3.4rem; padding: 40px 48px; }
+  .quiz-options { max-width: 560px; gap: 16px; }
+  .quiz-opt-btn { padding: 26px; font-size: 2.1rem; }
+  .quiz-advance-bar-wrap { max-width: 560px; }
+  .keypad-grid { max-width: 400px; gap: 12px; }
+  .keypad-btn { padding: 24px 0; font-size: 2rem; }
+  .keypad-display { min-height: 76px; padding: 18px 28px; }
+  .keypad-display-text { font-size: 2.4rem; }
+
+  /* Tekmovanje is untouched: no settings, centred, full focus. */
+  body.competition .container {
+    display: block; max-width: 700px; padding-top: 0;
+  }
+  body.competition .toolbar { position: sticky; top: 0; border-radius: 0 0 16px 16px; }
+  body.competition .summary-chip { display: flex; }
+  body.competition .toolbar.collapsed .toolbar-controls-wrap { max-height: 0; }
+  body.competition #modeBtnGroup { flex-direction: row; }
+  body.competition #modeBtnGroup .seg-btn { text-align: center; padding: 9px 10px; }
+  body.competition .filter-row { grid-template-columns: repeat(10, 1fr); }
+}

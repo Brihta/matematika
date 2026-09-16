@@ -217,6 +217,51 @@ function saveSettings() {
   } catch(e) {}
 }
 
+/* Teacher preset links: ?p=7&op=x opens straight into the 7 times table with
+   multiplication only, so a class never has to touch the settings at all.
+     p    1-10, comma separated, or "vse"   (poštevanke)
+     op   x | d | both                       (vrsta računa)
+     mode kviz | tipkovnica | tekmovanje
+   Applied after the saved settings, so a link always wins, and saved so the
+   choice survives a refresh without the query string. */
+function applyPresetFromURL() {
+  let q;
+  try { q = new URLSearchParams(location.search); } catch(e) { return false; }
+  if (![...q.keys()].length) return false;
+  let touched = false;
+
+  const m = (q.get('mode') || '').toLowerCase();
+  const modeMap = { kviz:'quiz', quiz:'quiz', tipkovnica:'keypad', keypad:'keypad',
+                    tekmovanje:'tekmovanje', competition:'tekmovanje' };
+  if (modeMap[m]) { mode = modeMap[m]; touched = true; }
+
+  const o = (q.get('op') || '').toLowerCase();
+  const opMap = { x:'multiply', mult:'multiply', multiply:'multiply', krat:'multiply',
+                  d:'divide', div:'divide', divide:'divide', deljenje:'divide',
+                  both:'both', xd:'both', obe:'both' };
+  if (opMap[o]) { opType = opMap[o]; touched = true; }
+
+  const praw = (q.get('p') || q.get('t') || '').toLowerCase();
+  if (praw === 'vse' || praw === 'all') {
+    tables = new Set([1,2,3,4,5,6,7,8,9,10]); touched = true;
+  } else if (praw) {
+    const arr = praw.split(',')
+      .map(x => parseInt(x.trim(), 10))
+      .filter(n => Number.isInteger(n) && n >= 1 && n <= 10);
+    if (arr.length) { tables = new Set(arr); touched = true; }
+  }
+  /* Asking for particular tables only makes sense in a practice mode —
+     tekmovanje always uses the full deck. Without this, a child whose last
+     session ended in tekmovanje opens the teacher's link and sees the
+     preset silently ignored. */
+  const askedForContent = praw || opMap[o];
+  if (askedForContent && !modeMap[m] && mode === 'tekmovanje') {
+    mode = 'quiz'; touched = true;
+  }
+  if (touched) saveSettings();
+  return touched;
+}
+
 /* Profile session persistence */
 const PROFILE_KEY = 'brihta_profile_v1';
 const TEACHER_KEY = 'brihta_teacher_v1';
@@ -2308,6 +2353,7 @@ setInterval(() => {
    INIT
 ══════════════════════════ */
 loadSettings();
+applyPresetFromURL();   // a teacher's link overrides whatever is saved
 loadProfile();
 applyUIFromState();
 updateControlLock();
