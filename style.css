@@ -1151,62 +1151,48 @@ body.competition {
 }
 
 @media (min-width: 900px) {
-  .container {
-    max-width: 1240px;
-    display: grid;
-    grid-template-columns: 104px minmax(0, 1fr);
-    grid-template-rows: auto auto 1fr;
-    column-gap: 20px; row-gap: 14px;
-    padding-top: 12px; padding-bottom: 18px;
-    align-items: start;
-  }
-  /* the toolbar stops being a box so its two halves can take
-     their own places in the grid */
-  .toolbar { display: contents; }
+  .container { max-width: 1180px; padding-top: 12px; padding-bottom: 18px; }
 
-  .topbar {
-    grid-column: 1 / -1; grid-row: 1;
+  /* Vse nastavitve v eni plošči na vrhu: zgoraj način in vrsta računa,
+     pod njima poštevanke v eni vrsti. Poštevanke so bile nekaj časa v
+     levem stolpcu, a so tam izgledale slabo — stolpec desetih gumbov je
+     vlekel pogled stran od računa. */
+  .toolbar {
     background: #16213e; border-radius: 16px;
-    padding: 10px 18px; gap: 20px; flex-wrap: nowrap;
+    padding: 10px 18px; gap: 10px;
+    display: flex; flex-direction: column;
     box-shadow: 0 2px 12px rgba(0,0,0,.4);
     position: sticky; top: 12px; z-index: 100;
+  }
+  .topbar {
+    background: none; padding: 0; box-shadow: none; position: static;
+    gap: 20px; flex-wrap: nowrap;
   }
   .brand { order: 1; }
   .topbar-ctrls { order: 2; flex: 1; flex-basis: auto; gap: 22px; margin-top: 0; }
   .profile-btn { order: 3; }
-  .summary-chip { display: none; }          /* nothing left to collapse */
-  /* Size the buttons to their labels. A fixed group width forced
-     "Tipkovnica" and "Tekmovanje" into boxes narrower than their own text,
-     so they clipped and overlapped. */
+  .summary-chip { display: none; }          /* ni česa zlagati */
+  /* Gumbi po meri napisa: fiksna širina skupine je "Tipkovnico" in
+     "Tekmovanje" stisnila v okvir, ožji od njunega besedila. */
   .topbar-ctrls .ctrl-block { flex: 0 0 auto; }
   .topbar-ctrls .btn-group { width: max-content; }
   .topbar-ctrls .seg-btn { flex: 0 0 auto; padding: 9px 16px; }
   #opBlock .seg-btn { min-width: 52px; text-align: center; }
 
-  /* Poštevanke rail — one number per row, beside the game */
-  /* the .toolbar.collapsed rule is more specific than a bare class, so the
-     override has to match it — otherwise the rail keeps max-height:0, its
-     content spills out visibly and the grid reserves no space for it */
+  /* Poštevanke — ena vrsta čez celotno širino */
   .toolbar-controls-wrap,
   .toolbar.collapsed .toolbar-controls-wrap {
-    grid-column: 1; grid-row: 2 / span 2;
     max-height: none; overflow: visible;
-    position: sticky; top: 108px;
   }
   .toolbar-controls { padding-top: 0; }
-  .tables-block {
-    background: #16213e; border-radius: 14px;
-    padding: 10px 9px; box-shadow: 0 2px 12px rgba(0,0,0,.35);
-  }
-  .tables-block .ctrl-label-row { flex-direction: column; gap: 5px; align-items: stretch; }
-  .tables-block .quick-group { justify-content: center; }
-  .filter-row { grid-template-columns: 1fr; gap: 5px; }
-  .table-btn { padding: 9px 0; font-size: .95rem; }
+  .tables-block { background: none; padding: 0; box-shadow: none; }
+  .tables-block .ctrl-label-row { flex-direction: row; align-items: center; }
+  .filter-row { grid-template-columns: repeat(10, 1fr); gap: 6px; }
+  .table-btn { padding: 9px 0; font-size: 1rem; }
 
   .stage {
     display: flex; flex-direction: column; gap: 14px;
-    grid-column: 2; grid-row: 2 / span 2;
-    min-height: calc(100vh - 145px);
+    min-height: calc(100vh - 305px);   /* izmerjeno: 12 + 160 plošča + 101 HUD + 14 + 18 */
     justify-content: center;
   }
   #scoreHUD { margin-top: 0; }
@@ -1226,7 +1212,12 @@ body.competition {
   /* Short laptops: the wide-screen sizes above are tuned for ~900px of
      height. On a 1280x720 or 1000x800 screen they push the ✓ row off the
      bottom, so scale the game down by height as well as width. */
-  @media (max-height: 870px) {
+  /* Plošča na vrhu je zdaj dvovrstična (način/vrsta + poštevanke), zato je
+     nad igro 305px namesto 244 — meja, pod katero je treba igro pomanjšati,
+     se je s tem dvignila. */
+  @media (max-height: 980px) {
+    .container { padding-bottom: 8px; }
+    .stage { gap: 10px; }
     .quiz-question { font-size: 2.6rem; padding: 24px 36px; }
     .quiz-opt-btn { padding: 18px; font-size: 1.7rem; }
     .quiz-options { gap: 12px; }
