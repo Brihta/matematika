@@ -1025,7 +1025,8 @@ async function loginTeacher(email, password) {
   if (rows && rows.length) {
     if (!rows[0].approved) return TEACHER_PENDING;
     teacherSession = { id: rows[0].id, username: rows[0].username,
-                       email: rows[0].email };
+                       email: rows[0].email,
+                       mustChange: !!rows[0].must_change };
     profile = null; saveProfile();
     saveTeacher();
     updateProfileButton();
@@ -1389,7 +1390,14 @@ function renderAuthView(view) {
       } else if (ok === TEACHER_PENDING) {
         msg.innerHTML = '⏳ Račun je ustvarjen, a še ni potrjen.<br>'
                       + 'Ko ga Nino odobri, se boš lahko prijavil_a.';
-      } else if (ok) { removeOverlay(); openTeacherDashboard(); }
+      } else if (ok) {
+        removeOverlay();
+        // Accounts created in bulk start on a password Nino chose. Without a
+        // forced stop nobody would ever replace it, and those passwords are
+        // guessable, so the dashboard stays shut until it is changed.
+        if (ok.mustChange) openTeacherPassword(true);
+        else openTeacherDashboard();
+      }
       else {
         msg.textContent = '❌ Napačen e-naslov ali geslo.';
       }
@@ -1703,6 +1711,9 @@ async function openStatsOverlay() {
 ══════════════════════════ */
 async function openTeacherDashboard() {
   if (!teacherSession) { openAuthOverlay('teacher'); return; }
+  // Also covers a reload: the session comes back from localStorage, so the
+  // check has to sit on the dashboard door, not only on the login path.
+  if (teacherSession.mustChange) { openTeacherPassword(true); return; }
   removeOverlay();
   const div = document.createElement('div');
   div.className = 'timed-overlay';
@@ -2086,16 +2097,19 @@ async function openTeacherDashboard() {
 /* ── Teacher: change your own password ──
    Accounts created in bulk start on a password Nino picked, so every teacher
    needs a way to replace it without him editing the database. */
-function openTeacherPassword() {
+function openTeacherPassword(firstLogin) {
   removeOverlay();
   const div = document.createElement('div');
   div.className = 'timed-overlay';
   div.innerHTML = `
     <div class="timed-overlay-box auth-box">
-      <div class="overlay-title" style="color:#f0a500">🔑 Spremeni svoje geslo</div>
+      <div class="overlay-title" style="color:#f0a500">${
+        firstLogin ? '👋 Prva prijava' : '🔑 Spremeni svoje geslo'}</div>
       <div class="overlay-divider"></div>
+      ${firstLogin ? `<div class="auth-msg">Geslo, ki si ga dobila, je začasno.<br>
+        Določi svojega, da boš do pregleda dostopala le ti.</div>` : ''}
       <div class="reset-student">${esc(teacherSession ? teacherSession.email || teacherSession.username : '')}</div>
-      <label class="auth-label">Staro geslo</label>
+      <label class="auth-label">${firstLogin ? 'Začasno geslo' : 'Staro geslo'}</label>
       <input id="cpOld" class="auth-input" type="password" autocomplete="current-password" />
       <label class="auth-label">Novo geslo (vsaj 8 znakov)</label>
       <input id="cpNew" class="auth-input" type="password" autocomplete="new-password" />
@@ -2103,11 +2117,20 @@ function openTeacherPassword() {
       <input id="cpNew2" class="auth-input" type="password" autocomplete="new-password" />
       <button class="overlay-btn overlay-btn-next" id="cpBtn">Shrani ✓</button>
       <div class="auth-msg" id="cpMsg"></div>
-      <button class="auth-switch auth-close" id="cpCancel">← Nazaj na pregled</button>
+      ${firstLogin
+        ? '<button class="auth-switch auth-close" id="cpLogout">Odjava</button>'
+        : '<button class="auth-switch auth-close" id="cpCancel">← Nazaj na pregled</button>'}
     </div>`;
   document.body.appendChild(div);
   activeOverlay = div;
-  div.querySelector('#cpCancel').addEventListener('click', () => openTeacherDashboard());
+  // On a first login the only ways out are changing the password or leaving.
+  if (firstLogin) {
+    div.querySelector('#cpLogout').addEventListener('click', () => {
+      logoutTeacher(); removeOverlay();
+    });
+  } else {
+    div.querySelector('#cpCancel').addEventListener('click', () => openTeacherDashboard());
+  }
   div.querySelector('#cpBtn').addEventListener('click', async () => {
     const oldP = div.querySelector('#cpOld').value;
     const n1 = div.querySelector('#cpNew').value;
@@ -2120,11 +2143,13 @@ function openTeacherPassword() {
     btn.disabled = true; btn.textContent = 'Shranjujem …';
     const res = await changeTeacherPassword(oldP, n1);
     if (res === 'OK') {
+      if (teacherSession) { teacherSession.mustChange = false; saveTeacher(); }
       div.querySelector('.timed-overlay-box').innerHTML = `
         <div class="overlay-title" style="color:#4caf50">✅ Geslo spremenjeno</div>
         <div class="overlay-divider"></div>
         <div class="auth-msg">Od zdaj se prijavljaj z novim geslom.</div>
-        <button class="overlay-btn overlay-btn-next" id="cpDone">Nazaj na pregled</button>`;
+        <button class="overlay-btn overlay-btn-next" id="cpDone">${
+          firstLogin ? 'Naprej na pregled ➡️' : 'Nazaj na pregled'}</button>`;
       div.querySelector('#cpDone').addEventListener('click', () => openTeacherDashboard());
       return;
     }

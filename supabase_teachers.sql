@@ -14,6 +14,10 @@
 -- ── 1. Novi stolpci ───────────────────────────────────────────────────────
 alter table teachers add column if not exists email text;
 alter table teachers add column if not exists approved boolean not null default false;
+-- Računi, ki jih ustvari Nino, startajo na geslu, ki ga je izbral on.
+-- Ta zastavica poskrbi, da ga učiteljica ob prvi prijavi MORA zamenjati —
+-- brez tega ga v praksi ne bi nihče, gesla pa so uganljiva.
+alter table teachers add column if not exists must_change_password boolean not null default false;
 
 create unique index if not exists teachers_email_unique
   on teachers (lower(email)) where email is not null;
@@ -90,12 +94,14 @@ drop function if exists public.login_teacher_email(text, text);
 
 create or replace function public.login_teacher_email(
   p_email text, p_password text)
-returns table(id uuid, username text, email text, approved boolean)
+returns table(id uuid, username text, email text, approved boolean,
+              must_change boolean)
 language plpgsql security definer set search_path = public, extensions
 as $$
 declare r record;
 begin
-  select t.id, t.username, t.email, t.approved, t.pin_hash into r
+  select t.id, t.username, t.email, t.approved, t.must_change_password, t.pin_hash
+    into r
     from teachers t
    where lower(t.email) = lower(trim(coalesce(p_email, '')));
 
@@ -103,7 +109,7 @@ begin
   if r.pin_hash is null then return; end if;
   if r.pin_hash <> crypt(coalesce(p_password, ''), r.pin_hash) then return; end if;
 
-  return query select r.id, r.username, r.email, r.approved;
+  return query select r.id, r.username, r.email, r.approved, r.must_change_password;
 end; $$;
 
 -- ── 4b. Učitelj si sam zamenja geslo ──────────────────────────────────────
@@ -126,7 +132,10 @@ begin
   if r.pin_hash is null then return 'BAD_LOGIN'; end if;
   if r.pin_hash <> crypt(coalesce(p_old, ''), r.pin_hash) then return 'BAD_LOGIN'; end if;
 
-  update teachers set pin_hash = crypt(p_new, gen_salt('bf')) where id = r.id;
+  update teachers
+     set pin_hash = crypt(p_new, gen_salt('bf')),
+         must_change_password = false
+   where id = r.id;
   return 'OK';
 end; $$;
 
@@ -164,9 +173,9 @@ end; $$;
 -- "Spremeni geslo" v učiteljskem pregledu). approved = true, ker jih
 -- ustvarjaš ti, zato ni ničesar za potrjevati.
 --
--- insert into teachers (username, email, pin_hash, approved) values
---   ('ana',   'ana.novak@sola.si', crypt('Zacetno-geslo-01', gen_salt('bf')), true),
---   ('marko', 'marko.kos@sola.si', crypt('Zacetno-geslo-02', gen_salt('bf')), true);
+-- insert into teachers (username, email, pin_hash, approved, must_change_password) values
+--   ('ana',   'ana.novak@sola.si', crypt('Zacetno-geslo-01', gen_salt('bf')), true, true),
+--   ('marko', 'marko.kos@sola.si', crypt('Zacetno-geslo-02', gen_salt('bf')), true, true);
 --
 -- Pregled, kdo obstaja:
 -- select username, email, approved from teachers order by created_at;
