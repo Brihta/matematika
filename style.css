@@ -772,16 +772,31 @@ body.competition {
   margin-top: 6px; align-self: flex-start;
 }
 .ptable-toggle {
-  display: flex; gap: 4px; width: 100%;
-  background: rgba(0,0,0,0.25); border-radius: 8px; padding: 3px;
+  display: flex; gap: 5px; width: 100%;
+  background: rgba(0,0,0,0.25); border-radius: 9px; padding: 4px;
 }
+/* Neaktiven gumb prej ni imel ozadja, zato ga oko ni prepoznalo kot gumb —
+   besedilo je bilo berljivo (8.6:1), manjkala je oblika. Samo s polnilom se
+   na tako temni podlagi ne da doseči 3:1, zato obliko določa obroba:
+   4.35:1 proti polnilu, 5.4:1 proti podlagi. */
 .ptable-tog-btn {
-  flex: 1; background: transparent; border: none;
-  border-radius: 6px; padding: 6px 8px;
-  font-size: 0.76rem; font-weight: 600; color: #aaa;
+  flex: 1;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.45);
+  border-radius: 7px; padding: 7px 8px;
+  font-size: 0.78rem; font-weight: 700; color: #e8e8e8;
   cursor: pointer; font-family: inherit; white-space: nowrap;
+  transition: background .12s, border-color .12s;
 }
-.ptable-tog-btn.active { background: #f0a500; color: #000; }
+.ptable-tog-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.7);
+}
+.ptable-tog-btn.active {
+  background: #f0a500; color: #000;
+  border-color: #ffc94d;
+  box-shadow: 0 1px 6px rgba(240,165,0,0.4);
+}
 .ptable-list { display: flex; flex-direction: column; gap: 4px; width: 100%; }
 .ptable-row {
   display: flex; align-items: center; gap: 10px;
