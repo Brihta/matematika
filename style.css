@@ -801,7 +801,7 @@ body.competition {
 
 /* ── Teacher dashboard ── */
 .teacher-box {
-  max-width: 96vw; width: 780px;
+  max-width: 96vw; width: 980px;
   max-height: 88vh; overflow-y: auto;
   position: relative; align-items: stretch !important;
 }
@@ -835,14 +835,15 @@ body.competition {
 /* ── Lesson view: one row per student ── */
 .td-lesson { display: flex; flex-direction: column; gap: 4px; width: 100%; }
 .tl-row {
-  display: grid; grid-template-columns: 1fr 76px 76px 104px;
-  gap: 8px; align-items: center;
-  padding: 8px 12px; border-radius: 9px;
+  display: grid; grid-template-columns: minmax(0,1fr) 84px 84px 104px;
+  gap: 10px; align-items: center;
+  padding: 8px 14px; border-radius: 9px;
   background: rgba(255,255,255,0.04);
 }
+.tl-row > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tl-head {
   background: transparent; padding-top: 0; padding-bottom: 0;
-  font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em;
+  font-size: 0.6rem; text-transform: uppercase;
   color: rgba(255,255,255,0.4); font-weight: 700;
 }
 .tl-name {
@@ -977,3 +978,12 @@ body.competition {
 @media (max-width: 360px) {
   .quiz-options { grid-template-columns: 1fr; }
 }
+
+.tl-more {
+  width: 100%; margin-top: 4px;
+  background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.6);
+  border: 1px dashed rgba(255,255,255,0.18); border-radius: 9px;
+  padding: 9px 12px; font-size: 0.76rem; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.tl-more:hover { background: rgba(255,255,255,0.08); color: #eee; }

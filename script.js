@@ -1603,6 +1603,7 @@ async function openTeacherDashboard() {
   let curWin = 'today';
   let curRazred = '';
   let curView = 'lesson';
+  let showIdle = false;
   let lastFetchTs = 0;
   let offline = false;
   let refreshing = false;
@@ -1716,6 +1717,22 @@ async function openTeacherDashboard() {
     };
   }
 
+  /* Split off students with nothing in this window, and fold them away once
+     there are more than a screenful — otherwise a school-wide view is 100+
+     dead rows burying the handful actually working. */
+  function splitIdle(list, slot) {
+    const active = [], idle = [];
+    for (const s of list) (summarise(s, slot).answers ? active : idle).push(s);
+    return { active, idle, folded: !showIdle && idle.length > 8 };
+  }
+  function foldButton(n) {
+    return `<button class="tl-more" id="tlMore">👀 Pokaži še ${n}, ki še niso začeli</button>`;
+  }
+  function wireFold() {
+    const more = wrap.querySelector('#tlMore');
+    if (more) more.addEventListener('click', () => { showIdle = true; renderGrid(); });
+  }
+
   function renderLesson() {
     const slot = curWin === 'all' ? 'all' : 'recent';
     const rows = baseList().map(s => Object.assign({ s }, summarise(s, slot)));
@@ -1737,11 +1754,16 @@ async function openTeacherDashboard() {
       return need(a) - need(b);
     });
 
+    const started = rows.filter(r => r.answers > 0);
+    const idleCount = rows.length - started.length;
+    const folded = !showIdle && idleCount > 8;
+    const shown = folded ? started : rows;
+
     const head = `<div class="tl-row tl-head">
         <span>Učenec</span><span class="tl-num">Odgovori</span>
         <span class="tl-num">Točnost</span><span class="tl-weak">Najšibkejša</span>
       </div>`;
-    const body = rows.map(r => {
+    const body = shown.map(r => {
       const rz = razredMap[r.s.username];
       const idle = r.answers === 0;
       const pctCls = cellClass(r.correct, r.wrong);
@@ -1760,7 +1782,11 @@ async function openTeacherDashboard() {
         <span class="tl-weak">${weakTxt}</span>
       </div>`;
     }).join('');
-    wrap.innerHTML = `<div class="td-lesson">${head}${body}</div>`;
+    const emptyNote = (folded && !started.length)
+      ? '<div class="comp-board-empty">Nihče še ni vadil.</div>' : '';
+    wrap.innerHTML = `<div class="td-lesson">${head}${body}${emptyNote}${
+      folded ? foldButton(idleCount) : ''}</div>`;
+    wireFold();
   }
 
   function updateClassSum(rows) {
@@ -1784,7 +1810,8 @@ async function openTeacherDashboard() {
 
   function renderMatrix() {
     const slot = curWin === 'all' ? 'all' : 'recent';
-    const filtered = baseList();
+    const { active, idle, folded } = splitIdle(baseList(), slot);
+    const filtered = folded ? active : active.concat(idle);
     if (!filtered.length) {
       const msg = curRazred
         ? `V razredu ${curRazred} ni podatkov.`
@@ -1828,7 +1855,8 @@ async function openTeacherDashboard() {
       }
       return row + '</div>';
     }).join('');
-    wrap.innerHTML = head + body;
+    wrap.innerHTML = head + body + (folded ? foldButton(idle.length) : '');
+    wireFold();
   }
 
   async function switchWindow(win) {
@@ -1854,7 +1882,9 @@ async function openTeacherDashboard() {
   });
 
   const razSelect = div.querySelector('#tdRazredSelect');
-  razSelect.addEventListener('change', () => { curRazred = razSelect.value; renderGrid(); });
+  razSelect.addEventListener('change', () => {
+    curRazred = razSelect.value; showIdle = false; renderGrid();
+  });
   div.querySelectorAll('#tdViewToggle .ptable-tog-btn').forEach(b => {
     b.addEventListener('click', () => {
       div.querySelectorAll('#tdViewToggle .ptable-tog-btn')
