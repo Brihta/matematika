@@ -1823,9 +1823,15 @@ async function openTeacherDashboard() {
     const folded = !showIdle && idleCount > 8;
     const shown = folded ? started : rows;
 
+    /* "ODGOVORI" and "NAJŠIBKEJŠA" are single unbreakable words — on a phone
+       no column width or wrapping saves them, so use short labels there. */
+    const narrow = window.matchMedia('(max-width: 600px)').matches;
+    const H = narrow
+      ? ['Učenec', 'Odg.', '%', 'Šibka']
+      : ['Učenec', 'Odgovori', 'Točnost', 'Najšibkejša'];
     const head = `<div class="tl-row tl-head">
-        <span>Učenec</span><span class="tl-num">Odgovori</span>
-        <span class="tl-num">Točnost</span><span class="tl-weak">Najšibkejša</span>
+        <span>${H[0]}</span><span class="tl-num">${H[1]}</span>
+        <span class="tl-num">${H[2]}</span><span class="tl-weak">${H[3]}</span>
       </div>`;
     const body = shown.map(r => {
       const rz = razredMap[r.s.username];

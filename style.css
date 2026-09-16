@@ -840,9 +840,16 @@ body.competition {
 .td-classsum { color: rgba(255,255,255,0.45); }
 
 /* ── Lesson view: one row per student ── */
-.td-lesson { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.td-lesson {
+  display: flex; flex-direction: column; gap: 4px;
+  width: 100%; max-width: 760px; margin-inline: auto;
+}
 .tl-row {
-  display: grid; grid-template-columns: minmax(0,1fr) 84px 84px 104px;
+  /* Measured: the headers need 83 / 76 / 103px, and the old 84/84/104
+     columns left one pixel of slack — enough to truncate "ODGOVORI" and
+     "NAJŠIBKEJŠA" on any machine whose text renders a hair wider. The name
+     column meanwhile had 500px it never used. */
+  display: grid; grid-template-columns: minmax(0,1fr) 108px 100px 130px;
   gap: 10px; align-items: center;
   padding: 8px 14px; border-radius: 9px;
   background: rgba(255,255,255,0.04);
@@ -852,6 +859,19 @@ body.competition {
   background: transparent; padding-top: 0; padding-bottom: 0;
   font-size: 0.6rem; text-transform: uppercase;
   color: rgba(255,255,255,0.4); font-weight: 700;
+}
+/* the modal centres its text; this one header must line up with the names */
+.tl-head > :first-child { text-align: left; }
+/* Phones: the desktop columns (108+100+130 plus gaps) are wider than the
+   modal, so tighten them and let the headers wrap instead of truncating. */
+@media (max-width: 600px) {
+  .tl-row {
+    grid-template-columns: minmax(0,1fr) 52px 48px 58px;
+    gap: 6px; padding: 8px 10px;
+  }
+  .tl-head { font-size: 0.55rem; }
+  .tl-num, .tl-weak { font-size: 0.76rem; }
+  .tl-name { font-size: 0.78rem; }
 }
 .tl-name {
   display: flex; align-items: center; gap: 6px;
