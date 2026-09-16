@@ -30,10 +30,12 @@ alter table scores drop constraint if exists scores_score_range;
 alter table scores add constraint scores_score_range
   check (score >= 0 and score <= 300);
 
--- ── 4. Day must be a real date, not arbitrary text ────────────────────────
-alter table scores drop constraint if exists scores_day_format;
-alter table scores add constraint scores_day_format
-  check (day ~ '^\d{4}-\d{2}-\d{2}$');
+-- ── 4. Day needs no constraint ────────────────────────────────────────────
+-- `day` is a real `date` column, so Postgres already rejects anything that is
+-- not a valid date. An earlier version of this file tried a regex check here
+-- and failed with "operator does not exist: date ~ unknown" — and because the
+-- editor runs the whole script in one transaction, that error also rolled back
+-- the two constraints above. Nothing to do.
 
 -- ── OPTIONAL: cap how many scores one device can post per day ─────────────
 -- Not expressible as a CHECK constraint. If kids start spamming the board,
