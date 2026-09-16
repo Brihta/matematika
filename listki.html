@@ -46,7 +46,11 @@
   .ime {
     font-size: 11pt; font-weight: 800; color: #f0a500;
     letter-spacing: -.2px; white-space: nowrap;
+    display: flex; align-items: center; gap: 1.6mm;
   }
+  /* pravi logotip namesto emojija: emoji se pri pretvorbi v PDF izriše
+     kot siva packa, ker pretvornik nima barvne različice pisave */
+  .logo { width: 5.2mm; height: 5.2mm; object-fit: contain; border-radius: 50%; }
   .ime span { color: #16213e; font-weight: 700; }
   .naslov { font-size: 7.2pt; font-weight: 600; color: #5a6480; letter-spacing: .1px; }
 
@@ -95,7 +99,7 @@
     <!-- 8 enakih listkov -->
     <div class="listek">
       <div class="glava">
-        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="ime"><img class="logo" src="Brihta.png" alt="">Brihta <span>— Poštevanka</span></div>
         <div class="naslov">brihta.github.io/matematika</div>
       </div>
 
@@ -119,7 +123,7 @@
     </div>
     <div class="listek">
       <div class="glava">
-        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="ime"><img class="logo" src="Brihta.png" alt="">Brihta <span>— Poštevanka</span></div>
         <div class="naslov">brihta.github.io/matematika</div>
       </div>
 
@@ -143,7 +147,7 @@
     </div>
     <div class="listek">
       <div class="glava">
-        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="ime"><img class="logo" src="Brihta.png" alt="">Brihta <span>— Poštevanka</span></div>
         <div class="naslov">brihta.github.io/matematika</div>
       </div>
 
@@ -167,7 +171,7 @@
     </div>
     <div class="listek">
       <div class="glava">
-        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="ime"><img class="logo" src="Brihta.png" alt="">Brihta <span>— Poštevanka</span></div>
         <div class="naslov">brihta.github.io/matematika</div>
       </div>
 
@@ -191,7 +195,7 @@
     </div>
     <div class="listek">
       <div class="glava">
-        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="ime"><img class="logo" src="Brihta.png" alt="">Brihta <span>— Poštevanka</span></div>
         <div class="naslov">brihta.github.io/matematika</div>
       </div>
 
@@ -215,7 +219,7 @@
     </div>
     <div class="listek">
       <div class="glava">
-        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="ime"><img class="logo" src="Brihta.png" alt="">Brihta <span>— Poštevanka</span></div>
         <div class="naslov">brihta.github.io/matematika</div>
       </div>
 
@@ -239,7 +243,7 @@
     </div>
     <div class="listek">
       <div class="glava">
-        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="ime"><img class="logo" src="Brihta.png" alt="">Brihta <span>— Poštevanka</span></div>
         <div class="naslov">brihta.github.io/matematika</div>
       </div>
 
@@ -263,7 +267,7 @@
     </div>
     <div class="listek">
       <div class="glava">
-        <div class="ime">🦉 Brihta <span>— Poštevanka</span></div>
+        <div class="ime"><img class="logo" src="Brihta.png" alt="">Brihta <span>— Poštevanka</span></div>
         <div class="naslov">brihta.github.io/matematika</div>
       </div>
 
