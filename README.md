@@ -39,9 +39,28 @@ vidna v zgornji vrstici, **poštevanke** pa so v levem stolpcu, vsaka v svoji
 vrsti. Ničesar ni treba odpirati ali zapirati. Na tablicah in telefonih
 ostane zgornja zložljiva vrstica.
 
-## Učiteljski pregled
+## Učiteljski računi
 
-Prijava prek gumba profila → **Prijava za učitelje**.
+Prijava prek gumba profila → **Prijava za učitelje**, z **e-naslovom in geslom**.
+
+Kolegi si račun ustvarijo sami (*Nimaš računa? Ustvari ga*), a potrebujejo
+**šolsko kodo**, ki jo poveš samo zaposlenim. Račun je po registraciji
+**neaktiven**, dokler ga ročno ne potrdiš:
+
+```sql
+-- kdo čaka
+select email, username, created_at from teachers where approved = false;
+-- potrditev
+update teachers set approved = true where lower(email) = 'kolega@sola.si';
+```
+
+Dvojna zaščita je namerna: učiteljski račun vidi rezultate **vseh** učencev
+šole in lahko ponastavi geslo kateremukoli učencu, stran pa je javna.
+Brez tega bi si lahko učiteljski dostop ustvaril vsak učenec.
+
+Vsi učitelji vidijo vse razrede — za medgeneracijsko primerjavo.
+
+## Učiteljski pregled
 
 - **Učenci** — vrstica na učenca: odgovori, točnost, najšibkejša poštevanka.
   Razvrščeno tako, da je zgoraj tisti, ki potrebuje pomoč.

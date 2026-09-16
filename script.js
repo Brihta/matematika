@@ -1013,12 +1013,17 @@ function logoutStudent() {
 }
 
 /* ── Teacher auth ── */
-async function loginTeacher(username, pin) {
-  const rows = await supabaseRPC('login_teacher', {
-    p_username: username.toLowerCase().trim(), p_pin: pin
+/* Returned when the credentials are right but the account is still waiting
+   for approval — worth telling a colleague apart from a wrong password. */
+const TEACHER_PENDING = { pending: true };
+
+async function loginTeacher(email, password) {
+  const rows = await supabaseRPC('login_teacher_email', {
+    p_email: String(email).toLowerCase().trim(), p_password: password
   });
   if (rows === RPC_UNREACHABLE) return RPC_UNREACHABLE;
   if (rows && rows.length) {
+    if (!rows[0].approved) return TEACHER_PENDING;
     teacherSession = { id: rows[0].id, username: rows[0].username };
     profile = null; saveProfile();
     saveTeacher();
@@ -1026,6 +1031,19 @@ async function loginTeacher(username, pin) {
     return teacherSession;
   }
   return null;
+}
+
+/* Self-registration, gated by a school code. The account is created but
+   inactive until Nino approves it in the SQL editor — a teacher account can
+   read every child's results and reset any child's password, so an open
+   form on a public page would hand that to whoever asked. */
+async function registerTeacher(email, password, code) {
+  const res = await supabaseRPC('register_teacher', {
+    p_email: String(email).toLowerCase().trim(),
+    p_password: password, p_code: code
+  });
+  if (res === RPC_UNREACHABLE) return RPC_UNREACHABLE;
+  return typeof res === 'string' ? res : 'ERROR';
 }
 function logoutTeacher() {
   teacherSession = null;
@@ -1334,36 +1352,99 @@ function renderAuthView(view) {
     box.innerHTML = `
       <div class="overlay-title" style="color:#f0a500">👨‍🏫 Prijava za učitelje</div>
       <div class="overlay-divider"></div>
-      <label class="auth-label">Uporabniško ime</label>
-      <input id="tUser" class="auth-input" autocomplete="off" autocapitalize="none" />
+      <label class="auth-label">E-naslov</label>
+      <input id="tUser" class="auth-input" type="email" autocomplete="username"
+             autocapitalize="none" placeholder="ime.priimek@sola.si" />
       <label class="auth-label">Geslo</label>
-      <input id="tPin" class="auth-input" type="password" autocomplete="off" />
+      <input id="tPin" class="auth-input" type="password" autocomplete="current-password" />
       <button class="overlay-btn overlay-btn-next" id="tLoginBtn">Prijava ✓</button>
       <div class="auth-msg" id="tMsg"></div>
+      <button class="auth-switch" id="tToReg">Nimaš računa? Ustvari ga</button>
       <button class="auth-switch" id="tToLogin">← Nazaj na prijavo učencev</button>
       <button class="auth-switch auth-close" id="tClose">Zapri</button>`;
     box.querySelector('#tClose').addEventListener('click', removeOverlay);
     box.querySelector('#tToLogin').addEventListener('click', () => renderAuthView('login'));
+    box.querySelector('#tToReg').addEventListener('click', () => renderAuthView('teacherReg'));
     const doTeacherLogin = async () => {
       const user = box.querySelector('#tUser').value.trim();
       const pin = box.querySelector('#tPin').value;
       const msg = box.querySelector('#tMsg');
-      if (!user || !pin) { msg.textContent = 'Vpiši uporabniško ime in geslo.'; return; }
+      if (!user || !pin) { msg.textContent = 'Vpiši e-naslov in geslo.'; return; }
       const btn = box.querySelector('#tLoginBtn');
       btn.disabled = true; btn.textContent = 'Preverjam …';
       const ok = await loginTeacher(user, pin);
+      btn.disabled = false; btn.textContent = 'Prijava ✓';
       if (ok === RPC_UNREACHABLE) {
-        btn.disabled = false; btn.textContent = 'Prijava ✓';
         msg.textContent = OFFLINE_MSG;
+      } else if (ok === TEACHER_PENDING) {
+        msg.innerHTML = '⏳ Račun je ustvarjen, a še ni potrjen.<br>'
+                      + 'Ko ga Nino odobri, se boš lahko prijavil_a.';
       } else if (ok) { removeOverlay(); openTeacherDashboard(); }
       else {
-        btn.disabled = false; btn.textContent = 'Prijava ✓';
-        msg.textContent = '❌ Napačno uporabniško ime ali geslo.';
+        msg.textContent = '❌ Napačen e-naslov ali geslo.';
       }
     };
     box.querySelector('#tLoginBtn').addEventListener('click', doTeacherLogin);
     box.querySelector('#tPin').addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); doTeacherLogin(); }
+    });
+    return;
+  }
+
+  if (view === 'teacherReg') {
+    box.innerHTML = `
+      <div class="overlay-title" style="color:#f0a500">👨‍🏫 Nov učiteljski račun</div>
+      <div class="overlay-divider"></div>
+      <label class="auth-label">E-naslov</label>
+      <input id="trEmail" class="auth-input" type="email" autocomplete="username"
+             autocapitalize="none" placeholder="ime.priimek@sola.si" />
+      <label class="auth-label">Geslo (vsaj 8 znakov)</label>
+      <input id="trPass" class="auth-input" type="password" autocomplete="new-password" />
+      <label class="auth-label">Ponovi geslo</label>
+      <input id="trPass2" class="auth-input" type="password" autocomplete="new-password" />
+      <label class="auth-label">Šolska koda</label>
+      <input id="trCode" class="auth-input" autocomplete="off" autocapitalize="none"
+             placeholder="dobiš jo pri Ninotu" />
+      <button class="overlay-btn overlay-btn-next" id="trBtn">Ustvari račun ✓</button>
+      <div class="auth-msg" id="trMsg"></div>
+      <button class="auth-switch" id="trToLogin">← Nazaj na prijavo</button>
+      <button class="auth-switch auth-close" id="trClose">Zapri</button>`;
+    box.querySelector('#trClose').addEventListener('click', removeOverlay);
+    box.querySelector('#trToLogin').addEventListener('click', () => renderAuthView('teacher'));
+    box.querySelector('#trBtn').addEventListener('click', async () => {
+      const email = box.querySelector('#trEmail').value.trim();
+      const p1 = box.querySelector('#trPass').value;
+      const p2 = box.querySelector('#trPass2').value;
+      const code = box.querySelector('#trCode').value.trim();
+      const msg = box.querySelector('#trMsg');
+      if (!email)        { msg.textContent = 'Vpiši svoj e-naslov.'; return; }
+      if (p1.length < 8) { msg.textContent = 'Geslo naj ima vsaj 8 znakov.'; return; }
+      if (p1 !== p2)     { msg.textContent = 'Gesli se ne ujemata.'; return; }
+      if (!code)         { msg.textContent = 'Vpiši šolsko kodo.'; return; }
+      const btn = box.querySelector('#trBtn');
+      btn.disabled = true; btn.textContent = 'Ustvarjam …';
+      const res = await registerTeacher(email, p1, code);
+      if (res === 'PENDING') {
+        box.innerHTML = `
+          <div class="overlay-title" style="color:#4caf50">✅ Račun ustvarjen</div>
+          <div class="overlay-divider"></div>
+          <div class="auth-msg">Račun za <strong>${esc(email)}</strong> je ustvarjen,
+            a še <strong>ni aktiven</strong>.</div>
+          <div class="auth-msg">Nino ga mora še potrditi. Ko to stori,
+            se prijaviš s tem e-naslovom in geslom.</div>
+          <button class="overlay-btn overlay-btn-next" id="trDone">V redu</button>`;
+        box.querySelector('#trDone').addEventListener('click', removeOverlay);
+        return;
+      }
+      btn.disabled = false; btn.textContent = 'Ustvari račun ✓';
+      const errors = {
+        BAD_CODE:      '❌ Šolska koda ni pravilna.',
+        BAD_EMAIL:     '❌ E-naslov ni veljaven.',
+        WEAK_PASSWORD: '❌ Geslo naj ima vsaj 8 znakov.',
+        EXISTS:        '❌ Račun s tem e-naslovom že obstaja.'
+      };
+      msg.textContent = res === RPC_UNREACHABLE ? OFFLINE_MSG
+                      : (errors[res] || '❌ Napaka pri ustvarjanju računa.');
     });
     return;
   }
