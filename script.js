@@ -1069,8 +1069,11 @@ function logoutTeacher() {
 }
 
 /* ── Student class (razred) ── */
-const RAZREDI = ['1A','1B','2A','2B','3A','3B','4A','4B','5A','5B',
-                 '6A','6B','7A','7B','8A','8B','9A','9B'];
+/* Oddelki, ki dejansko obstajajo na šoli — 2. in 3. razred imata samo A,
+   8. in 9. razreda ni. Ponujati oddelke, ki jih ni, samo vabi k napačni
+   izbiri. */
+const RAZREDI = ['1A','1B','2A','3A','4A','4B',
+                 '5A','5B','6A','6B','7A','7B'];
 async function getStudentRazred(id) {
   return supabaseRPC('get_student_razred', { p_student: id });
 }
@@ -1103,6 +1106,7 @@ function openRazredPrompt(onDone) {
     <div class="timed-overlay-box razred-box">
       <div class="overlay-title" style="color:#f0a500">🏫 V kateri razred hodiš?</div>
       <div class="overlay-divider"></div>
+      <div class="auth-msg">Novo šolsko leto se je začelo — izberi svoj razred.</div>
       <div class="razred-grid">
         ${RAZREDI.map(r => `<button class="razred-btn" data-r="${r}">${r}</button>`).join('')}
       </div>
