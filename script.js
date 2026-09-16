@@ -1352,9 +1352,11 @@ function renderAuthView(view) {
   if (!box) return;
 
   if (view === 'login') {
+    box.className = 'timed-overlay-box auth-box is-login';
     box.innerHTML = `
-      <div class="overlay-title" style="color:#f0a500">👤 Prijava</div>
+      <div class="overlay-title">🔑 Prijava</div>
       <div class="overlay-divider"></div>
+      <div class="auth-note">Vpiši se v račun, ki ga <strong>že imaš</strong>.</div>
       <label class="auth-label">Uporabniško ime</label>
       <input id="authUser" class="auth-input" autocomplete="off"
              autocapitalize="none" placeholder="npr. nin4" />
@@ -1362,8 +1364,9 @@ function renderAuthView(view) {
       <div id="authPickerSlot"></div>
       <button class="overlay-btn overlay-btn-next" id="authLoginBtn">Prijava ✓</button>
       <div class="auth-msg" id="authMsg"></div>
-      <button class="auth-switch" id="authToRegister">Nimaš računa? Ustvari ga</button>
+      <div id="authHelpSlot"></div>
       <button class="auth-switch" id="authToTeacher">👨‍🏫 Prijava za učitelje</button>
+      <button class="auth-switch auth-secondary" id="authToRegister">Še nimam računa — ustvari novega</button>
       <button class="auth-switch auth-close" id="authClose">Zapri</button>`;
     const picker = buildAnimalPicker();
     box.querySelector('#authPickerSlot').appendChild(picker);
@@ -1386,12 +1389,22 @@ function renderAuthView(view) {
       else {
         btn.disabled = false; btn.textContent = 'Prijava ✓';
         msg.textContent = '❌ Napačno uporabniško ime ali geslo.';
+        /* The old screen answered a forgotten password with "create an
+           account", which is how one child ended up with four. */
+        const help = box.querySelector('#authHelpSlot');
+        if (help && !help.innerHTML) {
+          help.innerHTML = '<div class="auth-help">🙋 Si pozabil_a geslo ali '
+            + 'uporabniško ime?<br><strong>Povej učiteljici</strong> — v nekaj '
+            + 'sekundah ti ga ponastavi.<br>Ne delaj novega računa, ker boš '
+            + 'izgubil_a vse svoje točke.</div>';
+        }
       }
     });
     return;
   }
 
   if (view === 'teacher') {
+    box.className = 'timed-overlay-box auth-box';
     box.innerHTML = `
       <div class="overlay-title" style="color:#f0a500">👨‍🏫 Prijava za učitelje</div>
       <div class="overlay-divider"></div>
@@ -1442,6 +1455,7 @@ function renderAuthView(view) {
   }
 
   if (view === 'teacherReg') {
+    box.className = 'timed-overlay-box auth-box';
     box.innerHTML = `
       <div class="overlay-title" style="color:#f0a500">👨‍🏫 Nov učiteljski račun</div>
       <div class="overlay-divider"></div>
@@ -1500,9 +1514,12 @@ function renderAuthView(view) {
   }
 
   /* register */
+  box.className = 'timed-overlay-box auth-box is-register';
   box.innerHTML = `
-    <div class="overlay-title" style="color:#f0a500">✨ Nov račun</div>
+    <div class="overlay-title">✨ Nov račun</div>
     <div class="overlay-divider"></div>
+    <div class="auth-warn">⚠️ Nov račun ustvari <strong>samo, če ga še nimaš</strong>.<br>
+      Če si geslo pozabil_a, ti ga učiteljica ponastavi — tvoje točke ostanejo.</div>
     <label class="auth-label">Tvoje ime</label>
     <input id="regName" class="auth-input" autocomplete="off" maxlength="20"
            placeholder="npr. Nino" />

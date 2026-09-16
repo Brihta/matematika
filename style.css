@@ -652,6 +652,43 @@ body.competition {
   max-width: 400px; width: 100%;
   max-height: 88vh; overflow-y: auto;
 }
+
+/* ── Prijava proti novemu računu ──
+   Štirje računi enega otroka so nastali zato, ker sta zaslona izgledala
+   enako: ista temna škatla, isti zelen gumb spodaj. Zdaj ju loči barva —
+   prijava modra, nov račun zelen — in to od roba do gumba. */
+.auth-box.is-login   { border-color: rgba(127,179,255,0.55); }
+.auth-box.is-login   .overlay-title { color: #7fb3ff !important; }
+.auth-box.is-login   .overlay-btn-next {
+  background: linear-gradient(135deg, #2f7fd4, #1d5fa8);
+  box-shadow: 0 5px 18px rgba(47,127,212,.4);
+}
+.auth-box.is-login   .overlay-divider { background: rgba(127,179,255,0.4); }
+
+.auth-box.is-register { border-color: rgba(64,200,110,0.55); }
+.auth-box.is-register .overlay-title { color: #5fd97a !important; }
+.auth-box.is-register .overlay-divider { background: rgba(64,200,110,0.4); }
+
+/* Vidno opozorilo na zaslonu za nov račun */
+.auth-warn {
+  background: rgba(240,165,0,0.14);
+  border: 1px solid rgba(240,165,0,0.55);
+  border-radius: 10px; padding: 9px 12px;
+  font-size: 0.82rem; font-weight: 600; color: #ffd97a;
+  line-height: 1.45;
+}
+/* Pot ob pozabljenem geslu — poudarjena, da ne posežejo po "nov račun" */
+.auth-help {
+  background: rgba(127,179,255,0.12);
+  border: 1px solid rgba(127,179,255,0.45);
+  border-radius: 10px; padding: 9px 12px;
+  font-size: 0.82rem; color: #cfe2ff; line-height: 1.45;
+}
+/* Povezava za nov račun na prijavi postane stranska, ne glavna pot */
+.auth-switch.auth-secondary {
+  color: rgba(255,255,255,0.45); font-size: 0.74rem; text-decoration: none;
+}
+.auth-switch.auth-secondary:hover { color: rgba(255,255,255,0.75); text-decoration: underline; }
 .auth-label {
   align-self: flex-start;
   font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,0.6);
@@ -667,6 +704,11 @@ body.competition {
 }
 .auth-input:focus { outline: none; border-color: #f0a500; }
 .auth-msg { font-size: 0.82rem; color: #ff9090; min-height: 1.1em; text-align: center; }
+/* .auth-msg je rdeč, ker je namenjen napakam — za navadno pojasnilo rabimo nevtralno */
+.auth-note {
+  font-size: 0.84rem; color: rgba(255,255,255,0.7);
+  text-align: center; line-height: 1.4; min-height: 0;
+}
 .auth-switch {
   background: none; border: none; color: #7fb3ff;
   font-size: 0.82rem; cursor: pointer; font-family: inherit;
