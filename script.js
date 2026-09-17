@@ -1803,7 +1803,7 @@ async function openTeacherDashboard() {
       <div class="td-grid-wrap" id="tdGridWrap">
         <div class="comp-board-empty">Nalagam …</div>
       </div>
-      <div class="td-hint">💡 Klikni na ime učenca za ponastavitev gesla.</div>
+      <div class="td-hint">💡 Klikni na ime učenca, če želiš popraviti njegovo ime ali ponastaviti geslo.</div>
       <div class="td-footer">
         <button class="overlay-btn overlay-btn-ghost" id="tdPass">🔑 Spremeni svoje geslo</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdLogout">Odjava</button>
@@ -1848,8 +1848,7 @@ async function openTeacherDashboard() {
         };
       }
     }
-    return Object.values(students).sort((a, b) =>
-      a.username.localeCompare(b.username));
+    return Object.values(students).sort(poAbecedi);
   }
 
   /* 'all' reads its numbers from the correct_all columns, which do not depend
@@ -1918,6 +1917,16 @@ async function openTeacherDashboard() {
 
   const OP_SIGN = { x: '×', d: '÷' };
 
+  /* Abecedno po tistem, kar je v vrstici dejansko izpisano: ko so imena
+     prikazana, učiteljica išče "Nace", ne "nac5". Slovenska abeceda, da se
+     č, š in ž uvrstijo pravilno in ne za z. */
+  function abecedniKljuc(s) {
+    return (showNames && s.display_name ? s.display_name : s.username) || '';
+  }
+  function poAbecedi(a, b) {
+    return abecedniKljuc(a).localeCompare(abecedniKljuc(b), 'sl', { sensitivity: 'base' });
+  }
+
   /* Uporabniško ime ostane vidno tudi ob prikazanih imenih: učiteljica mora
      povezavo med njima videti, sicer naslednjič spet ne ve, kdo je adr90. */
   function imeUcenca(s) {
@@ -1980,12 +1989,10 @@ async function openTeacherDashboard() {
        Ranking on it unsmoothed lets a single unlucky answer top the list. So
        pull small samples toward 50% and sort on that: a struggling beginner
        surfaces, a one-off mistake does not. */
-    const need = r => (r.correct + 2) / (r.answers + 4);
-    rows.sort((a, b) => {
-      if (!a.answers !== !b.answers) return a.answers ? -1 : 1;
-      if (!a.answers) return a.s.username.localeCompare(b.s.username);
-      return need(a) - need(b);
-    });
+    /* Abecedno, ne več po tem, kdo najbolj potrebuje pomoč: v razredu s
+       25 učenci je iskanje določenega otroka pogostejše kot iskanje
+       najšibkejšega, tega pa še vedno izda rdeča točnost. */
+    rows.sort((a, b) => poAbecedi(a.s, b.s));
 
     const started = rows.filter(r => r.answers > 0);
     const idleCount = rows.length - started.length;
@@ -2113,7 +2120,9 @@ async function openTeacherDashboard() {
   }
 
   wrap.addEventListener('click', e => {
-    const nameEl = e.target.closest('.td-name[data-username]');
+    // .tl-name je seznam učencev, .td-name mreža — namig pravi "klikni na
+    // ime", a je prej deloval samo v mreži
+    const nameEl = e.target.closest('.td-name[data-username], .tl-name[data-username]');
     if (!nameEl) return;
     const s = activeList().find(x => x.username === nameEl.dataset.username);
     if (s) openResetPin(s);
@@ -2262,10 +2271,18 @@ function openResetPin(student) {
   div.className = 'timed-overlay';
   div.innerHTML = `
     <div class="timed-overlay-box auth-box">
-      <div class="overlay-title" style="color:#f0a500">🔑 Ponastavi geslo</div>
+      <div class="overlay-title" style="color:#f0a500">✏️ Učenec</div>
       <div class="overlay-divider"></div>
       <div class="reset-student">${esc(student.emoji || '🦉')} <strong>${esc(student.username)}</strong></div>
-      <label class="auth-label">Izberi novo geslo — 4 živali</label>
+
+      <label class="auth-label">Ime učenca</label>
+      <input id="imeInput" class="auth-input" autocomplete="off" maxlength="30"
+             value="${esc(student.display_name || '')}" placeholder="npr. Nace" />
+      <button class="overlay-btn overlay-btn-ghost" id="imeBtn">Shrani ime ✓</button>
+      <div class="auth-msg" id="imeMsg"></div>
+      <div class="overlay-divider"></div>
+
+      <label class="auth-label">Novo geslo — 4 živali</label>
       <div id="resetPickerSlot"></div>
       <button class="overlay-btn overlay-btn-next" id="resetBtn">Ponastavi geslo ✓</button>
       <div class="auth-msg" id="resetMsg"></div>
@@ -2277,6 +2294,32 @@ function openResetPin(student) {
   const picker = buildAnimalPicker();
   div.querySelector('#resetPickerSlot').appendChild(picker);
   div.querySelector('#resetCancel').addEventListener('click', () => openTeacherDashboard());
+
+  div.querySelector('#imeBtn').addEventListener('click', async () => {
+    const ime = div.querySelector('#imeInput').value.trim();
+    const msg = div.querySelector('#imeMsg');
+    if (!ime) { msg.textContent = 'Vpiši ime.'; return; }
+    const btn = div.querySelector('#imeBtn');
+    btn.disabled = true; btn.textContent = 'Shranjujem …';
+    const res = await supabaseRPC('set_student_name', {
+      p_teacher_id: teacherSession.id, p_username: student.username, p_name: ime
+    });
+    btn.disabled = false; btn.textContent = 'Shrani ime ✓';
+    if (res === 'OK') {
+      student.display_name = ime;
+      msg.style.color = '#5fd97a';
+      msg.textContent = '✅ Ime shranjeno.';
+      return;
+    }
+    msg.style.color = '';
+    const napake = {
+      NI_DOVOLJENJA: '❌ Ni dovoljenja. Prijavi se znova.',
+      SLABO_IME:     '❌ Ime naj ima med 1 in 30 znakov.',
+      NI_UCENCA:     '❌ Tega učenca ni več.'
+    };
+    msg.textContent = res === RPC_UNREACHABLE ? OFFLINE_MSG
+                    : (napake[res] || '❌ Napaka pri shranjevanju imena.');
+  });
   div.querySelector('#resetBtn').addEventListener('click', async () => {
     const seq = picker.getSeq();
     const msg = div.querySelector('#resetMsg');
