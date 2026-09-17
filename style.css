@@ -917,11 +917,10 @@ body.competition {
   width: 100%; max-width: 760px; margin-inline: auto;
 }
 .tl-row {
-  /* Measured: the headers need 83 / 76 / 103px, and the old 84/84/104
-     columns left one pixel of slack — enough to truncate "ODGOVORI" and
-     "NAJŠIBKEJŠA" on any machine whose text renders a hair wider. The name
-     column meanwhile had 500px it never used. */
-  display: grid; grid-template-columns: minmax(0,1fr) 108px 100px 130px;
+  /* Measured: the headers need 83 / 111 / 103px. The answers column also
+     carries up to three mode chips under the number, so it gets the widest
+     share; the name column had 500px it never used. */
+  display: grid; grid-template-columns: minmax(0,1fr) 148px 116px 122px;
   gap: 10px; align-items: center;
   padding: 8px 14px; border-radius: 9px;
   background: rgba(255,255,255,0.04);
@@ -938,12 +937,26 @@ body.competition {
    modal, so tighten them and let the headers wrap instead of truncating. */
 @media (max-width: 600px) {
   .tl-row {
-    grid-template-columns: minmax(0,1fr) 52px 48px 58px;
+    /* Skupaj 156px — pol piksla manj, kot so zasedli stari trije stolpci,
+       zato imena niso nič bolj odrezana kot prej. */
+    grid-template-columns: minmax(0,1fr) 62px 50px 44px;
     gap: 6px; padding: 8px 10px;
   }
   .tl-head { font-size: 0.55rem; }
+  /* Naslovi stolpcev se raje prelomijo, kot da jih odreže na "BRIH…". */
+  .tl-head > * { white-space: normal; overflow: visible; }
   .tl-num, .tl-weak { font-size: 0.76rem; }
   .tl-name { font-size: 0.78rem; }
+  .tl-bm-val { font-size: 0.76rem; }
+  /* Ozko: pri oknu "ves čas" je skupno število lahko štirimestno, zato mora
+     "1024/✔987" ostati znotraj 62px in ne zlesti v sosednji stolpec. */
+  .tl-ans-line { font-size: 0.7rem; }
+  /* Tako majhne, da gresta dve ikoni v vrstico; tretja se prelomi navzdol
+     namesto da bi jo odrezalo. */
+  .tl-mode { font-size: 0.58rem; padding: 0 3px; }
+  .tl-modes { gap: 3px; }
+  .tl-bm-max { font-size: 0.6rem; }
+  .tl-legend { font-size: 0.62rem; gap: 8px; }
 }
 .tl-name {
   display: flex; align-items: center; gap: 6px;
@@ -962,12 +975,61 @@ body.competition {
 }
 .tl-weak { color: rgba(255,255,255,0.75); }
 /* accuracy reads as coloured text, not as a filled chip */
-.tl-num.m-good  { background: transparent; color: #5fd97a; }
-.tl-num.m-mid   { background: transparent; color: #e6b84a; }
-.tl-num.m-bad   { background: transparent; color: #ff7a7a; }
-.tl-num.m-early { background: transparent; box-shadow: none; color: rgba(255,255,255,0.6); }
-.tl-num.m-none  { background: transparent; color: rgba(255,255,255,0.35); }
+.tl-num.m-good,  .tl-ans-ok.m-good  { background: transparent; color: #5fd97a; }
+.tl-num.m-mid,   .tl-ans-ok.m-mid   { background: transparent; color: #e6b84a; }
+.tl-num.m-bad,   .tl-ans-ok.m-bad   { background: transparent; color: #ff7a7a; }
+.tl-num.m-early, .tl-ans-ok.m-early { background: transparent; box-shadow: none; color: rgba(255,255,255,0.6); }
+.tl-num.m-none,  .tl-ans-ok.m-none  { background: transparent; color: rgba(255,255,255,0.35); }
 .tl-idle { opacity: 0.5; }
+
+/* ── Odgovori: "63 / ✔34" in pod tem načini igre ──
+   Dve vrstici v eni celici, zato tu ne velja nowrap iz .tl-row > *. */
+.tl-ans, .tl-bm {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+  overflow: visible; white-space: normal;
+}
+.tl-ans-line {
+  font-weight: 700; font-size: 0.84rem; white-space: nowrap;
+  font-variant-numeric: tabular-nums; color: rgba(255,255,255,0.5);
+}
+.tl-ans-sep { color: rgba(255,255,255,0.22); margin: 0 3px; }
+.tl-ans-ok  { font-weight: 800; }
+.tl-ans-none {
+  display: block; text-align: right; font-weight: 700; font-size: 0.84rem;
+  color: rgba(255,255,255,0.35);
+}
+.tl-modes {
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px;
+}
+.tl-mode {
+  background: rgba(255,255,255,0.07); border-radius: 5px; padding: 1px 5px;
+  font-size: 0.66rem; font-weight: 700; white-space: nowrap;
+  color: rgba(255,255,255,0.65); font-variant-numeric: tabular-nums;
+}
+
+/* ── Brihtometer: obvladani predali od 20 ── */
+.tl-bm-val {
+  font-weight: 800; font-size: 0.84rem; color: #eee;
+  font-variant-numeric: tabular-nums;
+}
+.tl-bm-max { font-weight: 700; font-size: 0.68rem; color: rgba(255,255,255,0.35); }
+.tl-bm-bar {
+  width: 100%; height: 6px; border-radius: 3px;
+  background: rgba(255,255,255,0.09); overflow: hidden;
+}
+.tl-bm-fill {
+  display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, #f0a500, #5fd97a);
+  background-repeat: no-repeat;   /* širino preliva nastavi bmCell() */
+}
+
+/* Pomen ikon — v vrsticah samih namenoma ni besed. */
+.tl-legend {
+  display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  padding-top: 8px;
+  font-size: 0.68rem; color: rgba(255,255,255,0.45);
+}
+.tl-legend-note { font-style: italic; }
 .td-legend {
   display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
   font-size: 0.7rem; color: rgba(255,255,255,0.6);
@@ -1307,11 +1369,16 @@ body.competition {
   /* seznam učencev */
   .td-lesson { max-width: 980px; }
   .tl-row {
-    grid-template-columns: minmax(0,1fr) 130px 120px 150px;
+    grid-template-columns: minmax(0,1fr) 180px 140px 140px;
     padding: 11px 18px;
   }
   .tl-name { font-size: 1.05rem; }
   .tl-num, .tl-weak { font-size: 1.05rem; }
+  .tl-ans-line, .tl-bm-val { font-size: 1.05rem; }
+  .tl-mode { font-size: 0.78rem; padding: 2px 7px; }
+  .tl-bm-max { font-size: 0.82rem; }
+  .tl-bm-bar { height: 8px; }
+  .tl-legend { font-size: 0.8rem; }
   .tl-head { font-size: 0.68rem; }
   .tl-dot { width: 10px; height: 10px; }
 }

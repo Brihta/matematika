@@ -1834,12 +1834,13 @@ async function openTeacherDashboard() {
   let refreshing = false;
   const razredMap = {};   // username → razred
 
-  function buildStudents(rows) {
+  function buildStudents(rows, modeRows) {
     const students = {};
     for (const r of asRows(rows)) {
       if (!students[r.username]) {
         students[r.username] = { username: r.username, emoji: r.emoji,
-                                 display_name: r.display_name, cells: {} };
+                                 display_name: r.display_name,
+                                 cells: {}, modes: {} };
       }
       if (r.table_n != null) {
         students[r.username].cells[r.table_n + '_' + r.op] = {
@@ -1847,6 +1848,17 @@ async function openTeacherDashboard() {
           recent: { c: +r.correct_recent, w: +r.wrong_recent }
         };
       }
+    }
+    /* Ločen vir: način igre je v `stats`, ne v `table_stats`. Vrstic je malo
+       (učenec × trije načini), zato jih samo pripnemo k učencu. Če funkcije
+       v bazi še ni, je modeRows null in vse ostane po starem. */
+    for (const r of asRows(modeRows)) {
+      const s = students[r.username];
+      if (!s || !r.mode) continue;
+      s.modes[r.mode] = {
+        all:    { c: +r.correct_all,    w: +r.wrong_all },
+        recent: { c: +r.correct_recent, w: +r.wrong_recent }
+      };
     }
     return Object.values(students).sort(poAbecedi);
   }
@@ -1857,10 +1869,19 @@ async function openTeacherDashboard() {
 
   async function fetchWindow(key) {
     const since = key === 'recent' ? getRecentSinceKey() : getTodayKey();
-    const rows = await supabaseRPC('get_class_overview', {
-      p_teacher_id: teacherSession.id, p_recent_since: since
-    });
-    return rows === RPC_UNREACHABLE ? null : buildStudents(rows);
+    /* Hkrati, ne zaporedno: pregled se osvežuje vsakih 15 s, in dva
+       zaporedna klica bi ta interval po nepotrebnem podvojila.
+       get_class_modes je novejši — če ga v bazi še ni, vrne null in
+       pregled dela naprej, samo brez ikon načinov. */
+    const [rows, modeRows] = await Promise.all([
+      supabaseRPC('get_class_overview', {
+        p_teacher_id: teacherSession.id, p_recent_since: since
+      }),
+      supabaseRPC('get_class_modes', {
+        p_teacher_id: teacherSession.id, p_recent_since: since
+      })
+    ]);
+    return rows === RPC_UNREACHABLE ? null : buildStudents(rows, modeRows);
   }
 
   async function ensureWindow(win) {
@@ -1917,6 +1938,16 @@ async function openTeacherDashboard() {
 
   const OP_SIGN = { x: '×', d: '÷' };
 
+  /* Brez besed ob vsaki vrstici — 25 vrstic × tri besede je stena besedila.
+     Pomen ikon pove legenda pod seznamom, `title` pa natančno številko. */
+  const MODES = [
+    { key: 'keypad',     icon: '⌨️', label: 'Tipkovnica' },
+    { key: 'quiz',       icon: '🎯', label: 'Kviz' },
+    { key: 'tekmovanje', icon: '🏆', label: 'Tekmovanje' }
+  ];
+  /* 10 poštevank × (× in ÷) — imenovalec Brihtometra je za vse enak. */
+  const BUCKETS = 20;
+
   /* Abecedno po tistem, kar je v vrstici dejansko izpisano: ko so imena
      prikazana, učiteljica išče "Nace", ne "nac5". Slovenska abeceda, da se
      č, š in ž uvrstijo pravilno in ne za z. */
@@ -1935,12 +1966,20 @@ async function openTeacherDashboard() {
     return `${esc(s.display_name)} ${uporabnik}`;
   }
 
-  /* Roll a student's 20 table/op buckets up into the three things that
-     actually matter while a lesson is running. */
+  /* Roll a student's 20 table/op buckets up into the things that actually
+     matter while a lesson is running. */
   function summarise(s, slot) {
-    let c = 0, w = 0, worst = null, worstPct = 101;
+    let c = 0, w = 0, worst = null, worstPct = 101, mastered = 0;
     for (const key of Object.keys(s.cells)) {
-      const v = s.cells[key][slot];
+      const cell = s.cells[key];
+      /* Brihtometer se vedno računa iz vsega časa, tudi kadar je izbrano
+         "danes": obvladanje je trajno stanje, v enem samem dnevu pa nihče
+         ne nabere petih odgovorov v vsakem predalu — v oknu "danes" bi
+         zato pri vseh pisalo 0/20 in stolpec ne bi povedal ničesar. */
+      const a = cell.all;
+      if (a && masteryClass(a.c, a.w) === 'm-good') mastered++;
+
+      const v = cell[slot];
       if (!v) continue;
       c += v.c; w += v.w;
       const tot = v.c + v.w;
@@ -1951,12 +1990,58 @@ async function openTeacherDashboard() {
         if (p < worstPct) { worstPct = p; worst = key; }
       }
     }
-    const total = c + w;
+
+    /* Razčlenitev po načinu igre. `stats` in `table_stats` beležita iste
+       odgovore, zato sta vsoti enaki — številko v vrstici raje seštejemo iz
+       načinov, da je vedno natanko vsota prikazanih ikon. Kadar funkcije v
+       bazi še ni, obvelja seštevek predalov in ikon preprosto ni. */
+    const byMode = MODES.map(m => {
+      const v = s.modes && s.modes[m.key] && s.modes[m.key][slot];
+      return { icon: m.icon, label: m.label, c: v ? v.c : 0, w: v ? v.w : 0 };
+    });
+    const hasModes = byMode.some(m => m.c + m.w > 0);
+    const correct = hasModes ? byMode.reduce((a, m) => a + m.c, 0) : c;
+    const wrong   = hasModes ? byMode.reduce((a, m) => a + m.w, 0) : w;
+    const total = correct + wrong;
     return {
-      correct: c, wrong: w, answers: total,
-      pct: total ? Math.round(c / total * 100) : null,
-      weak: (worst && worstPct < 85) ? worst : null
+      correct, wrong, answers: total,
+      pct: total ? Math.round(correct / total * 100) : null,
+      weak: (worst && worstPct < 85) ? worst : null,
+      mastered,
+      byMode: hasModes ? byMode.filter(m => m.c + m.w > 0) : []
     };
+  }
+
+  /* "63 / ✔34" — koliko odgovorov in koliko od tega pravilnih. Napačni se
+     nikjer ne seštevajo v dosežek; vidni so samo kot razlika med številkama
+     in kot barva, ki takoj izda otroka, ki zgolj klika. */
+  function ansCell(r) {
+    if (!r.answers) return '<span class="tl-ans tl-ans-none">—</span>';
+    const chips = r.byMode.map(m =>
+      `<span class="tl-mode" title="${m.label}: ${m.c} pravilnih od ${m.c + m.w}">`
+      + `${m.icon}&#8202;${m.c}</span>`).join('');
+    return `<span class="tl-ans" title="${r.answers} odgovorov, ${r.correct} pravilnih (${r.pct}%)">
+        <span class="tl-ans-line">${r.answers}<span class="tl-ans-sep">/</span>`
+      + `<span class="tl-ans-ok ${cellClass(r.correct, r.wrong)}">✔${r.correct}</span></span>`
+      + (chips ? `<span class="tl-modes">${chips}</span>` : '')
+      + `</span>`;
+  }
+
+  /* Brihtometer: koliko od 20 predalov učenec obvlada (≥5 odgovorov in
+     ≥85 % pravilnih — isto pravilo kot barve v mreži). Ni ga mogoče
+     napihniti: 300× poštevanka 10 prinese natanko 1/20. */
+  function bmCell(n) {
+    const pct = Math.round(n / BUCKETS * 100);
+    /* Preliv mora biti raztegnjen čez CELO črtico, ne čez napolnjeni del —
+       sicer se pri 2/20 stisne vanj in je tudi tak otrok videti zelen.
+       background-size ga poveča nazaj na širino črtice, zato je barva
+       odvisna od tega, kako daleč si, ne od tega, kako dolg je kos. */
+    const bg = n ? `;background-size:${Math.round(BUCKETS / n * 100)}% 100%` : '';
+    return `<span class="tl-bm" title="Brihtometer: ${n} od ${BUCKETS} obvladanih poštevank`
+      + ` (vsaj 5 odgovorov in vsaj 85 % pravilnih). Šteje ves čas, ne glede na izbrano obdobje.">`
+      + `<span class="tl-bm-val">${n}<span class="tl-bm-max">/${BUCKETS}</span></span>`
+      + `<span class="tl-bm-bar"><span class="tl-bm-fill" style="width:${pct}%${bg}"></span></span>`
+      + `</span>`;
   }
 
   /* Split off students with nothing in this window, and fold them away once
@@ -1999,12 +2084,13 @@ async function openTeacherDashboard() {
     const folded = !showIdle && idleCount > 8;
     const shown = folded ? started : rows;
 
-    /* "ODGOVORI" and "NAJŠIBKEJŠA" are single unbreakable words — on a phone
-       no column width or wrapping saves them, so use short labels there. */
+    /* "ODGOVORI", "BRIHTOMETER" and "NAJŠIBKEJŠA" are single unbreakable
+       words — on a phone no column width or wrapping saves them, so use
+       short labels there. */
     const narrow = window.matchMedia('(max-width: 600px)').matches;
     const H = narrow
-      ? ['Učenec', 'Odg.', '%', 'Šibka']
-      : ['Učenec', 'Odgovori', 'Točnost', 'Najšibkejša'];
+      ? ['Učenec', 'Odg.', 'Brihta', 'Šibka']
+      : ['Učenec', 'Odgovori', 'Brihtometer', 'Najšibkejša'];
     const head = `<div class="tl-row tl-head">
         <span>${H[0]}</span><span class="tl-num">${H[1]}</span>
         <span class="tl-num">${H[2]}</span><span class="tl-weak">${H[3]}</span>
@@ -2012,7 +2098,6 @@ async function openTeacherDashboard() {
     const body = shown.map(r => {
       const rz = razredMap[r.s.username];
       const idle = r.answers === 0;
-      const pctCls = cellClass(r.correct, r.wrong);
       const weakTxt = r.weak
         ? `${r.weak.split('_')[0]} ${OP_SIGN[r.weak.split('_')[1]]}`
         : '—';
@@ -2023,15 +2108,23 @@ async function openTeacherDashboard() {
           ${esc(r.s.emoji || '🦉')} ${imeUcenca(r.s)}${
             !curRazred && rz ? `<span class="td-razred">${rz}</span>` : ''}
         </span>
-        <span class="tl-num">${r.answers || '—'}</span>
-        <span class="tl-num ${pctCls}">${r.pct === null ? '—' : r.pct + '%'}</span>
+        ${ansCell(r)}
+        ${bmCell(r.mastered)}
         <span class="tl-weak">${weakTxt}</span>
       </div>`;
     }).join('');
     const emptyNote = (folded && !started.length)
       ? '<div class="comp-board-empty">Nihče še ni vadil.</div>' : '';
+    /* Ikone brez legende so uganka, `title` pa se na tablici nikoli ne
+       pokaže — ista past kot pri oznakah × in ÷ v mreži. Legenda je pod
+       seznamom, da vrstice same ostanejo brez besedila. */
+    const anyModes = shown.some(r => r.byMode.length);
+    const legend = `<div class="tl-legend">${
+      anyModes ? MODES.map(m =>
+        `<span>${m.icon} ${m.label.toLowerCase()}</span>`).join('') : ''
+      }<span class="tl-legend-note">Brihtometer = obvladane poštevanke od ${BUCKETS}</span></div>`;
     wrap.innerHTML = `<div class="td-lesson">${head}${body}${emptyNote}${
-      folded ? foldButton(idleCount) : ''}</div>`;
+      folded ? foldButton(idleCount) : ''}${legend}</div>`;
     wireFold();
   }
 
@@ -2040,8 +2133,9 @@ async function openTeacherDashboard() {
     if (!el) return;
     const active = rows.filter(r => r.answers > 0).length;
     const total = rows.reduce((a, r) => a + r.answers, 0);
+    const correct = rows.reduce((a, r) => a + r.correct, 0);
     el.textContent = rows.length
-      ? `${rows.length} učencev · ${active} vadi · ${total} odgovorov`
+      ? `${rows.length} učencev · ${active} vadi · ${total} odgovorov, ${correct} pravilnih`
       : '';
   }
 
