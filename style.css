@@ -1032,6 +1032,26 @@ body.competition {
 }
 .td-ops-head { visibility: hidden; }
 
+/* Gumb za prikaz imen. Privzeto skrito — glej komentar v script.js. */
+.td-names-btn {
+  flex: 0 0 auto;
+  background: rgba(255,255,255,0.06); color: #ddd;
+  border: 1px solid rgba(255,255,255,0.28); border-radius: 8px;
+  padding: 6px 12px; font-size: 0.78rem; font-weight: 600;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.td-names-btn:hover { background: rgba(255,255,255,0.12); }
+.td-names-btn.on {
+  background: rgba(240,165,0,0.18); border-color: rgba(240,165,0,0.6);
+  color: #ffd97a;
+}
+/* ob prikazanih imenih postane uporabniško ime drugotno */
+.td-uname {
+  font-weight: 500; font-size: 0.86em;
+  color: rgba(255,255,255,0.45);
+}
+
 .td-name[data-username] { cursor: pointer; }
 .td-name[data-username]:hover { color: #f0a500; text-decoration: underline; }
 .td-hint {

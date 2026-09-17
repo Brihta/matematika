@@ -1785,6 +1785,8 @@ async function openTeacherDashboard() {
         <select class="td-razred-select" id="tdRazredSelect" title="Filtriraj po razredu">
           <option value="">Vsi razredi</option>
         </select>
+        <button class="td-names-btn" id="tdNames"
+                title="Pokaži ali skrij imena učencev">🙈 Imena skrita</button>
       </div>
       <div class="td-statusline">
         <span class="td-live" id="tdLive"></span>
@@ -1823,6 +1825,10 @@ async function openTeacherDashboard() {
   let curRazred = '';
   let curView = 'lesson';
   let showIdle = false;
+  /* Namenoma se NE shrani in ob vsakem odprtju začne skrito: pregled se
+     projicira na tablo, in če bi si nastavitev zapomnil, bi se imena
+     pokazala razredu, preden bi učiteljica sploh utegnila reagirati. */
+  let showNames = false;
   let lastFetchTs = 0;
   let offline = false;
   let refreshing = false;
@@ -1912,6 +1918,14 @@ async function openTeacherDashboard() {
 
   const OP_SIGN = { x: '×', d: '÷' };
 
+  /* Uporabniško ime ostane vidno tudi ob prikazanih imenih: učiteljica mora
+     povezavo med njima videti, sicer naslednjič spet ne ve, kdo je adr90. */
+  function imeUcenca(s) {
+    const uporabnik = `<span class="td-uname">${esc(s.username)}</span>`;
+    if (!showNames || !s.display_name) return esc(s.username);
+    return `${esc(s.display_name)} ${uporabnik}`;
+  }
+
   /* Roll a student's 20 table/op buckets up into the three things that
      actually matter while a lesson is running. */
   function summarise(s, slot) {
@@ -1999,7 +2013,7 @@ async function openTeacherDashboard() {
         <span class="tl-name" data-username="${esc(r.s.username)}"
               title="Klikni za ponastavitev gesla">
           <span class="tl-dot ${idle ? 'off' : 'on'}"></span>
-          ${esc(r.s.emoji || '🦉')} ${esc(r.s.username)}${
+          ${esc(r.s.emoji || '🦉')} ${imeUcenca(r.s)}${
             !curRazred && rz ? `<span class="td-razred">${rz}</span>` : ''}
         </span>
         <span class="tl-num">${r.answers || '—'}</span>
@@ -2052,7 +2066,7 @@ async function openTeacherDashboard() {
       const rz = razredMap[s.username];
       const rzTag = (!curRazred && rz) ? `<span class="td-razred">${rz}</span>` : '';
       let row = `<div class="td-row"><span class="td-name" data-username="${esc(s.username)}"`
-        + ` title="Klikni za ponastavitev gesla">${esc(s.emoji || '🦉')} ${esc(s.username)}${rzTag}</span>`
+        + ` title="Klikni za ponastavitev gesla">${esc(s.emoji || '🦉')} ${imeUcenca(s)}${rzTag}</span>`
         // Oznaka ob vsaki vrstici. Na tablici ni prehoda z miško, zato se
         // namig nikoli ne pokaže — brez tega na dotik nihče ne izve, katera
         // polovica je množenje.
@@ -2116,6 +2130,14 @@ async function openTeacherDashboard() {
   razSelect.addEventListener('change', () => {
     curRazred = razSelect.value; showIdle = false; renderGrid();
   });
+  const namesBtn = div.querySelector('#tdNames');
+  namesBtn.addEventListener('click', () => {
+    showNames = !showNames;
+    namesBtn.textContent = showNames ? '👁 Imena vidna' : '🙈 Imena skrita';
+    namesBtn.classList.toggle('on', showNames);
+    renderGrid();
+  });
+
   div.querySelectorAll('#tdViewToggle .ptable-tog-btn').forEach(b => {
     b.addEventListener('click', () => {
       div.querySelectorAll('#tdViewToggle .ptable-tog-btn')
