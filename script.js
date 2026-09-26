@@ -988,6 +988,27 @@ async function supabaseRPC(fn, params, extra) {
   } catch(e) { return RPC_UNREACHABLE; }
 }
 
+/* Supabase vrne največ 1000 vrstic na klic (nastavitev "Max rows") — tiho,
+   brez napake. get_class_overview ima vrstico na učenca × poštevanko ×
+   operacijo, zato je šola to mejo prerasla: pregled je dobil naključen
+   izsek, v mreži in na izpisu so manjkale poštevanke, ki jih je otrok v
+   resnici vadil, Brihtometer pa je bil prenizek. Zato beremo po straneh, v
+   stalnem vrstnem redu, dokler ne pride krajša stran. */
+const RPC_PAGE = 1000;
+async function supabaseRPCAll(fn, params, order) {
+  const all = [];
+  for (let offset = 0; ; offset += RPC_PAGE) {
+    const page = await supabaseRPC(
+      `${fn}?order=${order}&limit=${RPC_PAGE}&offset=${offset}`, params);
+    if (page === RPC_UNREACHABLE) return RPC_UNREACHABLE;
+    /* Prva stran zavrnjena (funkcije ni, ali baza ne sprejme razvrščanja):
+       poskusi še po starem, en klic brez strani — nikoli slabše kot prej. */
+    if (!Array.isArray(page)) return offset ? all : supabaseRPC(fn, params);
+    all.push(...page);
+    if (page.length < RPC_PAGE) return all;
+  }
+}
+
 /* Monday (Slovenia) of the current week, as YYYY-MM-DD */
 function getWeekStartKey() {
   const p = sloveniaParts();
@@ -1096,7 +1117,7 @@ async function setStudentRazred(id, razred) {
   return supabaseRPC('set_student_razred', { p_student: id, p_razred: razred });
 }
 async function getClassRazreds(teacherId) {
-  return supabaseRPC('get_class_razreds', { p_teacher_id: teacherId });
+  return supabaseRPCAll('get_class_razreds', { p_teacher_id: teacherId }, 'username');
 }
 /* Ask the server which class this child is in, and cache the answer.
    Deliberately asks every time rather than trusting the cached value: the
@@ -1936,15 +1957,15 @@ async function openTeacherDashboard() {
        get_class_modes je novejši — če ga v bazi še ni, vrne null in
        pregled dela naprej, samo brez ikon načinov. */
     const [rows, modeRows, speedRows] = await Promise.all([
-      supabaseRPC('get_class_overview', {
+      supabaseRPCAll('get_class_overview', {
         p_teacher_id: teacherSession.id, p_recent_since: since
-      }),
-      supabaseRPC('get_class_modes', {
+      }, 'username,table_n,op'),
+      supabaseRPCAll('get_class_modes', {
         p_teacher_id: teacherSession.id, p_recent_since: since
-      }),
-      supabaseRPC('get_class_speed', {
+      }, 'username,mode'),
+      supabaseRPCAll('get_class_speed', {
         p_teacher_id: teacherSession.id, p_recent_since: since
-      })
+      }, 'username,table_n,op')
     ]);
     return rows === RPC_UNREACHABLE ? null : buildStudents(rows, modeRows, speedRows);
   }
