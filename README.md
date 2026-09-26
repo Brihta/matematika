@@ -82,12 +82,23 @@ Zato vrstica pove troje:
   kvizu ni isto kot 300 na tipkovnici ali v tekmovanju. Vsota ikon je vedno
   enaka številki ✔.
 - **Brihtometer** — koliko od 20 predalov (10 poštevank × dve operaciji)
-  učenec obvlada, torej ima vsaj 5 odgovorov in vsaj 85 % pravilnih. Tega ni
+  učenec obvlada, torej ima vsaj 5 odgovorov, vsaj 85 % pravilnih **in**
+  vsaj 4 od 5 pravilnih hitreje kot v 3 sekundah. Pravilno, a počasi pomeni
+  "še vadi": otrok zna izračunati, ne pa še priklicati na pamet. Tega ni
   mogoče napihniti: 300× poštevanka 10 prinese natanko 1/20. Imenovalec je
   za vse enak, zato je primerjava poštena, otroku pa pove, kaj naj naredi.
   Šteje **ves čas**, tudi kadar je izbrano obdobje "danes" — obvladanje je
   trajno stanje, v enem dnevu pa nihče ne nabere petih odgovorov v vsakem
   predalu.
+
+### Izpis za razred (A4)
+
+Gumb **🖨️ Natisni za razred** v učiteljskem pregledu natisne en list za
+izbrani razred in obdobje (danes / zadnja 2 tedna / ves čas). Za vsakega
+otroka: pravilno, napačno, način, × ali ÷ in **katere poštevanke je vadil**
+(črn kvadratek = vadil). Tako se takoj vidi otroka, ki je nabral veliko
+odgovorov, a samo pri 1 in 10. Kdor ni vadil, je naštet spodaj v eni vrstici.
+V tiskalnem oknu izberi "Shrani kot PDF", če list želiš shraniti.
 
 ## Tehnično
 
@@ -95,8 +106,8 @@ Statična stran (brez build koraka), podatki v Supabase.
 
 - `index.html`, `script.js`, `style.css` — celotna aplikacija
 - `postevanka.json` — računi
-- `supabase_razred.sql`, `supabase_scores_guard.sql`, `supabase_nacini.sql`
-  — migracije za bazo
+- `supabase_razred.sql`, `supabase_scores_guard.sql`, `supabase_nacini.sql`,
+  `supabase_hitrost.sql` — migracije za bazo
 - `.github/workflows/keepalive.yml` — vsake 3 dni pinga bazo, da je
   Supabase ne ustavi zaradi neaktivnosti (brezplačni paket: 7 dni)
 

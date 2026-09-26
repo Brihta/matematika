@@ -187,6 +187,19 @@ let pendingStats = {};              // { mode: {correct,wrong,points,seconds} }
 let pendingTableStats = {};         // { "t_op": {t,op,c,w} }
 let pendingAnswerCount = 0;
 let lastAnswerTs = 0;               // for estimating practice time in quiz/keypad
+let pendingSpeed = {};              // { "t_op": {t,op,n,f} } — see FAST_SECONDS
+let questionShownTs = 0;            // when the current question appeared
+
+/* Hitrost: cilj poštevanke je priklic na pamet, ne računanje na prste.
+   Pravilen odgovor, hitrejši od FAST_SECONDS, je "hiter". Predal je obvladan
+   šele, ko je vsaj FAST_SHARE pravilnih odgovorov hitrih — a samo, če je
+   izmerjenih vsaj MIN_TIMED; stari podatki časa nimajo in zanje velja samo
+   točnost. Odgovor po več kot SPEED_IGNORE sekundah se ne meri: otrok je
+   takrat najbrž odšel od računalnika, ne razmišljal. */
+const FAST_SECONDS = 3;
+const FAST_SHARE   = 0.8;
+const MIN_TIMED    = 5;
+const SPEED_IGNORE = 30;
 
 /* 12 animal icons — the password is a sequence of 4 of these (order matters) */
 const ANIMALS = ['🐘','🦁','🦊','🐊','🐬','🦉','🐸','🐢','🦒','🐧','🐝','🐙'];
@@ -669,6 +682,7 @@ function renderQuizQ() {
     <div class="quiz-advance-bar-wrap" id="advWrap">
       <div class="quiz-advance-bar" id="advBar"></div>
     </div>`;
+  questionShownTs = Date.now();
   area.querySelectorAll('.quiz-opt-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       area.querySelectorAll('.quiz-opt-btn').forEach(b=>b.disabled=true);
@@ -751,6 +765,7 @@ function renderKeypadQ() {
       <div class="quiz-advance-bar" id="kAdvBar"></div>
     </div>
     <div class="keyboard-hint">💡 lahko tipkaš tudi na pravi tipkovnici · Enter potrdi · Backspace briše</div>`;
+  questionShownTs = Date.now();
   area.querySelectorAll('.keypad-btn').forEach(btn => {
     btn.addEventListener('click', () => handleKeypadInput(btn.dataset.d));
   });
@@ -1166,6 +1181,13 @@ function recordTableStat(question, isCorrect) {
   const key = p.b + '_' + op;
   if (!pendingTableStats[key]) pendingTableStats[key] = { t: p.b, op, c: 0, w: 0 };
   if (isCorrect) pendingTableStats[key].c++; else pendingTableStats[key].w++;
+
+  if (!isCorrect || !questionShownTs) return;
+  const sec = (Date.now() - questionShownTs) / 1000;
+  if (sec > SPEED_IGNORE) return;
+  if (!pendingSpeed[key]) pendingSpeed[key] = { t: p.b, op, n: 0, f: 0 };
+  pendingSpeed[key].n++;
+  if (sec < FAST_SECONDS) pendingSpeed[key].f++;
 }
 /* time since the previous answer, capped so idle time doesn't inflate it */
 function answerSeconds() {
@@ -1179,13 +1201,15 @@ function answerSeconds() {
    read the stats back (openStatsOverlay) can await it instead of racing it. */
 function flushStats(useKeepalive) {
   if (!profile) {
-    pendingStats = {}; pendingTableStats = {}; pendingAnswerCount = 0;
+    pendingStats = {}; pendingTableStats = {}; pendingSpeed = {}; pendingAnswerCount = 0;
     return Promise.resolve();
   }
   const toSend = pendingStats;
   const toSendTables = pendingTableStats;
+  const toSendSpeed = pendingSpeed;
   pendingStats = {};
   pendingTableStats = {};
+  pendingSpeed = {};
   pendingAnswerCount = 0;
   const day = getTodayKey();
   const extra = useKeepalive ? { keepalive: true } : undefined;
@@ -1203,6 +1227,14 @@ function flushStats(useKeepalive) {
   if (tableData.length) {
     writes.push(supabaseRPC('add_table_stats', {
       p_student: profile.id, p_day: day, p_data: tableData
+    }, extra));
+  }
+  /* Ločen klic, ker je hitrost v svoji tabeli. Če funkcije v bazi še ni
+     (supabase_hitrost.sql), klic tiho spodleti in vse ostalo dela naprej. */
+  const speedData = Object.keys(toSendSpeed).map(k => toSendSpeed[k]);
+  if (speedData.length) {
+    writes.push(supabaseRPC('add_table_speed', {
+      p_student: profile.id, p_day: day, p_data: speedData
     }, extra));
   }
   return Promise.all(writes);
@@ -1236,22 +1268,28 @@ function getRecentSinceKey() {
 }
 
 /* ── Mastery classification (shared by child + teacher views) ── */
-function masteryClass(correct, wrong) {
+/* timed/fast are optional: without them (old data, or before
+   supabase_hitrost.sql is run) the rule is accuracy alone. Accurate but slow
+   is "še vadi" — the child knows how to work it out, not yet by heart. */
+function masteryClass(correct, wrong, timed, fast) {
   const total = (correct || 0) + (wrong || 0);
   if (total < 5) return 'm-none';
   const pct = correct / total * 100;
-  if (pct >= 85) return 'm-good';
+  if (pct >= 85) return isSlow(timed, fast) ? 'm-mid' : 'm-good';
   if (pct >= 60) return 'm-mid';
   return 'm-bad';
+}
+function isSlow(timed, fast) {
+  return (timed || 0) >= MIN_TIMED && (fast || 0) / timed < FAST_SHARE;
 }
 /* Like masteryClass, but keeps "a few answers so far" visually distinct from
    "never touched". The old code called both m-none, so a child's first
    handful of answers on a table was indistinguishable from no work at all. */
-function cellClass(correct, wrong) {
+function cellClass(correct, wrong, timed, fast) {
   const total = (correct || 0) + (wrong || 0);
   if (!total) return 'm-none';
   if (total < 5) return 'm-early';
-  return masteryClass(correct, wrong);
+  return masteryClass(correct, wrong, timed, fast);
 }
 function masteryPct(correct, wrong) {
   const total = (correct || 0) + (wrong || 0);
@@ -1689,7 +1727,10 @@ async function openStatsOverlay() {
     </div>`).join('');
 
   /* ── Poštevanke section ── */
-  const tableRows = await fetchStudentTableStats();
+  const [tableRows, speedRows] = await Promise.all([
+    fetchStudentTableStats(),
+    supabaseRPC('get_my_speed', { p_student: profile.id })
+  ]);
   const recentSince = getRecentSinceKey();
 
   function aggTables(window) {
@@ -1702,19 +1743,26 @@ async function openStatsOverlay() {
       agg[k].c += r.correct || 0;
       agg[k].w += r.wrong || 0;
     }
+    for (const r of asRows(speedRows)) {
+      if (window === 'recent' && r.day < recentSince) continue;
+      const a = agg[r.table_n + '_' + r.op];
+      if (!a) continue;
+      a.n = (a.n || 0) + (r.timed || 0);
+      a.f = (a.f || 0) + (r.fast || 0);
+    }
     return agg;
   }
   function chip(cell) {
     const c = cell ? cell.c : 0, w = cell ? cell.w : 0;
     const pct = masteryPct(c, w);
-    const cls = masteryClass(c, w);
+    const cls = masteryClass(c, w, cell && cell.n, cell && cell.f);
     const txt = pct === null ? '—' : pct + '%';
     return `<span class="ptable-chip ${cls}">${txt}</span>`;
   }
   function renderPtable(window) {
     const agg = aggTables(window);
     const list = div.querySelector('#ptableList');
-    let worst = null, worstPct = 101;
+    let worst = null, worstPct = 101, slow = null;
     list.innerHTML = '';
     for (let t = 1; t <= 10; t++) {
       const x = agg[t + '_x'], d = agg[t + '_d'];
@@ -1724,6 +1772,7 @@ async function openStatsOverlay() {
           if (tot >= 5) {
             const p = cell.c / tot * 100;
             if (p < worstPct) { worstPct = p; worst = t; }
+            if (p >= 85 && slow === null && isSlow(cell.n, cell.f)) slow = t;
           }
         }
       });
@@ -1739,6 +1788,8 @@ async function openStatsOverlay() {
     const tip = div.querySelector('#ptableTip');
     if (worst !== null && worstPct < 85) {
       tip.textContent = `💡 Največ napak: poštevanka ${worst}. Tam še vadi!`;
+    } else if (slow !== null) {
+      tip.textContent = `⚡ Poštevanka ${slow} je pravilna — zdaj pa še hitreje, pod ${FAST_SECONDS} sekunde!`;
     } else if (worst !== null) {
       tip.textContent = '🎉 Odlično — vse poštevanke dobro obvladaš!';
     } else {
@@ -1793,7 +1844,7 @@ async function openTeacherDashboard() {
         <span class="td-classsum" id="tdClassSum"></span>
       </div>
       <div class="td-legend" id="tdLegend">
-        <span><span class="ptable-chip m-good"></span> obvlada</span>
+        <span><span class="ptable-chip m-good"></span> obvlada (pravilno in hitro)</span>
         <span><span class="ptable-chip m-mid"></span> še vadi</span>
         <span><span class="ptable-chip m-bad"></span> potrebuje vajo</span>
         <span><span class="ptable-chip m-early"></span> premalo odgovorov</span>
@@ -1805,6 +1856,7 @@ async function openTeacherDashboard() {
       </div>
       <div class="td-hint">💡 Klikni na ime učenca, če želiš popraviti njegovo ime ali ponastaviti geslo.</div>
       <div class="td-footer">
+        <button class="overlay-btn overlay-btn-next" id="tdPrint">🖨️ Natisni za razred (A4)</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdPass">🔑 Spremeni svoje geslo</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdLogout">Odjava</button>
       </div>
@@ -1818,6 +1870,7 @@ async function openTeacherDashboard() {
     removeOverlay();
   });
   div.querySelector('#tdPass').addEventListener('click', openTeacherPassword);
+  div.querySelector('#tdPrint').addEventListener('click', () => printSheet());
 
   const wrap = div.querySelector('#tdGridWrap');
   const cache = { today: null, recent: null };
@@ -1834,7 +1887,7 @@ async function openTeacherDashboard() {
   let refreshing = false;
   const razredMap = {};   // username → razred
 
-  function buildStudents(rows, modeRows) {
+  function buildStudents(rows, modeRows, speedRows) {
     const students = {};
     for (const r of asRows(rows)) {
       if (!students[r.username]) {
@@ -1860,6 +1913,15 @@ async function openTeacherDashboard() {
         recent: { c: +r.correct_recent, w: +r.wrong_recent }
       };
     }
+    /* Hitrost (supabase_hitrost.sql) — pripne se k obstoječim predalom.
+       Brez funkcije v bazi je speedRows null in velja samo točnost. */
+    for (const r of asRows(speedRows)) {
+      const s = students[r.username];
+      const cell = s && s.cells[r.table_n + '_' + r.op];
+      if (!cell) continue;
+      cell.all.n    = +r.timed_all;    cell.all.f    = +r.fast_all;
+      cell.recent.n = +r.timed_recent; cell.recent.f = +r.fast_recent;
+    }
     return Object.values(students).sort(poAbecedi);
   }
 
@@ -1873,15 +1935,18 @@ async function openTeacherDashboard() {
        zaporedna klica bi ta interval po nepotrebnem podvojila.
        get_class_modes je novejši — če ga v bazi še ni, vrne null in
        pregled dela naprej, samo brez ikon načinov. */
-    const [rows, modeRows] = await Promise.all([
+    const [rows, modeRows, speedRows] = await Promise.all([
       supabaseRPC('get_class_overview', {
         p_teacher_id: teacherSession.id, p_recent_since: since
       }),
       supabaseRPC('get_class_modes', {
         p_teacher_id: teacherSession.id, p_recent_since: since
+      }),
+      supabaseRPC('get_class_speed', {
+        p_teacher_id: teacherSession.id, p_recent_since: since
       })
     ]);
-    return rows === RPC_UNREACHABLE ? null : buildStudents(rows, modeRows);
+    return rows === RPC_UNREACHABLE ? null : buildStudents(rows, modeRows, speedRows);
   }
 
   async function ensureWindow(win) {
@@ -1977,7 +2042,7 @@ async function openTeacherDashboard() {
          ne nabere petih odgovorov v vsakem predalu — v oknu "danes" bi
          zato pri vseh pisalo 0/20 in stolpec ne bi povedal ničesar. */
       const a = cell.all;
-      if (a && masteryClass(a.c, a.w) === 'm-good') mastered++;
+      if (a && masteryClass(a.c, a.w, a.n, a.f) === 'm-good') mastered++;
 
       const v = cell[slot];
       if (!v) continue;
@@ -2038,7 +2103,8 @@ async function openTeacherDashboard() {
        odvisna od tega, kako daleč si, ne od tega, kako dolg je kos. */
     const bg = n ? `;background-size:${Math.round(BUCKETS / n * 100)}% 100%` : '';
     return `<span class="tl-bm" title="Brihtometer: ${n} od ${BUCKETS} obvladanih poštevank`
-      + ` (vsaj 5 odgovorov in vsaj 85 % pravilnih). Šteje ves čas, ne glede na izbrano obdobje.">`
+      + ` (vsaj 5 odgovorov, vsaj 85 % pravilnih in pravilni večinoma hitreje kot v ${FAST_SECONDS} s).`
+      + ` Šteje ves čas, ne glede na izbrano obdobje.">`
       + `<span class="tl-bm-val">${n}<span class="tl-bm-max">/${BUCKETS}</span></span>`
       + `<span class="tl-bm-bar"><span class="tl-bm-fill" style="width:${pct}%${bg}"></span></span>`
       + `</span>`;
@@ -2179,8 +2245,8 @@ async function openTeacherDashboard() {
         const vd = cd ? cd[slot] : null;
         const xc = vx ? vx.c : 0, xw = vx ? vx.w : 0;
         const dc = vd ? vd.c : 0, dw = vd ? vd.w : 0;
-        const xCls = cellClass(xc, xw);
-        const dCls = cellClass(dc, dw);
+        const xCls = vx ? cellClass(xc, xw, vx.n, vx.f) : 'm-none';
+        const dCls = vd ? cellClass(dc, dw, vd.n, vd.f) : 'm-none';
         const xPct = masteryPct(xc, xw);
         const dPct = masteryPct(dc, dw);
         const xTxt = xPct === null ? '–' : xPct;
@@ -2203,6 +2269,79 @@ async function openTeacherDashboard() {
     }).join('');
     wrap.innerHTML = head + body + (folded ? foldButton(idle.length) : '');
     wireFold();
+  }
+
+  /* ── Izpis na en list A4 ──
+     Učiteljica med uro v računalnici pomaga otrokom in pregleda ne gleda —
+     zato po uri en list: kdo je vadil, v katerem načinu, koliko pravilno in
+     narobe, in KATERE poštevanke. Zadnje je bistveno: otrok s 300 odgovori
+     je lahko vadil samo 1 in 10, kar se iz števila ne vidi.
+     Namenoma malo stolpcev in brez barv (tiskalnik je črno-bel). Brihtometra
+     in najšibkejše poštevanke ni: to je pregled ure, ne ocena otroka. */
+  const PRINT_MODE = { '⌨️': 'tipkovnica', '🎯': 'kviz', '🏆': 'tekmovanje' };
+  const WIN_LABEL = { today: 'Danes', recent: 'Zadnja 2 tedna', all: 'Ves čas' };
+  function printSheet() {
+    const slot = curWin === 'all' ? 'all' : 'recent';
+    const ime = s => (s.display_name || s.username || '');
+    const rows = baseList()
+      .map(s => Object.assign({ s }, summarise(s, slot)))
+      .sort((a, b) => ime(a.s).localeCompare(ime(b.s), 'sl', { sensitivity: 'base' }));
+    const active = rows.filter(r => r.answers > 0);
+    const idle = rows.filter(r => !r.answers);
+
+    const p = sloveniaParts();
+    const datum = `${+p.day}. ${+p.month}. ${p.year}`;
+    const title = `${curRazred || 'Vsi razredi'} · ${WIN_LABEL[curWin]}`;
+    const withRazred = !curRazred;
+
+    const body = active.map(r => {
+      let x = 0, d = 0, boxes = '';
+      for (let t = 1; t <= 10; t++) {
+        const cx = r.s.cells[t + '_x'], cd = r.s.cells[t + '_d'];
+        const nx = cx && cx[slot] ? cx[slot].c + cx[slot].w : 0;
+        const nd = cd && cd[slot] ? cd[slot].c + cd[slot].w : 0;
+        x += nx; d += nd;
+        boxes += `<span class="ps-box${nx + nd ? ' on' : ''}">${t}</span>`;
+      }
+      const racun = x && d ? '× ÷' : x ? '×' : d ? '÷' : '';
+      /* Besede, ne ikone: emoji na črno-belem tiskalniku postanejo sive packe. */
+      const nacin = r.byMode.slice().sort((a, b) => (b.c + b.w) - (a.c + a.w))
+        .map(m => PRINT_MODE[m.icon]).join(', ');
+      return `<tr>
+        <td class="ps-name">${esc(ime(r.s))}</td>
+        ${withRazred ? `<td>${esc(razredMap[r.s.username] || '')}</td>` : ''}
+        <td class="ps-num">${r.correct}</td>
+        <td class="ps-num">${r.wrong}</td>
+        <td class="ps-mode">${nacin}</td>
+        <td class="ps-op">${racun}</td>
+        <td class="ps-boxes">${boxes}</td>
+      </tr>`;
+    }).join('');
+
+    const sheet = document.createElement('div');
+    sheet.id = 'printSheet';
+    sheet.innerHTML = `
+      <div class="ps-head">
+        <div class="ps-title">Brihta · ${esc(title)}</div>
+        <div class="ps-date">${datum}</div>
+      </div>
+      ${active.length ? `<table class="ps-table">
+        <thead><tr>
+          <th class="ps-name">Učenec</th>${withRazred ? '<th>Razred</th>' : ''}
+          <th class="ps-num">✔</th><th class="ps-num">✘</th>
+          <th>Način</th><th class="ps-op">Račun</th><th>Poštevanke</th>
+        </tr></thead>
+        <tbody>${body}</tbody>
+      </table>` : '<p>V tem obdobju ni nihče vadil.</p>'}
+      ${idle.length ? `<p class="ps-idle"><strong>Niso vadili (${idle.length}):</strong> ${
+        idle.map(r => esc(ime(r.s))).join(', ')}</p>` : ''}
+      <p class="ps-legend">✔ pravilno · ✘ napačno ·
+        <span class="ps-box on">7</span> vadil to poštevanko</p>`;
+    const old = document.getElementById('printSheet');
+    if (old) old.remove();
+    document.body.appendChild(sheet);
+    window.addEventListener('afterprint', () => sheet.remove(), { once: true });
+    window.print();
   }
 
   async function switchWindow(win) {
@@ -2559,6 +2698,7 @@ function renderCompQ() {
       <button class="keypad-btn" data-d="0">0</button>
       <button class="keypad-btn keypad-ok" data-d="ok">✓</button>
     </div>`;
+  questionShownTs = Date.now();
   area.querySelectorAll('.keypad-btn').forEach(btn => {
     btn.addEventListener('click', () => handleCompInput(btn.dataset.d));
   });
