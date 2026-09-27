@@ -1350,6 +1350,12 @@ body.competition {
   body.competition .brand { order: 1; }
   body.competition .profile-btn { order: 2; margin-left: auto; }
   body.competition .topbar-ctrls { order: 3; flex-basis: 100%; margin-top: 10px; }
+  /* Plošča se tu ne lepi na vrh. V Chromu pri ~960 × 760 igra ni šla na
+     zaslon, stran se je malo pomaknila in lepljiva plošča je prekrila
+     rezultat, mesto in čas. Med igro način ni potreben — naj odide gor. */
+  body.competition .toolbar { position: static; padding: 8px 16px; }
+  body.competition #modeBlock .ctrl-label { display: none; }
+  body.competition .topbar-ctrls { margin-top: 8px; }
 }
 
 /* ── Velik zaslon (šolski monitor) ───────────────────────────────────────
