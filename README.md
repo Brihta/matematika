@@ -33,6 +33,10 @@ bi prednastavitev preprosto prezrlo.
 - **Kviz** — izbira med štirimi odgovori
 - **Tekmovanje** — 60 sekund, vse poštevanke, dnevna lestvica.
   Odprto med 7:00 in 19:00 po slovenskem času. Brez nastavitev — namenoma.
+  Na lestvici je vsak otrok **samo enkrat**, z najboljšim rezultatom dneva
+  (vsi poskusi se še vedno štejejo v statistiko). Prijavljen učenec ne
+  vpisuje začetnic — rezultat se shrani pod njegovim uporabniškim imenom.
+  Zahteva `supabase_lestvica.sql`.
 
 Na širokih zaslonih (nad 900 px) sta **način** in **vrsta računa** stalno
 vidna v zgornji vrstici, **poštevanke** pa so v levem stolpcu, vsaka v svoji

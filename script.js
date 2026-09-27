@@ -910,10 +910,24 @@ function isCompetitionOpen() {
 }
 
 /* ── Leaderboard storage ── */
+/* En otrok = ena vrstica: samo najboljši rezultat vsakega imena. Sicer dober
+   otrok, ki vadi celo uro, zasede vseh 10 mest in drugi izginejo s
+   projektorja. Vsi poskusi se še vedno shranijo — skrije se le slabše. */
+function bestPerName(rows) {
+  const best = {};
+  for (const r of rows) {
+    const b = best[r.name];
+    if (!b || r.score > b.score
+        || (r.score === b.score && String(r.created_at) < String(b.created_at))) best[r.name] = r;
+  }
+  return Object.values(best)
+    .sort((a, b) => (b.score - a.score) || String(a.created_at).localeCompare(String(b.created_at)))
+    .slice(0, 10);
+}
 function loadLocalBoard(day) {
   try {
     const all = JSON.parse(localStorage.getItem('brihta_leaderboard') || '{}');
-    return (all[day] || []).slice().sort((a,b)=>b.score-a.score).slice(0,10);
+    return bestPerName(all[day] || []);
   } catch(e) { return []; }
 }
 function saveLocalScore(day, name, score) {
@@ -931,16 +945,20 @@ function saveLocalScore(day, name, score) {
 async function fetchLeaderboard() {
   const day = getTodayKey();
   if (leaderboardEnabled()) {
+    /* Baza sama izbere najboljšega na ime (supabase_lestvica.sql). Dokler
+       funkcije ni, preberi več vrstic in izberi tukaj. */
+    const board = await supabaseRPC('get_daily_board', { p_day: day });
+    if (Array.isArray(board)) return board;
     try {
       const url = `${LEADERBOARD.supabaseUrl}/rest/v1/scores`
-        + `?day=eq.${day}&order=score.desc,created_at.asc&limit=10`;
+        + `?day=eq.${day}&order=score.desc,created_at.asc&limit=300`;
       const res = await fetch(url, {
         headers: {
           apikey: LEADERBOARD.supabaseKey,
           Authorization: `Bearer ${LEADERBOARD.supabaseKey}`
         }
       });
-      if (res.ok) return await res.json();
+      if (res.ok) return bestPerName(await res.json());
     } catch(e) {}
   }
   return loadLocalBoard(day);
@@ -3061,25 +3079,35 @@ function endCompetition() {
       <div class="overlay-divider"></div>
       <div class="overlay-score-big" style="color:#c79bff">${cScore}</div>
       <div class="overlay-score-label">točk</div>
-      <div class="comp-name-prompt">Vpiši svoje začetnice (3 črke):</div>
-      <input id="compNameInput" class="comp-name-input" maxlength="3"
-             autocomplete="off" autocapitalize="characters" placeholder="ABC" />
+      ${profile
+        ? `<div class="comp-name-prompt">Rezultat se shrani kot</div>
+           <div class="comp-name-auto">${esc(profile.emoji || '🦉')} ${esc(profile.username)}</div>`
+        : `<div class="comp-name-prompt">Vpiši svoje začetnice (3 črke):</div>
+           <input id="compNameInput" class="comp-name-input" maxlength="3"
+                  autocomplete="off" autocapitalize="characters" placeholder="ABC" />`}
       <button class="overlay-btn overlay-btn-next" id="compSaveBtn">Shrani rezultat ✓</button>
       <button class="overlay-btn overlay-btn-ghost" id="compSkipBtn">Preskoči</button>
     </div>`;
   document.body.appendChild(div);
   activeOverlay = div;
 
+  /* Prijavljen učenec ne tipka začetnic: uporabniško ime je enolično, zato
+     se njegovi poskusi na lestvici združijo v enega — tri črke tega ne
+     zmorejo (dve Ani sta obe "ANA"). */
   const input = div.querySelector('#compNameInput');
-  setTimeout(() => input.focus(), 50);
-  input.addEventListener('input', () => {
-    input.value = input.value.toUpperCase().replace(/[^A-ZČŠŽ]/g, '').slice(0, 3);
-  });
+  if (input) {
+    setTimeout(() => input.focus(), 50);
+    input.addEventListener('input', () => {
+      input.value = input.value.toUpperCase().replace(/[^A-ZČŠŽ]/g, '').slice(0, 3);
+    });
+  } else {
+    setTimeout(() => { const b = div.querySelector('#compSaveBtn'); if (b) b.focus(); }, 50);
+  }
   let saving = false;
   const save = async () => {
     if (saving) return;
     saving = true;
-    const name = (input.value.trim() || '???').slice(0, 3);
+    const name = profile ? profile.username : ((input.value.trim() || '???').slice(0, 3));
     div.querySelector('#compSaveBtn').disabled = true;
     div.querySelector('#compSaveBtn').textContent = 'Shranjujem …';
     await submitScore(name, cScore);
@@ -3091,7 +3119,7 @@ function endCompetition() {
     removeOverlay();
     showTekmovanjePanel();
   });
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+  if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
 }
 
 /* ── Daily leaderboard overlay ── */
@@ -3126,10 +3154,10 @@ async function openLeaderboard(highlightName, highlightScore) {
     list.innerHTML = '<div class="comp-board-empty">Še ni rezultatov. Bodi prvi! 🚀</div>';
     return;
   }
-  let highlighted = false;
+  let highlighted = false, myBest = null;
   list.innerHTML = rows.map((r, i) => {
-    const isMe = !highlighted && highlightName != null
-      && r.name === highlightName && r.score === highlightScore;
+    const isMe = !highlighted && highlightName != null && r.name === highlightName;
+    if (isMe) myBest = r.score;
     if (isMe) highlighted = true;
     const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
     return `<div class="comp-board-row${isMe ? ' me' : ''}">
@@ -3138,6 +3166,12 @@ async function openLeaderboard(highlightName, highlightScore) {
       <span class="cb-score">${esc(r.score)}</span>
     </div>`;
   }).join('');
+  /* Lestvica kaže samo najboljši rezultat — otrok, ki je tokrat dosegel
+     manj, mora vseeno videti, da je bil poskus štet. */
+  if (highlightScore != null && myBest !== null && myBest > highlightScore) {
+    list.insertAdjacentHTML('beforeend', `<div class="comp-board-note">`
+      + `Tokrat ${esc(highlightScore)} · tvoj najboljši danes ostaja ${esc(myBest)} 💪</div>`);
+  }
 }
 
 /* physical keyboard for competition mode */

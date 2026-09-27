@@ -1447,3 +1447,7 @@ body.competition {
   border-radius: 8px; padding: 7px 10px; color: #ffd27a;
 }
 .td-dupwarn-how { opacity: 0.85; font-size: 0.75rem; }
+
+/* Tekmovanje: samodejno ime prijavljenega učenca, opomba pod lestvico */
+.comp-name-auto { font-size: 1.3rem; font-weight: 800; color: #fff; margin: 4px 0 12px; }
+.comp-board-note { text-align: center; font-size: 0.85rem; opacity: 0.8; margin-top: 10px; }
