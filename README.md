@@ -147,6 +147,14 @@ razreda gre vsak razred na svojo stran. **Gesel na seznamu ni** in jih ne
 more biti: v bazi so shranjena samo zakodirana, ne v berljivi obliki.
 Pozabljeno geslo ponastaviš s klikom na ime učenca v pregledu.
 
+### Premik v drug razred
+
+Klikni ime učenca → **Razred** → izberi razred → **Premakni**. Za otroka, ki
+je ob prijavi izbral napačen razred ali je zamenjal oddelek. Razred se
+shrani kot letnik vpisa (glej `supabase_generacije.sql`), zato otrok
+vsako poletje še vedno sam napreduje. Zahteva `supabase_premakni_razred.sql`
+(zaženi enkrat).
+
 ### Podvojeni in opuščeni računi
 
 Klikni ime učenca v pregledu. Na dnu okna:
@@ -169,7 +177,8 @@ Statična stran (brez build koraka), podatki v Supabase.
 - `index.html`, `script.js`, `style.css` — celotna aplikacija
 - `postevanka.json` — računi
 - `supabase_razred.sql`, `supabase_scores_guard.sql`, `supabase_nacini.sql`,
-  `supabase_hitrost.sql`, `supabase_zdruzi_izbrisi.sql` — migracije za bazo
+  `supabase_hitrost.sql`, `supabase_zdruzi_izbrisi.sql`,
+  `supabase_premakni_razred.sql` — migracije za bazo
 - `.github/workflows/keepalive.yml` — vsake 3 dni pinga bazo, da je
   Supabase ne ustavi zaradi neaktivnosti (brezplačni paket: 7 dni)
 

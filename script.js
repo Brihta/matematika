@@ -2497,7 +2497,7 @@ async function openTeacherDashboard() {
     const nameEl = e.target.closest('.td-name[data-username], .tl-name[data-username]');
     if (!nameEl) return;
     const s = activeList().find(x => x.username === nameEl.dataset.username);
-    if (s) openResetPin(s, mergeTargets(s));
+    if (s) openResetPin(s, mergeTargets(s), razredMap[s.username]);
   });
 
   /* Kam lahko združiš ta račun: isti razred (če ga poznamo), najprej računi z
@@ -2654,7 +2654,7 @@ function openTeacherPassword(firstLogin) {
 }
 
 /* ── Teacher: reset a student's password ── */
-function openResetPin(student, targets) {
+function openResetPin(student, targets, razred) {
   removeOverlay();
   const div = document.createElement('div');
   div.className = 'timed-overlay';
@@ -2669,6 +2669,14 @@ function openResetPin(student, targets) {
              value="${esc(student.display_name || '')}" placeholder="npr. Nace" />
       <button class="overlay-btn overlay-btn-ghost" id="imeBtn">Shrani ime ✓</button>
       <div class="auth-msg" id="imeMsg"></div>
+
+      <label class="auth-label">Razred</label>
+      <select id="razredSelect" class="td-razred-select td-merge-select">
+        ${razred ? '' : '<option value="">— ni izbran —</option>'}
+        ${RAZREDI.map(r => `<option value="${r}"${r === razred ? ' selected' : ''}>${r}</option>`).join('')}
+      </select>
+      <button class="overlay-btn overlay-btn-ghost" id="razredBtn">Premakni v izbrani razred ✓</button>
+      <div class="auth-msg" id="razredMsg"></div>
       <div class="overlay-divider"></div>
 
       <label class="auth-label">Novo geslo — 4 živali</label>
@@ -2717,6 +2725,29 @@ function openResetPin(student, targets) {
       <button class="overlay-btn overlay-btn-next" id="accDone">Nazaj na pregled</button>`;
     div.querySelector('#accDone').addEventListener('click', () => openTeacherDashboard());
   }
+
+  div.querySelector('#razredBtn').addEventListener('click', async () => {
+    const nov = div.querySelector('#razredSelect').value;
+    const msg = div.querySelector('#razredMsg');
+    if (!nov) { msg.textContent = 'Izberi razred.'; return; }
+    if (nov === razred) { msg.style.color = ''; msg.textContent = `Učenec je že v ${nov}.`; return; }
+    const btn = div.querySelector('#razredBtn');
+    btn.disabled = true; btn.textContent = 'Premikam …';
+    const res = await supabaseRPC('move_student_razred', {
+      p_teacher_id: teacherSession.id, p_username: student.username, p_razred: nov
+    });
+    btn.disabled = false; btn.textContent = 'Premakni v izbrani razred ✓';
+    if (res === 'OK') {
+      razred = nov;
+      msg.style.color = '#5fd97a';
+      msg.textContent = `✅ Premaknjen v ${nov}.`;
+      return;
+    }
+    msg.style.color = '';
+    msg.textContent = res === null
+      ? '❌ V bazi še ni funkcije — zaženi supabase_premakni_razred.sql.'
+      : res === 'SLAB_RAZRED' ? '❌ Neveljaven razred.' : accountError(res);
+  });
 
   div.querySelector('#mergeBtn').addEventListener('click', async () => {
     const into = div.querySelector('#mergeSelect').value;
