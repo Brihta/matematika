@@ -95,10 +95,49 @@ Zato vrstica pove troje:
 
 Gumb **🖨️ Natisni za razred** v učiteljskem pregledu natisne en list za
 izbrani razred in obdobje (danes / zadnja 2 tedna / ves čas). Za vsakega
-otroka: pravilno, napačno, način, × ali ÷ in **katere poštevanke je vadil**
-(črn kvadratek = vadil). Tako se takoj vidi otroka, ki je nabral veliko
-odgovorov, a samo pri 1 in 10. Kdor ni vadil, je naštet spodaj v eni vrstici.
-V tiskalnem oknu izberi "Shrani kot PDF", če list želiš shraniti.
+otroka: pravilno, napačno, način, × ali ÷ in **kako zna posamezno
+poštevanko**. Tako se takoj vidi otroka, ki je nabral veliko odgovorov, a
+samo pri 1 in 10. Kdor ni vadil, je naštet spodaj v eni vrstici. Če se isto
+ime pojavi večkrat (isti otrok z več računi), je zraven drobno izpisano
+uporabniško ime. V tiskalnem oknu izberi "Shrani kot PDF", če list želiš
+shraniti.
+
+#### Kvadratki poštevank
+
+Šteje se × in ÷ skupaj, **napačni odgovori odštevajo**:
+
+| Kvadratek | Pravilo | Pomen |
+|---|---|---|
+| ■ črn | pravilni − napačni **vsaj 12** | zna |
+| ▣ siv | vse vmes | še vadi |
+| □ bel | **manj kot 10** odgovorov, ali napačnih **vsaj toliko** kot pravilnih | ne zna ali ni vadil |
+
+Primeri:
+
+| Odgovori pri poštevanki 7 | Pravilni − napačni | Kvadratek |
+|---|---|---|
+| 20, od tega 12 pravilnih | 12 − 8 = 4 | ▣ siv |
+| 20, od tega 15 pravilnih | 15 − 5 = 10 | ▣ siv |
+| 20, od tega 18 pravilnih | 18 − 2 = 16 | ■ črn |
+| 12, vsi pravilni | 12 − 0 = 12 | ■ črn |
+| 8, vsi pravilni | premalo odgovorov | □ bel |
+| 20 ugibanj v kvizu, ~5 pravilnih | 5 − 15 = −10 | □ bel |
+
+**Zakaj te številke.** Vseh računov je 200 (10 × in 10 ÷ na poštevanko). V
+kvizu in na tipkovnici se premešajo kot karte in se ne ponavljajo, dokler
+otrok ne gre skozi vse: 200 odgovorov = vsak račun natanko enkrat = 20 na
+poštevanko. Za črn kvadratek je pri takem krogu treba vsaj 16 pravilnih
+(80 %). Tekmovanje premeša vsako minuto znova, zato je tam 20 le povprečje;
+meja za bel kvadratek (10) je zato pol kroga, ne cel, da pošten otrok ne
+pade vanj po naključju.
+
+Bel kvadratek namenoma združuje "ni vadil" in "ne zna": na papirju je oboje
+isti signal — tu je treba pomagati. Kateri od obeh je, povesta ✔ in ✘ v isti
+vrstici. Meji sta konstanti `PRINT_KNOWS` in `PRINT_MIN` v `script.js`.
+
+Najbolj zanesljiv je izpis **Danes** takoj po uri: v daljšem obdobju lahko
+otrok, ki težke poštevanke izklaplja, deset odgovorov pri njih vseeno nabere
+v tekmovanju.
 
 ## Tehnično
 
