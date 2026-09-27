@@ -656,11 +656,11 @@ function btShowWaiting(lateJoiner) {
   div.innerHTML = `
     <div class="timed-overlay-box comp-end-box">
       ${lateJoiner
-        ? `<div class="overlay-title" style="color:#c79bff">⚔️ Bitka poteka</div>
+        ? `<div class="overlay-title bt-accent">⚔️ Bitka poteka</div>
            <div class="overlay-subtitle">Ta runda se je začela brez tebe.<br>Rezultate vidiš, ko se konča.</div>`
-        : `<div class="overlay-title" style="color:#c79bff">⏱️ Konec!</div>
+        : `<div class="overlay-title bt-accent">⏱️ Konec!</div>
            <div class="overlay-divider"></div>
-           <div class="overlay-score-big" style="color:#c79bff">${btG ? btG.score : 0}</div>
+           <div class="overlay-score-big bt-accent">${btG ? btG.score : 0}</div>
            <div class="overlay-score-label">točk</div>`}
       <div class="bt-drum">🥁</div>
       <div class="overlay-subtitle">Čakam na rezultate ostalih …</div>
@@ -756,7 +756,7 @@ function btUpdatePodiumButtons() {
 }
 
 function btConfetti(host) {
-  const colors = ['#ffd700', '#c79bff', '#7dff7d', '#ff6b9d', '#5eb8ff', '#ff9d2e'];
+  const colors = ['#ffd700', '#ffb23f', '#ff7a1a', '#7dff7d', '#ff6b9d', '#5eb8ff'];
   const layer = document.createElement('div');
   layer.className = 'bt-confetti';
   for (let i = 0; i < 90; i++) {

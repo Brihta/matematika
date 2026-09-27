@@ -1462,8 +1462,57 @@ body.competition {
    ⚔️ BITKA
    Postavitev si deli s tekmovanjem (body.competition), barva je svoja,
    da otrok na prvi pogled ve, da igra proti prijateljem.
+
+   Barva: "žerjavica" — topla temna podlaga in EN jantarni poudarek.
+   Prej je bila Bitka vijolična kot tekmovanje in se od njega ni ločila.
+   Topla barva pomeni tekmo, rdeča pa ostane rezervirana za napake in
+   zadnjih 10 sekund, da se pomena ne pomešata. Zlato ostane za točke in
+   stopničke. Vse barve so tu, na enem mestu; kontrast je preverjen za
+   WCAG AA (naslovi 9,7 : 1, temen tekst na gumbu vsaj 6,7 : 1).
 ══════════════════════════ */
-body.competition.bitka { background: #3a1433; }
+body.bitka {
+  --bt-bg:          #3b1a0c;
+  --bt-title:       #ffc15e;
+  --bt-accent:      #ffb23f;
+  --bt-accent-soft: rgba(255,157,46,0.24);
+  --bt-line:        rgba(255,178,63,0.28);
+  --bt-glow:        rgba(255,122,26,0.45);
+  --bt-btn:         linear-gradient(135deg, #ffb23f, #ff7a1a);
+  --bt-btn-text:    #2b1406;    /* bel tekst na oranžni nima dovolj kontrasta */
+  --bt-soft-text:   #ffd9a8;
+  --bt-q-bg:        linear-gradient(135deg, #5a2a12, #33160a);
+  --bt-q-line:      #ff9d2e;
+  --bt-panel:       linear-gradient(145deg, rgba(45,20,8,.98), rgba(72,30,12,.98));
+}
+body.competition.bitka { background: var(--bt-bg); }
+
+/* Skupni gradniki tekmovanja, prebarvani samo v bitki. Nekateri imajo v
+   osnovi !important, zato ga morajo imeti tudi tu. */
+body.bitka .comp-intro, body.bitka .comp-locked { border-color: var(--bt-line); }
+body.bitka .comp-intro h2, body.bitka .comp-locked h2 { color: var(--bt-title); }
+body.bitka .comp-btn-start {
+  background: var(--bt-btn); color: var(--bt-btn-text);
+  box-shadow: 0 5px 20px var(--bt-glow);
+}
+body.bitka .comp-btn-start:hover { box-shadow: 0 8px 28px var(--bt-glow); }
+body.bitka .comp-btn-ghost { color: var(--bt-soft-text); border-color: var(--bt-line); }
+body.bitka .comp-name-input { border-color: var(--bt-accent); caret-color: var(--bt-accent); }
+body.bitka .comp-name-input:focus { box-shadow: 0 0 18px var(--bt-glow); }
+body.bitka .comp-question {
+  border-color: var(--bt-q-line) !important;
+  background: var(--bt-q-bg) !important;
+}
+body.bitka .comp-countdown-num { color: var(--bt-title); text-shadow: 0 0 50px var(--bt-glow); }
+body.bitka .comp-countdown-num.go { color: #7dff7d; text-shadow: 0 0 50px rgba(80,255,80,0.7); }
+body.bitka .comp-end-box {
+  background: var(--bt-panel) !important;
+  border-color: var(--bt-line) !important;
+}
+body.bitka .comp-board-row.me {
+  background: var(--bt-accent-soft); border-color: var(--bt-accent);
+  animation: none; box-shadow: 0 0 16px var(--bt-glow);
+}
+.bt-accent { color: var(--bt-title); }
 
 .bt-card { gap: 12px; }
 .bt-as { font-size: 1rem; color: rgba(255,255,255,0.8); }
@@ -1481,10 +1530,10 @@ body.competition.bitka { background: #3a1433; }
   flex: 0 0 120px; min-width: 0;
   text-align: center; font-size: 1.6rem; font-weight: 800; letter-spacing: 0.2em;
   padding: 8px 6px; border-radius: 12px;
-  background: rgba(0,0,0,0.35); border: 2px solid #b06bff; color: #fff;
+  background: rgba(0,0,0,0.35); border: 2px solid var(--bt-accent); color: #fff;
   font-family: inherit;
 }
-.bt-code-input:focus { outline: none; box-shadow: 0 0 18px rgba(150,80,255,0.5); }
+.bt-code-input:focus { outline: none; box-shadow: 0 0 18px var(--bt-glow); }
 .bt-code-input::placeholder { color: rgba(255,255,255,0.25); font-size: 1rem; letter-spacing: 0.05em; }
 .bt-join-btn { flex: 1; margin-top: 0; padding: 10px 12px; }
 
@@ -1495,11 +1544,11 @@ body.competition.bitka { background: #3a1433; }
 }
 .bt-code {
   font-size: 4.2rem; font-weight: 900; letter-spacing: 0.18em; line-height: 1;
-  color: #fff; text-shadow: 0 0 30px rgba(199,155,255,0.6);
+  color: #fff; text-shadow: 0 0 30px var(--bt-glow);
   padding-left: 0.18em;   /* letter-spacing pusti prostor le desno */
 }
 .bt-code-hint { font-size: 0.85rem; color: rgba(255,255,255,0.55); }
-.bt-count { font-size: 0.8rem; font-weight: 700; color: #d8c4ff; margin-top: 6px; }
+.bt-count { font-size: 0.8rem; font-weight: 700; color: var(--bt-soft-text); margin-top: 6px; }
 .bt-players {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
   width: 100%; min-height: 48px;
@@ -1510,14 +1559,14 @@ body.competition.bitka { background: #3a1433; }
   background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
   font-weight: 700;
 }
-.bt-player.me { background: rgba(150,80,255,0.28); border-color: #c79bff; }
+.bt-player.me { background: var(--bt-accent-soft); border-color: var(--bt-accent); }
 .bt-player.pop { animation: btPop .45s cubic-bezier(.34,1.7,.5,1); }
 @keyframes btPop { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .bt-p-emoji { font-size: 1.3rem; }
 .bt-p-name { font-size: 1rem; }
 .bt-p-you {
   font-size: .62rem; text-transform: uppercase; letter-spacing: .1em;
-  background: #c79bff; color: #2d1b4e; border-radius: 6px; padding: 1px 5px;
+  background: var(--bt-accent); color: var(--bt-btn-text); border-radius: 6px; padding: 1px 5px;
 }
 #btLobbyAction { width: 100%; display: flex; justify-content: center; }
 .bt-wait { font-size: 0.95rem; color: rgba(255,255,255,0.75); padding: 10px 0; }
@@ -1525,9 +1574,9 @@ body.competition.bitka { background: #3a1433; }
 .bt-net { font-size: 0.8rem; color: #ffb3c7; text-align: center; }
 
 /* Odštevanje */
-.bt-countdown { background: rgba(45,10,40,0.94); }
+.bt-countdown { background: rgba(40,16,6,0.94); }
 .bt-cd-inner { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 0 16px; }
-.bt-cd-title { font-size: 1.4rem; font-weight: 800; color: #d8c4ff; letter-spacing: .06em; }
+.bt-cd-title { font-size: 1.4rem; font-weight: 800; color: var(--bt-soft-text); letter-spacing: .06em; }
 .bt-cd-players { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px;
   font-weight: 700; color: rgba(255,255,255,0.8); max-width: 460px; }
 
@@ -1543,7 +1592,7 @@ body.competition.bitka { background: #3a1433; }
   background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08);
   transition: background .3s;
 }
-.bt-live-chip.me { background: rgba(150,80,255,0.35); border-color: #c79bff; }
+.bt-live-chip.me { background: var(--bt-accent-soft); border-color: var(--bt-accent); }
 .bt-live-rank { font-weight: 800; min-width: 1.2em; text-align: center; }
 .bt-live-name { max-width: 7em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bt-live-chip strong { color: #ffd700; margin-left: 2px; }
@@ -1555,8 +1604,8 @@ body.competition.bitka { background: #3a1433; }
 .bt-podium-box {
   margin: auto; width: 100%; max-width: 520px;
   display: flex; flex-direction: column; align-items: center; gap: 14px;
-  background: linear-gradient(145deg, rgba(35,15,65,.98), rgba(58,20,51,.98));
-  border: 2px solid rgba(199,155,255,0.3); border-radius: 24px;
+  background: var(--bt-panel);
+  border: 2px solid var(--bt-line); border-radius: 24px;
   padding: 26px 18px; box-shadow: 0 30px 80px rgba(0,0,0,.7);
   position: relative;
 }
@@ -1589,8 +1638,8 @@ body.competition.bitka { background: #3a1433; }
 .bt-step-1 .bt-step-block { height: 130px; background: linear-gradient(180deg, #ffe45c, #d4a600); }
 .bt-step-2 .bt-step-block { height: 95px;  background: linear-gradient(180deg, #e6e6e6, #9a9a9a); }
 .bt-step-3 .bt-step-block { height: 70px;  background: linear-gradient(180deg, #e8a867, #a8662a); }
-.bt-step.me .bt-step-name { color: #d8c4ff; }
-.bt-step.me .bt-step-block { box-shadow: 0 0 0 3px #c79bff, 0 0 24px rgba(199,155,255,0.6); }
+.bt-step.me .bt-step-name { color: var(--bt-soft-text); }
+.bt-step.me .bt-step-block { box-shadow: 0 0 0 3px var(--bt-accent), 0 0 24px var(--bt-glow); }
 .bt-step-1.show { animation: btWinner 1s ease .6s; }
 @keyframes btWinner { 0%,100% { transform: none; } 50% { transform: scale(1.08); } }
 .bt-rest, .bt-me-line, .bt-podium-actions {
