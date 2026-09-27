@@ -46,6 +46,14 @@ const SFX = (() => {
         setTimeout(() => tone(f, 'sine', 0.28, 0.28, f * 1.015), i * 65)
       );
       setTimeout(() => tone(1047, 'sine', 0.5, 0.3), 480);
+    },
+    /* Boben pred razglasitvijo zmagovalca v bitki — vse hitrejši udarci. */
+    drumroll() {
+      let t = 0;
+      for (let i = 0; i < 26; i++) {
+        setTimeout(() => tone(95 + (i % 2) * 12, 'triangle', 0.07, 0.22 + i * 0.006), t);
+        t += Math.max(35, 95 - i * 3);
+      }
     }
   };
 })();
@@ -225,7 +233,7 @@ function loadSettings() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const s = JSON.parse(raw);
-    if (s && ['quiz','keypad','tekmovanje'].includes(s.mode)) mode = s.mode;
+    if (s && ['quiz','keypad','tekmovanje','bitka'].includes(s.mode)) mode = s.mode;
   } catch(e) {}
 }
 function saveSettings() {
@@ -238,7 +246,7 @@ function saveSettings() {
    multiplication only, so a class never has to touch the settings at all.
      p    1-10, comma separated, or "vse"   (poštevanke)
      op   x | d | both                       (vrsta računa)
-     mode kviz | tipkovnica | tekmovanje
+     mode kviz | tipkovnica | tekmovanje | bitka
    Applied after the saved settings, so a link always wins, and saved so the
    choice survives a refresh without the query string. */
 function applyPresetFromURL() {
@@ -249,7 +257,8 @@ function applyPresetFromURL() {
 
   const m = (q.get('mode') || '').toLowerCase();
   const modeMap = { kviz:'quiz', quiz:'quiz', tipkovnica:'keypad', keypad:'keypad',
-                    tekmovanje:'tekmovanje', competition:'tekmovanje' };
+                    tekmovanje:'tekmovanje', competition:'tekmovanje',
+                    bitka:'bitka', battle:'bitka' };
   if (modeMap[m]) { mode = modeMap[m]; touched = true; }
 
   const o = (q.get('op') || '').toLowerCase();
@@ -268,11 +277,11 @@ function applyPresetFromURL() {
     if (arr.length) { tables = new Set(arr); touched = true; }
   }
   /* Asking for particular tables only makes sense in a practice mode —
-     tekmovanje always uses the full deck. Without this, a child whose last
-     session ended in tekmovanje opens the teacher's link and sees the
+     tekmovanje and bitka always use the full deck. Without this, a child
+     whose last session ended there opens the teacher's link and sees the
      preset silently ignored. */
   const askedForContent = praw || opMap[o];
-  if (askedForContent && !modeMap[m] && mode === 'tekmovanje') {
+  if (askedForContent && !modeMap[m] && (mode === 'tekmovanje' || mode === 'bitka')) {
     mode = 'quiz'; touched = true;
   }
   if (touched) saveSettings();
@@ -391,7 +400,7 @@ function loadData(cb) {
 function showLoadError() {
   const html = '<div class="quiz-empty">⚠️ Računov ni bilo mogoče naložiti.<br>'
              + 'Preveri internetno povezavo in osveži stran.</div>';
-  ['quizArea','keypadArea','tekmovanjeArea'].forEach(id => {
+  ['quizArea','keypadArea','tekmovanjeArea','bitkaArea'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = html;
   });
@@ -455,9 +464,9 @@ document.querySelectorAll('#modeBtnGroup .seg-btn').forEach(btn => {
   });
 });
 
-/* Lock the op / tables controls while in Tekmovanje (fixed settings there) */
+/* Lock the op / tables controls in Tekmovanje and Bitka (fixed settings there) */
 function updateControlLock() {
-  const lock = (mode === 'tekmovanje');
+  const lock = (mode === 'tekmovanje' || mode === 'bitka');
   document.querySelectorAll('#opBtnGroup .seg-btn, .table-btn, #selAll, #selNone')
     .forEach(b => { b.disabled = lock; });
   document.getElementById('opBtnGroup').classList.toggle('locked', lock);
@@ -519,8 +528,12 @@ function showPanel(m) {
   document.getElementById('quizPanel').style.display       = m==='quiz'       ? '' : 'none';
   document.getElementById('keypadPanel').style.display     = m==='keypad'     ? '' : 'none';
   document.getElementById('tekmovanjePanel').style.display = m==='tekmovanje' ? '' : 'none';
-  document.getElementById('scoreHUD').style.display = (m==='tekmovanje') ? 'none' : 'flex';
-  document.body.classList.toggle('competition', m==='tekmovanje');
+  document.getElementById('bitkaPanel').style.display      = m==='bitka'      ? '' : 'none';
+  const race = m === 'tekmovanje' || m === 'bitka';
+  document.getElementById('scoreHUD').style.display = race ? 'none' : 'flex';
+  // bitka si deli postavitev tekmovanja, le barva je svoja
+  document.body.classList.toggle('competition', race);
+  document.body.classList.toggle('bitka', m==='bitka');
 }
 
 /* The chip now shows a static "Nastavitve" / "Skrij nastavitve" label
@@ -545,12 +558,14 @@ function doRestart() {
   if (cTimer) { clearInterval(cTimer); cTimer = null; }
   if (cAdvanceTimer) { clearTimeout(cAdvanceTimer); cAdvanceTimer = null; }
   cActive = false;
+  if (mode !== 'bitka') battleLeave();   // preklop drugam = odhod iz bitke
   flushStats();          // persist any answers from the mode we are leaving
   lastAnswerTs = 0;
   removeOverlay();
   cards = shuffle(getFilteredCards());
   if      (mode === 'quiz')   startQuiz();
   else if (mode === 'keypad') startKeypad();
+  else if (mode === 'bitka')  showBattlePanel();
   else                        showTekmovanjePanel();
 }
 
@@ -1761,6 +1776,7 @@ async function openStatsOverlay() {
     { key: 'keypad',     label: '⌨️ Tipkovnica' },
     { key: 'quiz',       label: '🎯 Kviz' },
     { key: 'tekmovanje', label: '🏆 Tekmovanje' },
+    { key: 'bitka',      label: '⚔️ Bitka' },
   ];
   const body = div.querySelector('#statsBody');
   body.innerHTML = modeList.map(m => `
@@ -2060,7 +2076,8 @@ async function openTeacherDashboard() {
   const MODES = [
     { key: 'keypad',     icon: '⌨️', label: 'Tipkovnica' },
     { key: 'quiz',       icon: '🎯', label: 'Kviz' },
-    { key: 'tekmovanje', icon: '🏆', label: 'Tekmovanje' }
+    { key: 'tekmovanje', icon: '🏆', label: 'Tekmovanje' },
+    { key: 'bitka',      icon: '⚔️', label: 'Bitka' }
   ];
   /* 10 poštevank × (× in ÷) — imenovalec Brihtometra je za vse enak. */
   const BUCKETS = 20;
@@ -2443,7 +2460,7 @@ async function openTeacherDashboard() {
       ${idle.length ? `<p class="ps-idle"><strong>Niso vadili (${idle.length}):</strong> ${
         idle.map(r => imeIzpis(r.s)).join(', ')}</p>` : ''}
       <p class="ps-legend">✔ pravilno · ✘ napačno ·
-        ⌨️ tipkovnica · 🎯 kviz · 🏆 tekmovanje (pravilni) ·
+        ⌨️ tipkovnica · 🎯 kviz · 🏆 tekmovanje · ⚔️ bitka (pravilni) ·
         <span class="ps-box on">7</span> zna (pravilni − napačni ≥ ${PRINT_KNOWS}) ·
         <span class="ps-box few">7</span> še vadi ·
         <span class="ps-box">7</span> ne zna ali ni vadil
@@ -3225,6 +3242,7 @@ loadData(() => {
   cards = shuffle(getFilteredCards());
   if      (mode === 'quiz')   startQuiz();
   else if (mode === 'keypad') startKeypad();
+  else if (mode === 'bitka')  showBattlePanel();
   else                        showTekmovanjePanel();
 });
 collapseToolbar();

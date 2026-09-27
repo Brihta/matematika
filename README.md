@@ -21,7 +21,7 @@ zato vaja ostane enaka tudi po osvežitvi strani.
 - **`p`** — poštevanke: ena številka (`7`), več ločenih z vejico (`3,4,6`),
   ali `vse`
 - **`op`** — vrsta računa: `x` (množenje), `d` (deljenje), `both` (oboje)
-- **`mode`** — način: `kviz`, `tipkovnica` ali `tekmovanje`
+- **`mode`** — način: `kviz`, `tipkovnica`, `tekmovanje` ali `bitka`
 
 Če povezava določa poštevanke ali vrsto računa, se način samodejno preklopi
 iz tekmovanja v kviz — tekmovanje namreč vedno uporablja vse poštevanke in
@@ -37,6 +37,23 @@ bi prednastavitev preprosto prezrlo.
   (vsi poskusi se še vedno štejejo v statistiko). Prijavljen učenec ne
   vpisuje začetnic — rezultat se shrani pod njegovim uporabniškim imenom.
   Zahteva `supabase_lestvica.sql`.
+
+- **⚔️ Bitka** — 60 sekund proti prijateljem, 2–8 igralcev. En otrok
+  ustvari bitko in dobi **4-mestno kodo**, ostali jo vpišejo in se
+  pridružijo. Ko gostitelj (👑) začne, vsi hkrati dobijo odštevanje in
+  **ista vprašanja v istem vrstnem redu**. Med igro vsak vidi svoje mesto in
+  rezultate ostalih v živo, na koncu pa se razkrijejo stopničke kot pri
+  Kahootu (3. → 2. → boben → 1.). *Še enkrat* vrne vse v čakalnico.
+  Prijavljen učenec igra pod uporabniškim imenom, ostali z začetnicami.
+  Odprto med 7:00 in 19:00, kot tekmovanje. Odgovori se štejejo v
+  statistiko in Brihtometer (v pregledu z ikono ⚔️). Zahteva
+  `supabase_bitka.sql`.
+
+  Čas teče po uri strežnika, ne tablice — šolske tablice imajo pogosto
+  napačno uro. Naprave se s strežnikom uskladijo vsaki 2 s (brez
+  WebSocketov, ki jih šolska omrežja včasih blokirajo). Kdor zapre stran v
+  čakalnici, po 20 s izpade; če odide gostitelj, vlogo prevzame naslednji.
+  Bitke, starejše od 12 ur, se samodejno pobrišejo.
 
 Na širokih zaslonih (nad 900 px) sta **način** in **vrsta računa** stalno
 vidna v zgornji vrstici, **poštevanke** pa so v levem stolpcu, vsaka v svoji
@@ -179,10 +196,11 @@ Oboje zahteva `supabase_zdruzi_izbrisi.sql` (zaženi enkrat).
 Statična stran (brez build koraka), podatki v Supabase.
 
 - `index.html`, `script.js`, `style.css` — celotna aplikacija
+- `battle.js` — ⚔️ Bitka (naloži se za `script.js`)
 - `postevanka.json` — računi
 - `supabase_razred.sql`, `supabase_scores_guard.sql`, `supabase_nacini.sql`,
   `supabase_hitrost.sql`, `supabase_zdruzi_izbrisi.sql`,
-  `supabase_premakni_razred.sql` — migracije za bazo
+  `supabase_premakni_razred.sql`, `supabase_bitka.sql` — migracije za bazo
 - `.github/workflows/keepalive.yml` — vsake 3 dni pinga bazo, da je
   Supabase ne ustavi zaradi neaktivnosti (brezplačni paket: 7 dni)
 

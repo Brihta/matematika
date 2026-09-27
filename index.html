@@ -34,6 +34,7 @@
             <button class="seg-btn" data-mode="keypad" aria-label="Tipkovnica">⌨️<span class="seg-label"> Tipkovnica</span></button>
             <button class="seg-btn active" data-mode="quiz" aria-label="Kviz">🎯<span class="seg-label"> Kviz</span></button>
             <button class="seg-btn" data-mode="tekmovanje" aria-label="Tekmovanje">🏆<span class="seg-label"> Tekmovanje</span></button>
+            <button class="seg-btn" data-mode="bitka" aria-label="Bitka">⚔️<span class="seg-label"> Bitka</span></button>
           </div>
         </div>
         <div class="ctrl-block" id="opBlock">
@@ -127,6 +128,13 @@
     </div>
   </div>
 
+  <!-- BITKA PANEL -->
+  <div id="bitkaPanel" class="tekmovanje-panel" style="display:none">
+    <div id="bitkaArea" class="tekmovanje-area">
+      <div class="quiz-empty">Nalagam bitko … ⚔️</div>
+    </div>
+  </div>
+
   </div><!-- /stage -->
 
 </div>
@@ -142,5 +150,6 @@
 </div>
 
 <script src="script.js"></script>
+<script src="battle.js"></script>
 </body>
 </html>
