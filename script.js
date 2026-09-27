@@ -2300,8 +2300,11 @@ async function openTeacherDashboard() {
      Namenoma malo stolpcev in brez barv (tiskalnik je črno-bel). Brihtometra
      in najšibkejše poštevanke ni: to je pregled ure, ne ocena otroka. */
   const PRINT_MODE = { '⌨️': 'tipkovnica', '🎯': 'kviz', '🏆': 'tekmovanje' };
-  /* Kdaj je poštevanka na listu "vadena": ×/÷ skupaj, vsaj PRINT_FULL
-     odgovorov = črno, manj = sivo, nič = belo. Kup kart je 200 (10 × in
+  /* Kdaj je poštevanka na listu "vadena": ×/÷ skupaj, PRAVILNI MINUS
+     NAPAČNI vsaj PRINT_FULL = črno, manj = sivo, nič odgovorov = belo.
+     Napačni odštevajo: 20 računov s 12 pravilnimi (12 − 8 = 4) ni "vadil",
+     ampak "še ne zna" — in ugibanje v kvizu (25 %) gre celo v minus. Pri
+     enem polnem krogu (20 računov) je za črno treba vsaj 15 pravilnih. Kup kart je 200 (10 × in
      10 ÷ na poštevanko) in se v kvizu in na tipkovnici premeša kot karte,
      brez ponavljanja: 200 odgovorov = vsak račun natanko enkrat = 20 na
      poštevanko. Tekmovanje pa vsako minuto premeša znova, zato je tam 20
@@ -2334,11 +2337,13 @@ async function openTeacherDashboard() {
       let x = 0, d = 0, boxes = '';
       for (let t = 1; t <= 10; t++) {
         const cx = r.s.cells[t + '_x'], cd = r.s.cells[t + '_d'];
-        const nx = cx && cx[slot] ? cx[slot].c + cx[slot].w : 0;
-        const nd = cd && cd[slot] ? cd[slot].c + cd[slot].w : 0;
+        const vx = cx && cx[slot], vd = cd && cd[slot];
+        const nx = vx ? vx.c + vx.w : 0;
+        const nd = vd ? vd.c + vd.w : 0;
+        const neto = (vx ? vx.c - vx.w : 0) + (vd ? vd.c - vd.w : 0);
         x += nx; d += nd;
         const n = nx + nd;
-        boxes += `<span class="ps-box${n >= PRINT_FULL ? ' on' : n ? ' few' : ''}">${t}</span>`;
+        boxes += `<span class="ps-box${neto >= PRINT_FULL ? ' on' : n ? ' few' : ''}">${t}</span>`;
       }
       const racun = x && d ? '× ÷' : x ? '×' : d ? '÷' : '';
       /* Besede, ne ikone: emoji na črno-belem tiskalniku postanejo sive packe. */
@@ -2373,8 +2378,8 @@ async function openTeacherDashboard() {
       ${idle.length ? `<p class="ps-idle"><strong>Niso vadili (${idle.length}):</strong> ${
         idle.map(r => imeIzpis(r.s)).join(', ')}</p>` : ''}
       <p class="ps-legend">✔ pravilno · ✘ napačno ·
-        <span class="ps-box on">7</span> vadil (${PRINT_FULL}+ računov) ·
-        <span class="ps-box few">7</span> le nekaj računov ·
+        <span class="ps-box on">7</span> vadil (pravilni − napačni ≥ ${PRINT_FULL}) ·
+        <span class="ps-box few">7</span> premalo ali preveč napak ·
         <span class="ps-box">7</span> ni vadil</p>`;
     const old = document.getElementById('printSheet');
     if (old) old.remove();
