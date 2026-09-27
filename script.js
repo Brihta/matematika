@@ -2406,8 +2406,25 @@ async function openTeacherDashboard() {
     const nameEl = e.target.closest('.td-name[data-username], .tl-name[data-username]');
     if (!nameEl) return;
     const s = activeList().find(x => x.username === nameEl.dataset.username);
-    if (s) openResetPin(s);
+    if (s) openResetPin(s, mergeTargets(s));
   });
+
+  /* Kam lahko združiš ta račun: isti razred (če ga poznamo), najprej računi z
+     istim imenom — to so skoraj vedno podvojeni računi istega otroka. Število
+     odgovorov (ves čas) pomaga izbrati tistega, ki ga otrok res uporablja. */
+  function mergeTargets(s) {
+    const ime = x => (x.display_name || x.username || '').toLowerCase();
+    const rz = razredMap[s.username];
+    return activeList()
+      .filter(x => x.username !== s.username && (!rz || razredMap[x.username] === rz))
+      .map(x => ({
+        username: x.username,
+        label: x.display_name ? `${x.display_name} · ${x.username}` : x.username,
+        same: ime(x) === ime(s),
+        total: Object.values(x.cells).reduce((a, c) => a + c.all.c + c.all.w, 0)
+      }))
+      .sort((a, b) => (b.same - a.same) || a.label.localeCompare(b.label, 'sl'));
+  }
   div.querySelectorAll('#tdWinToggle .ptable-tog-btn').forEach(b => {
     b.addEventListener('click', () => {
       div.querySelectorAll('#tdWinToggle .ptable-tog-btn').forEach(x => x.classList.remove('active'));
@@ -2546,7 +2563,7 @@ function openTeacherPassword(firstLogin) {
 }
 
 /* ── Teacher: reset a student's password ── */
-function openResetPin(student) {
+function openResetPin(student, targets) {
   removeOverlay();
   const div = document.createElement('div');
   div.className = 'timed-overlay';
@@ -2567,6 +2584,21 @@ function openResetPin(student) {
       <div id="resetPickerSlot"></div>
       <button class="overlay-btn overlay-btn-next" id="resetBtn">Ponastavi geslo ✓</button>
       <div class="auth-msg" id="resetMsg"></div>
+      <div class="overlay-divider"></div>
+
+      <label class="auth-label">Račun ni več v uporabi?</label>
+      <div class="td-merge-help">Prenesi njegovo vadbo v račun, ki ga otrok uporablja.
+        Ta račun se potem izbriše.</div>
+      <select id="mergeSelect" class="td-razred-select td-merge-select">
+        <option value="">— izberi račun —</option>
+        ${(targets || []).map(t => `<option value="${esc(t.username)}">${
+          t.same ? '★ ' : ''}${esc(t.label)} · ${t.total} odg.</option>`).join('')}
+      </select>
+      <button class="overlay-btn overlay-btn-ghost" id="mergeBtn">🔗 Združi</button>
+      <div class="auth-msg" id="mergeMsg"></div>
+      <button class="overlay-btn overlay-btn-ghost td-delete-btn" id="deleteBtn">🗑️ Izbriši račun (brez prenosa)</button>
+      <div class="auth-msg" id="deleteMsg"></div>
+
       <button class="auth-switch auth-close" id="resetCancel">← Nazaj na pregled</button>
     </div>`;
   document.body.appendChild(div);
@@ -2575,6 +2607,62 @@ function openResetPin(student) {
   const picker = buildAnimalPicker();
   div.querySelector('#resetPickerSlot').appendChild(picker);
   div.querySelector('#resetCancel').addEventListener('click', () => openTeacherDashboard());
+
+  const ACCOUNT_ERR = {
+    NI_DOVOLJENJA: '❌ Ni dovoljenja. Prijavi se znova.',
+    NI_UCENCA:     '❌ Tega računa ni več.',
+    ISTI:          '❌ Izberi drug račun.'
+  };
+  function accountError(res) {
+    if (res === RPC_UNREACHABLE) return OFFLINE_MSG;
+    if (res === null) return '❌ V bazi še ni funkcije — zaženi supabase_zdruzi_izbrisi.sql.';
+    if (typeof res === 'string' && res.startsWith('NAPAKA')) return '❌ ' + res;
+    return ACCOUNT_ERR[res] || '❌ Napaka. Poskusi znova.';
+  }
+  function accountDone(text) {
+    div.querySelector('.timed-overlay-box').innerHTML = `
+      <div class="overlay-title" style="color:#4caf50">✅ ${text}</div>
+      <div class="overlay-divider"></div>
+      <button class="overlay-btn overlay-btn-next" id="accDone">Nazaj na pregled</button>`;
+    div.querySelector('#accDone').addEventListener('click', () => openTeacherDashboard());
+  }
+
+  div.querySelector('#mergeBtn').addEventListener('click', async () => {
+    const into = div.querySelector('#mergeSelect').value;
+    const msg = div.querySelector('#mergeMsg');
+    if (!into) { msg.textContent = 'Izberi račun, v katerega preneseš vadbo.'; return; }
+    if (!confirm(`Vadba računa ${student.username} se prenese v ${into}.\n`
+               + `Račun ${student.username} se nato izbriše. Nadaljujem?`)) return;
+    const btn = div.querySelector('#mergeBtn');
+    btn.disabled = true; btn.textContent = 'Združujem …';
+    const res = await supabaseRPC('merge_students', {
+      p_teacher_id: teacherSession.id, p_from: student.username, p_into: into
+    });
+    if (res === 'OK') { accountDone(`Združeno v ${esc(into)}`); return; }
+    btn.disabled = false; btn.textContent = '🔗 Združi';
+    msg.textContent = accountError(res);
+  });
+
+  /* Brisanje se ne da razveljaviti, zato ga mora učiteljica potrditi z
+     vpisom uporabniškega imena — en nehoten dotik na tablici ne sme zbrisati
+     otrokove vadbe. */
+  div.querySelector('#deleteBtn').addEventListener('click', async () => {
+    const msg = div.querySelector('#deleteMsg');
+    const typed = prompt(`Brisanje je dokončno — vadba se izgubi.\n`
+                       + `Za potrditev vpiši uporabniško ime: ${student.username}`);
+    if (typed === null) return;
+    if (typed.trim().toLowerCase() !== String(student.username).toLowerCase()) {
+      msg.textContent = 'Ime se ne ujema — nič ni izbrisano.'; return;
+    }
+    const btn = div.querySelector('#deleteBtn');
+    btn.disabled = true; btn.textContent = 'Brišem …';
+    const res = await supabaseRPC('delete_student', {
+      p_teacher_id: teacherSession.id, p_username: student.username
+    });
+    if (res === 'OK') { accountDone(`Račun ${esc(student.username)} izbrisan`); return; }
+    btn.disabled = false; btn.textContent = '🗑️ Izbriši račun (brez prenosa)';
+    msg.textContent = accountError(res);
+  });
 
   div.querySelector('#imeBtn').addEventListener('click', async () => {
     const ime = div.querySelector('#imeInput').value.trim();

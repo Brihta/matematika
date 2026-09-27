@@ -1426,3 +1426,8 @@ body.competition {
   .ps-idle   { margin-top: 4mm; font-size: 9.5pt; }
   .ps-legend { margin-top: 3mm; font-size: 8.5pt; color: #444; }
 }
+
+/* Združi / izbriši račun (okno učenca v učiteljskem pregledu) */
+.td-merge-help { font-size: 0.78rem; opacity: 0.75; margin: -2px 0 8px; line-height: 1.35; }
+.td-merge-select { width: 100%; margin-bottom: 8px; }
+.td-delete-btn { color: #ff8a8a; border-color: rgba(255,120,120,0.35); margin-top: 6px; }

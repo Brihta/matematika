@@ -139,6 +139,21 @@ Najbolj zanesljiv je izpis **Danes** takoj po uri: v daljšem obdobju lahko
 otrok, ki težke poštevanke izklaplja, deset odgovorov pri njih vseeno nabere
 v tekmovanju.
 
+### Podvojeni in opuščeni računi
+
+Klikni ime učenca v pregledu. Na dnu okna:
+
+- **🔗 Združi** — za otroka, ki si je (po pozabljenem geslu) naredil nov
+  račun. Izberi račun, ki ga otrok **zdaj uporablja**; vadba iz odprtega
+  računa se prenese vanj, odprti račun se izbriše. Računi z istim imenom so
+  na vrhu seznama (★), zraven je število odgovorov — obdrži tistega, ki ga
+  otrok res uporablja. Nič se ne izgubi, Brihtometer pa končno pokaže celega
+  otroka.
+- **🗑️ Izbriši račun** — za račun, ki ga nihče ne rabi. Vadba se izgubi,
+  zato je treba za potrditev vpisati uporabniško ime.
+
+Oboje zahteva `supabase_zdruzi_izbrisi.sql` (zaženi enkrat).
+
 ## Tehnično
 
 Statična stran (brez build koraka), podatki v Supabase.
@@ -146,7 +161,7 @@ Statična stran (brez build koraka), podatki v Supabase.
 - `index.html`, `script.js`, `style.css` — celotna aplikacija
 - `postevanka.json` — računi
 - `supabase_razred.sql`, `supabase_scores_guard.sql`, `supabase_nacini.sql`,
-  `supabase_hitrost.sql` — migracije za bazo
+  `supabase_hitrost.sql`, `supabase_zdruzi_izbrisi.sql` — migracije za bazo
 - `.github/workflows/keepalive.yml` — vsake 3 dni pinga bazo, da je
   Supabase ne ustavi zaradi neaktivnosti (brezplačni paket: 7 dni)
 
