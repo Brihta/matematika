@@ -1423,6 +1423,11 @@ body.competition {
   .ps-box.on { background: #000; border-color: #000; color: #fff; font-weight: 700; }
   .ps-box.few { background: #bbb; border-color: #888; color: #000; }
   .ps-uname  { font-size: 8pt; color: #555; }
+  .ps-page + .ps-page { break-before: page; }
+  .ps-names td { font-size: 12pt; padding: 1.8mm 1.5mm; }
+  .ps-names th:nth-child(2) { width: 55%; }
+  .ps-rownum { width: 8mm; color: #777; font-size: 9pt !important; text-align: right; }
+  .ps-login { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; }
   .ps-idle   { margin-top: 4mm; font-size: 9.5pt; }
   .ps-legend { margin-top: 3mm; font-size: 8.5pt; color: #444; }
 }

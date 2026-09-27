@@ -1878,6 +1878,7 @@ async function openTeacherDashboard() {
       <div class="td-hint">💡 Klikni na ime učenca, če želiš popraviti njegovo ime ali ponastaviti geslo.</div>
       <div class="td-footer">
         <button class="overlay-btn overlay-btn-next" id="tdPrint">🖨️ Natisni za razred (A4)</button>
+        <button class="overlay-btn overlay-btn-ghost" id="tdNamesPrint">📋 Seznam uporabniških imen</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdPass">🔑 Spremeni svoje geslo</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdLogout">Odjava</button>
       </div>
@@ -1892,6 +1893,7 @@ async function openTeacherDashboard() {
   });
   div.querySelector('#tdPass').addEventListener('click', openTeacherPassword);
   div.querySelector('#tdPrint').addEventListener('click', () => printSheet());
+  div.querySelector('#tdNamesPrint').addEventListener('click', () => printNames());
 
   const wrap = div.querySelector('#tdGridWrap');
   const cache = { today: null, recent: null };
@@ -2385,11 +2387,57 @@ async function openTeacherDashboard() {
         <span class="ps-box few">7</span> še vadi ·
         <span class="ps-box">7</span> ne zna ali ni vadil
         (manj kot ${PRINT_MIN} računov ali napačnih vsaj toliko kot pravilnih)</p>`;
+    printNode(sheet);
+  }
+  function printNode(sheet) {
     const old = document.getElementById('printSheet');
     if (old) old.remove();
     document.body.appendChild(sheet);
     window.addEventListener('afterprint', () => sheet.remove(), { once: true });
     window.print();
+  }
+
+  /* ── Seznam imen in uporabniških imen ──
+     Za otroka, ki je pozabil uporabniško ime, in za učiteljico, ki mora
+     vedeti, kdo je "adr90". Gesel ni: v bazi so samo zakodirana in se jih ne
+     da prebrati. Vsi učenci razreda, tudi tisti, ki še niso vadili. Brez
+     izbranega razreda gre vsak razred na svojo stran. */
+  function printNames() {
+    const ime = s => (s.display_name || '');
+    const sortKey = s => (s.display_name || s.username || '');
+    const byRazred = {};
+    for (const s of baseList()) {
+      const rz = razredMap[s.username] || 'Brez razreda';
+      (byRazred[rz] = byRazred[rz] || []).push(s);
+    }
+    const order = RAZREDI.filter(r => byRazred[r]).concat(
+      Object.keys(byRazred).filter(r => !RAZREDI.includes(r)));
+    const p = sloveniaParts();
+    const datum = `${+p.day}. ${+p.month}. ${p.year}`;
+    const pages = order.map(rz => {
+      const list = byRazred[rz].slice().sort((a, b) =>
+        sortKey(a).localeCompare(sortKey(b), 'sl', { sensitivity: 'base' }));
+      return `<div class="ps-page">
+        <div class="ps-head">
+          <div class="ps-title">Brihta · ${esc(rz)} · učenci</div>
+          <div class="ps-date">${datum}</div>
+        </div>
+        <table class="ps-table ps-names">
+          <thead><tr><th class="ps-rownum"></th><th>Ime</th><th>Uporabniško ime</th></tr></thead>
+          <tbody>${list.map((s, i) => `<tr>
+            <td class="ps-rownum">${i + 1}</td>
+            <td>${esc(ime(s)) || '<span class="ps-uname">— ime ni vpisano —</span>'}</td>
+            <td class="ps-login">${esc(s.username)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+        <p class="ps-legend">Gesla (4 živali) niso shranjena v berljivi obliki, zato jih
+          ni na seznamu. Pozabljeno geslo ponastaviš s klikom na ime učenca v pregledu.</p>
+      </div>`;
+    }).join('');
+    const sheet = document.createElement('div');
+    sheet.id = 'printSheet';
+    sheet.innerHTML = pages || '<p>Ni učencev.</p>';
+    printNode(sheet);
   }
 
   async function switchWindow(win) {

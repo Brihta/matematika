@@ -139,6 +139,14 @@ Najbolj zanesljiv je izpis **Danes** takoj po uri: v daljšem obdobju lahko
 otrok, ki težke poštevanke izklaplja, deset odgovorov pri njih vseeno nabere
 v tekmovanju.
 
+### Seznam uporabniških imen
+
+Gumb **📋 Seznam uporabniških imen** natisne ime in uporabniško ime vseh
+učencev izbranega razreda, tudi tistih, ki še niso vadili. Brez izbranega
+razreda gre vsak razred na svojo stran. **Gesel na seznamu ni** in jih ne
+more biti: v bazi so shranjena samo zakodirana, ne v berljivi obliki.
+Pozabljeno geslo ponastaviš s klikom na ime učenca v pregledu.
+
 ### Podvojeni in opuščeni računi
 
 Klikni ime učenca v pregledu. Na dnu okna:
