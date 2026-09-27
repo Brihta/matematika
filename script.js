@@ -2376,7 +2376,7 @@ async function openTeacherDashboard() {
         <thead><tr>
           <th class="ps-name">Učenec</th>${withRazred ? '<th>Razred</th>' : ''}
           <th class="ps-num">✔</th><th class="ps-num">✘</th>
-          <th>Način</th><th class="ps-op">Račun</th><th>Poštevanke</th>
+          <th class="ps-mode">Način</th><th class="ps-op">Račun</th><th>Poštevanke</th>
         </tr></thead>
         <tbody>${body}</tbody>
       </table>` : '<p>V tem obdobju ni nihče vadil.</p>'}
