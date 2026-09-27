@@ -2301,7 +2301,6 @@ async function openTeacherDashboard() {
      je lahko vadil samo 1 in 10, kar se iz števila ne vidi.
      Namenoma malo stolpcev in brez barv (tiskalnik je črno-bel). Brihtometra
      in najšibkejše poštevanke ni: to je pregled ure, ne ocena otroka. */
-  const PRINT_MODE = { '⌨️': 'tipkovnica', '🎯': 'kviz', '🏆': 'tekmovanje' };
   /* Kvadratek na poštevanko (× in ÷ skupaj). Napačni odgovori odštevajo:
        ■ zna        pravilni − napačni ≥ PRINT_KNOWS
        ▣ še vadi    vse vmes
@@ -2351,9 +2350,10 @@ async function openTeacherDashboard() {
         boxes += `<span class="ps-box${cls}">${t}</span>`;
       }
       const racun = x && d ? '× ÷' : x ? '×' : d ? '÷' : '';
-      /* Besede, ne ikone: emoji na črno-belem tiskalniku postanejo sive packe. */
-      const nacin = r.byMode.slice().sort((a, b) => (b.c + b.w) - (a.c + a.w))
-        .map(m => PRINT_MODE[m.icon]).join(', ');
+      /* Kot v pregledu: ikona načina in število pravilnih, vedno v istem
+         vrstnem redu (⌨️ 🎯 🏆), da se stolpec bere navpično. Vsota = ✔. */
+      const nacin = r.byMode.map(m =>
+        `<span class="ps-modechip">${m.icon}${m.c}</span>`).join('');
       return `<tr>
         <td class="ps-name">${imeIzpis(r.s)}</td>
         ${withRazred ? `<td>${esc(razredMap[r.s.username] || '')}</td>` : ''}
@@ -2383,6 +2383,7 @@ async function openTeacherDashboard() {
       ${idle.length ? `<p class="ps-idle"><strong>Niso vadili (${idle.length}):</strong> ${
         idle.map(r => imeIzpis(r.s)).join(', ')}</p>` : ''}
       <p class="ps-legend">✔ pravilno · ✘ napačno ·
+        ⌨️ tipkovnica · 🎯 kviz · 🏆 tekmovanje (pravilni) ·
         <span class="ps-box on">7</span> zna (pravilni − napačni ≥ ${PRINT_KNOWS}) ·
         <span class="ps-box few">7</span> še vadi ·
         <span class="ps-box">7</span> ne zna ali ni vadil

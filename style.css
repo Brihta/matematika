@@ -1413,7 +1413,9 @@ body.competition {
   .ps-name { width: 26%; }
   .ps-num  { text-align: right; width: 8%; font-variant-numeric: tabular-nums; }
   .ps-op   { text-align: center; white-space: nowrap; }
-  .ps-mode { font-size: 9pt; }
+  .ps-mode { font-size: 9.5pt; white-space: nowrap; }
+  .ps-modechip { margin-right: 2.5mm; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ps-table th.ps-num { text-align: right; }
   .ps-boxes { white-space: nowrap; }
   .ps-box {
     display: inline-block; width: 5.2mm; height: 5.2mm; line-height: 5.2mm;
