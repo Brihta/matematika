@@ -1421,6 +1421,8 @@ body.competition {
     border: 0.5px solid #999; border-radius: 1mm; color: #999;
   }
   .ps-box.on { background: #000; border-color: #000; color: #fff; font-weight: 700; }
+  .ps-box.few { background: #bbb; border-color: #888; color: #000; }
+  .ps-uname  { font-size: 8pt; color: #555; }
   .ps-idle   { margin-top: 4mm; font-size: 9.5pt; }
   .ps-legend { margin-top: 3mm; font-size: 8.5pt; color: #444; }
 }

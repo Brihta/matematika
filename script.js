@@ -2300,10 +2300,25 @@ async function openTeacherDashboard() {
      Namenoma malo stolpcev in brez barv (tiskalnik je črno-bel). Brihtometra
      in najšibkejše poštevanke ni: to je pregled ure, ne ocena otroka. */
   const PRINT_MODE = { '⌨️': 'tipkovnica', '🎯': 'kviz', '🏆': 'tekmovanje' };
+  /* Kdaj je poštevanka na listu "vadena": ×/÷ skupaj, vsaj PRINT_FULL
+     odgovorov = črno, manj = sivo, nič = belo. Kup kart je 200 (10 × in
+     10 ÷ na poštevanko) in se v kvizu in na tipkovnici premeša kot karte,
+     brez ponavljanja: 200 odgovorov = vsak račun natanko enkrat = 20 na
+     poštevanko. Tekmovanje pa vsako minuto premeša znova, zato je tam 20
+     samo povprečje, polovica poštevank pade pod njo. Prag 10 je pol
+     polnega kroga: otrok, ki je vse pošteno vadil, je ves črn; otrok, ki je
+     izklopil težke, pa ima pri njih le drobtine iz tekmovanja — sivo. */
+  const PRINT_FULL = 10;
   const WIN_LABEL = { today: 'Danes', recent: 'Zadnja 2 tedna', all: 'Ves čas' };
   function printSheet() {
     const slot = curWin === 'all' ? 'all' : 'recent';
     const ime = s => (s.display_name || s.username || '');
+    /* Isto ime večkrat je skoraj vedno isti otrok z več računi (pozabljeno
+       geslo → nov račun). Brez uporabniškega imena jih na papirju ne ločiš. */
+    const seen = {};
+    for (const s of baseList()) { const k = ime(s).toLowerCase(); seen[k] = (seen[k] || 0) + 1; }
+    const imeIzpis = s => esc(ime(s)) + (seen[ime(s).toLowerCase()] > 1 && s.display_name
+      ? ` <span class="ps-uname">${esc(s.username)}</span>` : '');
     const rows = baseList()
       .map(s => Object.assign({ s }, summarise(s, slot)))
       .sort((a, b) => ime(a.s).localeCompare(ime(b.s), 'sl', { sensitivity: 'base' }));
@@ -2322,14 +2337,15 @@ async function openTeacherDashboard() {
         const nx = cx && cx[slot] ? cx[slot].c + cx[slot].w : 0;
         const nd = cd && cd[slot] ? cd[slot].c + cd[slot].w : 0;
         x += nx; d += nd;
-        boxes += `<span class="ps-box${nx + nd ? ' on' : ''}">${t}</span>`;
+        const n = nx + nd;
+        boxes += `<span class="ps-box${n >= PRINT_FULL ? ' on' : n ? ' few' : ''}">${t}</span>`;
       }
       const racun = x && d ? '× ÷' : x ? '×' : d ? '÷' : '';
       /* Besede, ne ikone: emoji na črno-belem tiskalniku postanejo sive packe. */
       const nacin = r.byMode.slice().sort((a, b) => (b.c + b.w) - (a.c + a.w))
         .map(m => PRINT_MODE[m.icon]).join(', ');
       return `<tr>
-        <td class="ps-name">${esc(ime(r.s))}</td>
+        <td class="ps-name">${imeIzpis(r.s)}</td>
         ${withRazred ? `<td>${esc(razredMap[r.s.username] || '')}</td>` : ''}
         <td class="ps-num">${r.correct}</td>
         <td class="ps-num">${r.wrong}</td>
@@ -2355,9 +2371,11 @@ async function openTeacherDashboard() {
         <tbody>${body}</tbody>
       </table>` : '<p>V tem obdobju ni nihče vadil.</p>'}
       ${idle.length ? `<p class="ps-idle"><strong>Niso vadili (${idle.length}):</strong> ${
-        idle.map(r => esc(ime(r.s))).join(', ')}</p>` : ''}
+        idle.map(r => imeIzpis(r.s)).join(', ')}</p>` : ''}
       <p class="ps-legend">✔ pravilno · ✘ napačno ·
-        <span class="ps-box on">7</span> vadil to poštevanko</p>`;
+        <span class="ps-box on">7</span> vadil (${PRINT_FULL}+ računov) ·
+        <span class="ps-box few">7</span> le nekaj računov ·
+        <span class="ps-box">7</span> ni vadil</p>`;
     const old = document.getElementById('printSheet');
     if (old) old.remove();
     document.body.appendChild(sheet);
