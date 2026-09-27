@@ -31,6 +31,10 @@ let btPlayedRound = 0;       // runda, ki jo je ta naprava že odigrala/začela
 let btG = null;              // stanje igre med rundo
 let btCountdownTimer = null;
 let btPodiumTimers = [];
+let btListTimer = null;      // osveževanje seznama odprtih bitk na začetnem zaslonu
+let btListGen = 0;           // vsak izris začne svojo zanko; stare se ustavijo
+const BT_POLL_LIST = 3000;
+const BT_POLL_BOARD = 2000;
 
 function btNow() { return Date.now() + btOffset; }
 
@@ -115,6 +119,7 @@ async function btCall(fn, params) {
 
 function btStopTimers() {
   if (btPollTimer) { clearTimeout(btPollTimer); btPollTimer = null; }
+  if (btListTimer) { clearTimeout(btListTimer); btListTimer = null; }
   if (btCountdownTimer) { clearInterval(btCountdownTimer); btCountdownTimer = null; }
   btPodiumTimers.forEach(clearTimeout); btPodiumTimers = [];
   if (btG) {
@@ -203,6 +208,11 @@ function btRenderStart(msg) {
                maxlength="4" autocomplete="off" placeholder="koda" />
         <button class="comp-btn comp-btn-ghost bt-join-btn" id="btJoin">Pridruži se</button>
       </div>
+      ${btCanList() ? `
+      <div class="bt-open">
+        <div class="bt-open-title">Odprte bitke</div>
+        <div class="bt-open-list" id="btOpenList"><div class="bt-open-empty">Iščem …</div></div>
+      </div>` : ''}
     </div>`;
 
   const nameIn = area.querySelector('#btName');
@@ -216,6 +226,164 @@ function btRenderStart(msg) {
   codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); btJoin(); } });
   area.querySelector('#btCreate').addEventListener('click', btCreate);
   area.querySelector('#btJoin').addEventListener('click', btJoin);
+  // ob ponovnem izrisu (prijava/odjava) ne sme teči dvojna zanka
+  if (btListTimer) { clearTimeout(btListTimer); btListTimer = null; }
+  btListGen++;
+  if (btCanList()) btRefreshOpenList(btListGen);
+}
+
+/* ══════════════════════════
+   ODPRTE BITKE — seznam za prijavljene in projektor za učitelja
+   Seznam pove, kdo je ta trenutek na spletu, zato ga baza vrne samo
+   prijavljenemu učencu ali potrjenemu učitelju (supabase_bitka_seznam.sql).
+══════════════════════════ */
+function btCanList() { return !!(profile || teacherSession); }
+
+async function btFetchOpen() {
+  if (!btCanList()) return null;
+  return supabaseRPC('list_open_battles', {
+    p_teacher: teacherSession ? teacherSession.id : null,
+    p_student: profile ? profile.id : null
+  });
+}
+
+/* Čakalnice, v katere se še da vstopiti, najprej; polne na konec. */
+function btLobbiesFirstOpen(battles) {
+  const lobbies = battles.filter(b => b.status === 'lobby');
+  return lobbies.filter(b => b.players.length < BT_MAX_PLAYERS)
+    .concat(lobbies.filter(b => b.players.length >= BT_MAX_PLAYERS));
+}
+
+function btPlayerNames(players, host, max) {
+  const others = players.filter(p => p.id !== host);
+  const shown = others.slice(0, max).map(p => `${esc(p.emoji)} ${esc(p.name)}`);
+  if (others.length > max) shown.push(`+${others.length - max}`);
+  return shown.join(' · ');
+}
+
+async function btRefreshOpenList(gen) {
+  btListTimer = null;
+  const res = await btFetchOpen();
+  const list = document.getElementById('btOpenList');
+  if (gen !== btListGen || !list || btView !== 'start' || mode !== 'bitka') return;   // zaslon je že drug
+  const lobbies = res && Array.isArray(res.battles) ? btLobbiesFirstOpen(res.battles) : null;
+  if (res == null) {
+    // baza je zavrnila ali funkcije še ni (supabase_bitka_seznam.sql) —
+    // otrokom ne kaži napake, samo skrij razdelek
+    const wrap = list.closest('.bt-open');
+    if (wrap) wrap.style.display = 'none';
+  } else if (!lobbies) {
+    list.innerHTML = '<div class="bt-open-empty">⚠️ Strežnik ni dosegljiv.</div>';
+  } else if (!lobbies.length) {
+    list.innerHTML = '<div class="bt-open-empty">Nobena bitka ne čaka. Ustvari svojo! ⚔️</div>';
+  } else {
+    list.innerHTML = lobbies.map(b => {
+      const host = b.players.find(p => p.id === b.host);
+      const full = b.players.length >= BT_MAX_PLAYERS;
+      const rest = btPlayerNames(b.players, b.host, 3);
+      return `<div class="bt-open-row${full ? ' full' : ''}">
+        <span class="bt-open-code">${esc(b.code)}</span>
+        <span class="bt-open-who">
+          <span class="bt-open-host">👑 ${host ? `${esc(host.emoji)} ${esc(host.name)}` : '—'}</span>
+          <span class="bt-open-rest">${rest || 'čaka na igralce …'}</span>
+        </span>
+        <span class="bt-open-count">${b.players.length}/${BT_MAX_PLAYERS}</span>
+        <button class="bt-open-join" data-code="${esc(b.code)}" ${full ? 'disabled' : ''}>
+          ${full ? 'Polna' : 'Pridruži se'}</button>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('.bt-open-join').forEach(btn => btn.addEventListener('click', () => {
+      const codeIn = document.getElementById('btCode');
+      if (codeIn) codeIn.value = btn.dataset.code;
+      btJoin();
+    }));
+  }
+  btListTimer = setTimeout(() => btRefreshOpenList(gen), BT_POLL_LIST);
+}
+
+/* Projektor: vse čakalnice z velikimi kodami, spodaj bitke v teku z
+   rezultati v živo. Odpre se iz učiteljskega pregleda. */
+function openBattleBoard() {
+  if (!teacherSession) return;
+  removeOverlay();
+  const div = document.createElement('div');
+  div.className = 'timed-overlay bt-theme bt-board-overlay';
+  div.innerHTML = `
+    <div class="bt-board">
+      <button class="medal-modal-close" id="btBoardClose" title="Zapri">✕</button>
+      <div class="bt-board-head">
+        <div class="bt-board-title">⚔️ Bitke</div>
+        <div class="bt-board-sub">Odpri <strong>⚔️ Bitka</strong> in vpiši kodo — ali tapni bitko na seznamu.</div>
+      </div>
+      <div class="bt-board-body" id="btBoardBody"><div class="comp-board-empty">Nalagam …</div></div>
+    </div>`;
+  document.body.appendChild(div);
+  activeOverlay = div;
+  div.querySelector('#btBoardClose').addEventListener('click', () => openTeacherDashboard());
+
+  let offset = 0;
+  const render = (res) => {
+    const body = div.querySelector('#btBoardBody');
+    if (!body) return;
+    if (!res || !Array.isArray(res.battles)) {
+      body.innerHTML = `<div class="comp-board-empty">${res === RPC_UNREACHABLE
+        ? '⚠️ Strežnik ni dosegljiv.'
+        : '⚠️ Seznam bitk v bazi še ni vklopljen (supabase_bitka_seznam.sql).'}</div>`;
+      return;
+    }
+    offset = res.now - Date.now();
+    const lobbies = btLobbiesFirstOpen(res.battles);
+    const running = res.battles.filter(b => b.status === 'running');
+    const lobbyCard = b => {
+      const host = b.players.find(p => p.id === b.host);
+      const full = b.players.length >= BT_MAX_PLAYERS;
+      return `<div class="bt-bcard${full ? ' full' : ''}">
+        <div class="bt-bcard-top">
+          <span class="bt-bcard-code">${esc(b.code)}</span>
+          <span class="bt-bcard-count">${full ? 'polna' : `${b.players.length} / ${BT_MAX_PLAYERS}`}</span>
+        </div>
+        <div class="bt-bcard-host">👑 ${host ? `${esc(host.emoji)} ${esc(host.name)}` : '—'}</div>
+        <div class="bt-bcard-players">${btPlayerNames(b.players, b.host, 7) || 'čaka na igralce …'}</div>
+      </div>`;
+    };
+    const runCard = b => {
+      const left = Math.max(0, Math.ceil((b.ends_at - (Date.now() + offset)) / 1000));
+      const notYet = b.starts_at > Date.now() + offset;
+      return `<div class="bt-bcard running">
+        <div class="bt-bcard-top">
+          <span class="bt-bcard-code small">${esc(b.code)}</span>
+          <span class="bt-bcard-time${left <= 10 ? ' danger' : ''}">${notYet ? '3 · 2 · 1 …' : `⏱️ ${left} s`}</span>
+        </div>
+        ${b.players.map((p, i) => `<div class="bt-bcard-row">
+          <span class="bt-bcard-rank">${btPlaceIcon(i)}</span>
+          <span class="bt-bcard-name">${esc(p.emoji)} ${esc(p.name)}</span>
+          <span class="bt-bcard-score">${p.score}</span>
+        </div>`).join('')}
+      </div>`;
+    };
+    body.innerHTML = `
+      <div class="bt-board-section">🟢 Čakajo na igralce</div>
+      ${lobbies.length
+        ? `<div class="bt-board-grid">${lobbies.map(lobbyCard).join('')}</div>`
+        : '<div class="bt-board-empty">Trenutno nobena bitka ne čaka.</div>'}
+      <div class="bt-board-section">⚔️ V igri</div>
+      ${running.length
+        ? `<div class="bt-board-grid">${running.map(runCard).join('')}</div>`
+        : '<div class="bt-board-empty">Nobena bitka ne poteka.</div>'}`;
+  };
+
+  let busy = false;
+  const refresh = async () => {
+    if (busy || activeOverlay !== div) return;
+    busy = true;
+    const res = await btFetchOpen();
+    busy = false;
+    if (activeOverlay === div) render(res);
+  };
+  refresh();
+  /* tdRefreshTimer počisti removeOverlay — tako se osveževanje ustavi,
+     ko se projektor zapre ali se odpre karkoli drugega. */
+  tdRefreshTimer = setInterval(refresh, BT_POLL_BOARD);
 }
 
 function btSetMsg(text) {

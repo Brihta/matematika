@@ -1925,6 +1925,7 @@ async function openTeacherDashboard() {
       <div class="td-hint">💡 Klikni na ime učenca, če želiš popraviti njegovo ime ali ponastaviti geslo.</div>
       <div class="td-footer">
         <button class="overlay-btn overlay-btn-next" id="tdPrint">🖨️ Natisni za razred (A4)</button>
+        <button class="overlay-btn overlay-btn-ghost" id="tdBattles">⚔️ Bitke v živo</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdNamesPrint">📋 Seznam uporabniških imen</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdPass">🔑 Spremeni svoje geslo</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdLogout">Odjava</button>
@@ -1941,6 +1942,7 @@ async function openTeacherDashboard() {
   div.querySelector('#tdPass').addEventListener('click', openTeacherPassword);
   div.querySelector('#tdPrint').addEventListener('click', () => printSheet());
   div.querySelector('#tdNamesPrint').addEventListener('click', () => printNames());
+  div.querySelector('#tdBattles').addEventListener('click', () => openBattleBoard());
 
   const wrap = div.querySelector('#tdGridWrap');
   const cache = { today: null, recent: null };

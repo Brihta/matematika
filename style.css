@@ -1470,7 +1470,9 @@ body.competition {
    stopničke. Vse barve so tu, na enem mestu; kontrast je preverjen za
    WCAG AA (naslovi 9,7 : 1, temen tekst na gumbu vsaj 6,7 : 1).
 ══════════════════════════ */
-body.bitka {
+/* .bt-theme: projektor bitk se odpre iz učiteljskega pregleda, tudi ko
+   način ni Bitka — barve mora nositi s sabo. */
+body.bitka, .bt-theme {
   --bt-bg:          #3b1a0c;
   --bt-title:       #ffc15e;
   --bt-accent:      #ffb23f;
@@ -1671,3 +1673,67 @@ body.bitka .comp-board-row.me {
   .bt-step-1 .bt-step-emoji { font-size: 2.4rem; }
   .bt-step-name { font-size: .85rem; }
 }
+
+/* ── Odprte bitke na začetnem zaslonu (prijavljeni) ── */
+.bt-open { width: 100%; max-width: 420px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.bt-open-title {
+  font-size: .7rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(255,255,255,0.6); text-align: left;
+}
+.bt-open-list { display: flex; flex-direction: column; gap: 6px; }
+.bt-open-empty { font-size: .85rem; color: rgba(255,255,255,0.6); padding: 8px 0; }
+.bt-open-row {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 8px 10px; border-radius: 12px;
+  background: rgba(0,0,0,0.28); border: 1px solid var(--bt-line);
+}
+.bt-open-row.full { opacity: .55; }
+.bt-open-code { font-size: 1.35rem; font-weight: 900; letter-spacing: .08em; color: #fff; }
+.bt-open-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bt-open-host { font-weight: 700; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bt-open-rest { font-size: .75rem; color: rgba(255,255,255,0.65); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bt-open-count { font-size: .75rem; font-weight: 700; color: var(--bt-soft-text); }
+.bt-open-join {
+  border: 0; border-radius: 10px; padding: 8px 12px; font: 700 .85rem inherit;
+  font-family: inherit; cursor: pointer;
+  background: var(--bt-btn); color: var(--bt-btn-text); white-space: nowrap;
+}
+.bt-open-join:disabled { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6); cursor: default; }
+
+/* ── Projektor bitk (učitelj) ── */
+.bt-board-overlay { background: var(--bt-bg); backdrop-filter: none; align-items: stretch; overflow-y: auto; }
+.bt-board {
+  position: relative; width: 100%; max-width: 1400px; margin: 0 auto;
+  padding: 28px 24px 40px; display: flex; flex-direction: column; gap: 14px;
+}
+.bt-board .medal-modal-close { position: absolute; top: 18px; right: 18px; }
+.bt-board-head { text-align: center; }
+.bt-board-title { font-size: 2.4rem; font-weight: 900; color: var(--bt-title); letter-spacing: .04em; }
+.bt-board-sub { font-size: 1.05rem; color: rgba(255,255,255,0.75); margin-top: 4px; }
+.bt-board-section {
+  font-size: 1rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: rgba(255,255,255,0.7); margin-top: 14px;
+}
+.bt-board-empty { font-size: 1.05rem; color: rgba(255,255,255,0.55); padding: 6px 0 4px; }
+.bt-board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.bt-bcard {
+  background: rgba(0,0,0,0.3); border: 2px solid var(--bt-line); border-radius: 18px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 6px;
+}
+.bt-bcard.full { opacity: .55; }
+.bt-bcard.running { border-color: rgba(255,255,255,0.14); }
+.bt-bcard-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.bt-bcard-code {
+  font-size: 3.2rem; font-weight: 900; letter-spacing: .12em; line-height: 1;
+  color: #fff; text-shadow: 0 0 24px var(--bt-glow);
+}
+.bt-bcard-code.small { font-size: 1.6rem; text-shadow: none; color: rgba(255,255,255,0.8); }
+.bt-bcard-count { font-size: 1rem; font-weight: 800; color: var(--bt-soft-text); }
+.bt-bcard-host { font-size: 1.25rem; font-weight: 800; }
+.bt-bcard-players { font-size: 1rem; color: rgba(255,255,255,0.75); line-height: 1.5; }
+.bt-bcard-time { font-size: 1.1rem; font-weight: 800; color: var(--bt-title); }
+.bt-bcard-time.danger { color: #ff6b6b; }
+.bt-bcard-row { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; }
+.bt-bcard-rank { min-width: 2em; text-align: center; font-weight: 800; }
+.bt-bcard-name { flex: 1; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bt-bcard-score { font-weight: 900; color: #ffd700; }

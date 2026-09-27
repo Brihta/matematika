@@ -47,7 +47,16 @@ bi prednastavitev preprosto prezrlo.
   Prijavljen učenec igra pod uporabniškim imenom, ostali z začetnicami.
   Odprto med 7:00 in 19:00, kot tekmovanje; **prijavljen učitelj** lahko
   bitko ustvari ali se ji pridruži kadarkoli (za preizkus ali prikaz v
-  razredu). Otroci izven ure še vedno vidijo zaklenjen zaslon. Odgovori se štejejo v
+  razredu). Otroci izven ure še vedno vidijo zaklenjen zaslon.
+
+  **Odprte bitke.** Učitelj v pregledu odpre **⚔️ Bitke v živo** — pogled
+  za projektor: zgoraj vse čakalnice z veliko kodo, gostiteljem (👑) in
+  igralci, spodaj bitke, ki potekajo, z rezultati v živo. Osveži se vsaki
+  2 s. Prijavljeni učenci iste čakalnice vidijo na zaslonu Bitka in se
+  pridružijo z enim dotikom. Neprijavljeni seznama ne vidijo: pove namreč,
+  kateri otroci so ta trenutek na spletu. Zahteva `supabase_bitka_seznam.sql`.
+
+  Odgovori se štejejo v
   statistiko in Brihtometer (v pregledu z ikono ⚔️). Zahteva
   `supabase_bitka.sql`.
 
@@ -202,7 +211,8 @@ Statična stran (brez build koraka), podatki v Supabase.
 - `postevanka.json` — računi
 - `supabase_razred.sql`, `supabase_scores_guard.sql`, `supabase_nacini.sql`,
   `supabase_hitrost.sql`, `supabase_zdruzi_izbrisi.sql`,
-  `supabase_premakni_razred.sql`, `supabase_bitka.sql` — migracije za bazo
+  `supabase_premakni_razred.sql`, `supabase_bitka.sql`,
+  `supabase_bitka_seznam.sql` — migracije za bazo
 - `.github/workflows/keepalive.yml` — vsake 3 dni pinga bazo, da je
   Supabase ne ustavi zaradi neaktivnosti (brezplačni paket: 7 dni)
 
