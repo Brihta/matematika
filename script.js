@@ -1874,6 +1874,7 @@ async function openTeacherDashboard() {
         <span class="td-live" id="tdLive"></span>
         <span class="td-classsum" id="tdClassSum"></span>
       </div>
+      <div class="td-dupwarn" id="tdDupWarn" style="display:none"></div>
       <div class="td-legend" id="tdLegend">
         <span><span class="ptable-chip m-good"></span> obvlada (pravilno in hitro)</span>
         <span><span class="ptable-chip m-mid"></span> še vadi</span>
@@ -2238,11 +2239,42 @@ async function openTeacherDashboard() {
       : '';
   }
 
+  /* Dve Evi v istem razredu: na izpisu jih učiteljica ne loči. Lahko sta
+     dva otroka (dodaj začetnico priimka) ali en otrok z dvema računoma
+     (združi). Razredi se preverjajo vsak zase — Eva v 4A in Eva v 5B nista
+     težava. Kadar so imena skrita (pregled na projektorju), opozorilo
+     imen ne izda, samo pove, koliko jih je. */
+  function updateDupWarn() {
+    const el = div.querySelector('#tdDupWarn');
+    if (!el) return;
+    const groups = {};
+    for (const s of baseList()) {
+      const name = s.display_name || s.username || '';
+      const rz = razredMap[s.username] || '';
+      const k = rz + '|' + name.toLowerCase();
+      (groups[k] = groups[k] || { name, rz, n: 0 }).n++;
+    }
+    const dups = Object.values(groups).filter(g => g.n > 1)
+      .sort((a, b) => (a.rz + a.name).localeCompare(b.rz + b.name, 'sl'));
+    if (!dups.length) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    const what = showNames
+      ? dups.map(g => `<strong>${esc(g.name)}</strong>${
+          !curRazred && g.rz ? ` (${esc(g.rz)})` : ''} ${g.n}×`).join(', ')
+      : `${dups.length} ${[, 'ime se ponovi', 'imeni se ponovita', 'imena se ponovijo',
+          'imena se ponovijo'][dups.length] || 'imen se ponovi'}`
+        + ` — pokaži imena za podrobnosti`;
+    el.innerHTML = `⚠️ Enako ime v razredu: ${what}.<br>`
+      + `<span class="td-dupwarn-how">Klikni ime: <b>dva otroka</b> → dodaj začetnico priimka `
+      + `(Eva K.) · <b>en otrok, več računov</b> → 🔗 Združi.</span>`;
+  }
+
   function renderGrid() {
     div.querySelector('#tdLegend').style.display = curView === 'matrix' ? '' : 'none';
     // Summary follows the class filter in both views, not just the lesson one.
     const slot = curWin === 'all' ? 'all' : 'recent';
     updateClassSum(baseList().map(s => summarise(s, slot)));
+    updateDupWarn();
     if (curView === 'lesson') renderLesson();
     else renderMatrix();
   }

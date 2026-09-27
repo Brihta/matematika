@@ -1439,3 +1439,11 @@ body.competition {
 .td-merge-help { font-size: 0.78rem; opacity: 0.75; margin: -2px 0 8px; line-height: 1.35; }
 .td-merge-select { width: 100%; margin-bottom: 8px; }
 .td-delete-btn { color: #ff8a8a; border-color: rgba(255,120,120,0.35); margin-top: 6px; }
+
+/* Opozorilo: enako ime v razredu */
+.td-dupwarn {
+  width: 100%; font-size: 0.8rem; line-height: 1.45;
+  background: rgba(240,165,0,0.12); border: 1px solid rgba(240,165,0,0.4);
+  border-radius: 8px; padding: 7px 10px; color: #ffd27a;
+}
+.td-dupwarn-how { opacity: 0.85; font-size: 0.75rem; }
