@@ -54,3 +54,20 @@ end; $$;
 -- update students
 --    set display_name = upper(left(display_name,1)) || lower(substr(display_name,2))
 --  where display_name is not null;
+
+-- ── Učenci brez imena: ime iz uporabniškega imena ─────────────────────────
+-- Na izpisu se namesto imena pokaže uporabniško ime (z malo: 'amadej').
+-- Kjer je uporabniško ime samo iz črk, je to skoraj vedno ime otroka.
+-- Najprej poglej:
+--
+-- select username,
+--        upper(left(username,1)) || lower(substr(username,2)) as novo_ime
+--   from students
+--  where display_name is null and username ~ '^[a-zčšž]+$'
+--  order by 1;
+--
+-- Nato uveljavi:
+--
+-- update students
+--    set display_name = upper(left(username,1)) || lower(substr(username,2))
+--  where display_name is null and username ~ '^[a-zčšž]+$';

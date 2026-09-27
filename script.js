@@ -312,6 +312,16 @@ function saveTeacher() {
    innerHTML — usernames, display names and leaderboard names are typed by
    kids, and the leaderboard POST endpoint is reachable with the publishable
    key, so its contents cannot be trusted to be 3 safe letters. */
+/* Imena z veliko začetnico: "nace" → "Nace", "ana marija" → "Ana Marija".
+   Enkratni popravek v bazi (supabase_ime_ucenca.sql) je uredil stara imena,
+   nova pa spet prihajajo z malo — otroci jih tako vpišejo, in tudi
+   učiteljica na tablici. Zato se popravi ob branju in ob shranjevanju. */
+function velikaZacetnica(ime) {
+  if (!ime) return ime;
+  // enako kot enkratni popravek v bazi: prva velika, ostale male ("BRIN" → "Brin")
+  return String(ime).trim().toLowerCase()
+    .replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+}
 function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -1915,7 +1925,7 @@ async function openTeacherDashboard() {
     for (const r of asRows(rows)) {
       if (!students[r.username]) {
         students[r.username] = { username: r.username, emoji: r.emoji,
-                                 display_name: r.display_name,
+                                 display_name: velikaZacetnica(r.display_name),
                                  cells: {}, modes: {} };
       }
       if (r.table_n != null) {
@@ -2714,7 +2724,7 @@ function openResetPin(student, targets) {
   });
 
   div.querySelector('#imeBtn').addEventListener('click', async () => {
-    const ime = div.querySelector('#imeInput').value.trim();
+    const ime = velikaZacetnica(div.querySelector('#imeInput').value.trim());
     const msg = div.querySelector('#imeMsg');
     if (!ime) { msg.textContent = 'Vpiši ime.'; return; }
     const btn = div.querySelector('#imeBtn');
