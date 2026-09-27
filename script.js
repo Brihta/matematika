@@ -2300,18 +2300,19 @@ async function openTeacherDashboard() {
      Namenoma malo stolpcev in brez barv (tiskalnik je črno-bel). Brihtometra
      in najšibkejše poštevanke ni: to je pregled ure, ne ocena otroka. */
   const PRINT_MODE = { '⌨️': 'tipkovnica', '🎯': 'kviz', '🏆': 'tekmovanje' };
-  /* Kdaj je poštevanka na listu "vadena": ×/÷ skupaj, PRAVILNI MINUS
-     NAPAČNI vsaj PRINT_FULL = črno, manj = sivo, nič odgovorov = belo.
-     Napačni odštevajo: 20 računov s 12 pravilnimi (12 − 8 = 4) ni "vadil",
-     ampak "še ne zna" — in ugibanje v kvizu (25 %) gre celo v minus. Pri
-     enem polnem krogu (20 računov) je za črno treba vsaj 15 pravilnih. Kup kart je 200 (10 × in
-     10 ÷ na poštevanko) in se v kvizu in na tipkovnici premeša kot karte,
-     brez ponavljanja: 200 odgovorov = vsak račun natanko enkrat = 20 na
-     poštevanko. Tekmovanje pa vsako minuto premeša znova, zato je tam 20
-     samo povprečje, polovica poštevank pade pod njo. Prag 10 je pol
-     polnega kroga: otrok, ki je vse pošteno vadil, je ves črn; otrok, ki je
-     izklopil težke, pa ima pri njih le drobtine iz tekmovanja — sivo. */
-  const PRINT_FULL = 10;
+  /* Kvadratek na poštevanko (× in ÷ skupaj). Napačni odgovori odštevajo:
+       ■ zna        pravilni − napačni ≥ PRINT_KNOWS
+       ▣ še vadi    vse vmes
+       □ ne zna     manj kot PRINT_MIN odgovorov, ali napačnih vsaj toliko
+                    kot pravilnih — nevadeno in neznano sta za učiteljico
+                    isti signal: tu je treba pomagati.
+     Kup kart je 200 (10 × in 10 ÷ na poštevanko), v kvizu in na tipkovnici
+     premešan brez ponavljanja: en krog = 20 računov na poštevanko, in za
+     črno je treba vsaj 16 pravilnih (80 %). Tekmovanje premeša vsako
+     minuto znova, zato je 20 tam le povprečje — PRINT_MIN je zato pol
+     kroga, ne cel. */
+  const PRINT_KNOWS = 12;
+  const PRINT_MIN   = 10;
   const WIN_LABEL = { today: 'Danes', recent: 'Zadnja 2 tedna', all: 'Ves čas' };
   function printSheet() {
     const slot = curWin === 'all' ? 'all' : 'recent';
@@ -2343,7 +2344,9 @@ async function openTeacherDashboard() {
         const neto = (vx ? vx.c - vx.w : 0) + (vd ? vd.c - vd.w : 0);
         x += nx; d += nd;
         const n = nx + nd;
-        boxes += `<span class="ps-box${neto >= PRINT_FULL ? ' on' : n ? ' few' : ''}">${t}</span>`;
+        const cls = neto >= PRINT_KNOWS ? ' on'
+                  : (n < PRINT_MIN || neto <= 0) ? '' : ' few';
+        boxes += `<span class="ps-box${cls}">${t}</span>`;
       }
       const racun = x && d ? '× ÷' : x ? '×' : d ? '÷' : '';
       /* Besede, ne ikone: emoji na črno-belem tiskalniku postanejo sive packe. */
@@ -2378,9 +2381,10 @@ async function openTeacherDashboard() {
       ${idle.length ? `<p class="ps-idle"><strong>Niso vadili (${idle.length}):</strong> ${
         idle.map(r => imeIzpis(r.s)).join(', ')}</p>` : ''}
       <p class="ps-legend">✔ pravilno · ✘ napačno ·
-        <span class="ps-box on">7</span> vadil (pravilni − napačni ≥ ${PRINT_FULL}) ·
-        <span class="ps-box few">7</span> premalo ali preveč napak ·
-        <span class="ps-box">7</span> ni vadil</p>`;
+        <span class="ps-box on">7</span> zna (pravilni − napačni ≥ ${PRINT_KNOWS}) ·
+        <span class="ps-box few">7</span> še vadi ·
+        <span class="ps-box">7</span> ne zna ali ni vadil
+        (manj kot ${PRINT_MIN} računov ali napačnih vsaj toliko kot pravilnih)</p>`;
     const old = document.getElementById('printSheet');
     if (old) old.remove();
     document.body.appendChild(sheet);
