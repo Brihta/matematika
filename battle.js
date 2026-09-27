@@ -152,6 +152,16 @@ function showBattlePanel() {
 
 function btArea() { return document.getElementById('bitkaArea'); }
 
+/* Bitke so odprte kot tekmovanje (7:00–19:00), prijavljen učitelj pa jih
+   lahko odpre kadarkoli — da jih preizkusi zvečer ali pokaže razredu. */
+function btIsOpen() { return !!teacherSession || isCompetitionOpen(); }
+
+/* Prijava ali odjava spremeni, kdo sme igrati in pod katerim imenom, zato
+   se začetni zaslon nariše znova (kliče ga updateProfileButton). */
+function battleAccessChanged() {
+  if (mode === 'bitka' && btView === 'start') btRenderStart();
+}
+
 /* ══════════════════════════
    ZAČETNI ZASLON: ustvari / pridruži se
 ══════════════════════════ */
@@ -160,7 +170,7 @@ function btRenderStart(msg) {
   btState = null;
   const area = btArea();
   if (!area) return;
-  if (!isCompetitionOpen()) {
+  if (!btIsOpen()) {
     area.innerHTML = `
       <div class="comp-locked bt-card">
         <div class="comp-lock-icon">🔒</div>
@@ -177,6 +187,8 @@ function btRenderStart(msg) {
       <div class="comp-trophy">⚔️</div>
       <h2>Bitka</h2>
       <p class="comp-rules">60 sekund · 2–${BT_MAX_PLAYERS} igralcev · ista vprašanja za vse</p>
+      ${isCompetitionOpen() ? '' : `<p class="bt-teacher-note">👨‍🏫 Učiteljski dostop — bitke so zate odprte ves čas.
+         Otroci se lahko pridružijo med 7:00 in 19:00.</p>`}
       ${profile
         ? `<p class="bt-as">Igraš kot <strong>${esc(profile.emoji || '🦉')} ${esc(profile.username)}</strong></p>`
         : `<label class="bt-label" for="btName">Tvoje začetnice</label>

@@ -45,7 +45,9 @@ bi prednastavitev preprosto prezrlo.
   rezultate ostalih v živo, na koncu pa se razkrijejo stopničke kot pri
   Kahootu (3. → 2. → boben → 1.). *Še enkrat* vrne vse v čakalnico.
   Prijavljen učenec igra pod uporabniškim imenom, ostali z začetnicami.
-  Odprto med 7:00 in 19:00, kot tekmovanje. Odgovori se štejejo v
+  Odprto med 7:00 in 19:00, kot tekmovanje; **prijavljen učitelj** lahko
+  bitko ustvari ali se ji pridruži kadarkoli (za preizkus ali prikaz v
+  razredu). Otroci izven ure še vedno vidijo zaklenjen zaslon. Odgovori se štejejo v
   statistiko in Brihtometer (v pregledu z ikono ⚔️). Zahteva
   `supabase_bitka.sql`.
 

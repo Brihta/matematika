@@ -1379,6 +1379,8 @@ function updateProfileButton() {
       + `<span class="profile-name">Prijava</span>`;
     btn.classList.remove('logged-in');
   }
+  // battle.js se naloži za tem skriptom, ob prvem klicu ga še ni
+  if (typeof battleAccessChanged === 'function') battleAccessChanged();
 }
 function handleProfileButton() {
   if (teacherSession) openTeacherDashboard();
