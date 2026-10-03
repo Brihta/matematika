@@ -1707,6 +1707,7 @@ async function openStatsOverlay() {
         <span><span class="ptable-chip m-good"></span> pravilno in hitro</span>
         <span><span class="ptable-chip m-mid"></span> še vadi</span>
         <span><span class="ptable-chip m-bad"></span> veliko napak</span>
+        <span>🐢 pravilno, a počasi</span>
       </div>
       <div class="ptable-tip" id="ptableTip"></div>
     </div>`;
@@ -1750,7 +1751,9 @@ async function openStatsOverlay() {
     const c = cell ? cell.c : 0, w = cell ? cell.w : 0;
     const pct = masteryPct(c, w);
     const cls = masteryClass(c, w, cell && cell.n, cell && cell.f);
-    const txt = pct === null ? '—' : pct + '%';
+    // rumeno pri visoki točnosti pomeni "pravilno, a prepočasi" — želva to pove brez legende
+    const slow = pct !== null && pct >= 85 && cls === 'm-mid';
+    const txt = pct === null ? '—' : pct + '%' + (slow ? ' 🐢' : '');
     return `<span class="ptable-chip ${cls}">${txt}</span>`;
   }
   function renderPtable(window) {
