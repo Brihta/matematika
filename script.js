@@ -1703,6 +1703,11 @@ async function openStatsOverlay() {
       <div class="ptable-list" id="ptableList">
         <div class="comp-board-empty">Nalagam …</div>
       </div>
+      <div class="ptable-legend">
+        <span><span class="ptable-chip m-good"></span> pravilno in hitro</span>
+        <span><span class="ptable-chip m-mid"></span> še vadi</span>
+        <span><span class="ptable-chip m-bad"></span> veliko napak</span>
+      </div>
       <div class="ptable-tip" id="ptableTip"></div>
     </div>`;
   document.body.appendChild(div);
