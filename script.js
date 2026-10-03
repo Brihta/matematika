@@ -1052,15 +1052,6 @@ async function supabaseRPCAll(fn, params, order) {
   }
 }
 
-/* Monday (Slovenia) of the current week, as YYYY-MM-DD */
-function getWeekStartKey() {
-  const p = sloveniaParts();
-  const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day));
-  const dow = d.getUTCDay();              // 0 = Sun … 6 = Sat
-  d.setUTCDate(d.getUTCDate() - (dow === 0 ? 6 : dow - 1));
-  return d.toISOString().slice(0, 10);
-}
-
 /* ── Auth ── */
 async function registerStudent(name, number, emoji, pinSeq) {
   const rows = await supabaseRPC('register_student', {
@@ -1313,10 +1304,6 @@ async function supabaseSelect(path) {
     if (res.ok) return await res.json();
   } catch(e) {}
   return [];
-}
-async function fetchStudentStats() {
-  if (!profile) return [];
-  return supabaseSelect(`stats?student_id=eq.${profile.id}`);
 }
 async function fetchStudentTableStats() {
   if (!profile) return [];
@@ -1692,41 +1679,6 @@ function renderAuthView(view) {
 }
 
 /* ── Stats dashboard ── */
-function aggregateStats(rows, since) {
-  // since = null → all-time, else only rows with day >= since
-  const byMode = {};
-  for (const r of rows) {
-    if (since && r.day < since) continue;
-    if (!byMode[r.mode]) byMode[r.mode] = { correct:0, wrong:0, points:0, seconds:0 };
-    const m = byMode[r.mode];
-    m.correct += r.correct || 0;
-    m.wrong   += r.wrong   || 0;
-    m.points  += r.points  || 0;
-    m.seconds += r.seconds || 0;
-  }
-  return byMode;
-}
-function fmtDuration(sec) {
-  sec = Math.round(sec || 0);
-  if (sec < 60) return sec + ' s';
-  const m = Math.floor(sec / 60);
-  if (m < 60) return m + ' min';
-  const h = Math.floor(m / 60);
-  return h + ' h ' + (m % 60) + ' min';
-}
-function statCell(s) {
-  if (!s || (!s.correct && !s.wrong)) {
-    return '<div class="stat-cell empty">—</div>';
-  }
-  const total = s.correct + s.wrong;
-  const pct = total ? Math.round(s.correct / total * 100) : 0;
-  return `<div class="stat-cell">
-    <div class="stat-line"><span class="stat-ico">✅</span> ${s.correct}</div>
-    <div class="stat-line"><span class="stat-ico">❌</span> ${s.wrong} <span class="stat-pct">${pct}%</span></div>
-    <div class="stat-line"><span class="stat-ico">⭐</span> ${s.points}</div>
-    <div class="stat-line"><span class="stat-ico">⏱️</span> ${fmtDuration(s.seconds)}</div>
-  </div>`;
-}
 async function openStatsOverlay() {
   if (!profile) { openAuthOverlay('login'); return; }
   removeOverlay();
@@ -1741,9 +1693,7 @@ async function openStatsOverlay() {
           <div class="stats-username">${esc(profile.username)}</div>
           <div class="stats-subname">${esc(profile.display_name || '')}</div>
         </div>
-      </div>
-      <div class="stats-body" id="statsBody">
-        <div class="comp-board-empty">Nalagam statistiko …</div>
+        <button class="stats-logout" id="statsLogout">🚪 Odjava</button>
       </div>
       <div class="stats-section-title">📚 Poštevanke</div>
       <div class="ptable-toggle" id="ptableToggle">
@@ -1754,7 +1704,6 @@ async function openStatsOverlay() {
         <div class="comp-board-empty">Nalagam …</div>
       </div>
       <div class="ptable-tip" id="ptableTip"></div>
-      <button class="overlay-btn overlay-btn-ghost" id="statsLogout">Odjava</button>
     </div>`;
   document.body.appendChild(div);
   activeOverlay = div;
@@ -1766,33 +1715,6 @@ async function openStatsOverlay() {
   });
 
   await flushStats();           // make sure latest answers are counted
-  const rows = await fetchStudentStats();
-  const today = getTodayKey();
-  const weekStart = getWeekStartKey();
-  const scopes = [
-    { label: 'Danes',    data: aggregateStats(rows, today) },
-    { label: 'Ta teden', data: aggregateStats(rows, weekStart) },
-    { label: 'Ves čas',  data: aggregateStats(rows, null) },
-  ];
-  const modeList = [
-    { key: 'keypad',     label: '⌨️ Tipkovnica' },
-    { key: 'quiz',       label: '🎯 Kviz' },
-    { key: 'tekmovanje', label: '🏆 Tekmovanje' },
-    { key: 'bitka',      label: '⚔️ Bitka' },
-  ];
-  const body = div.querySelector('#statsBody');
-  body.innerHTML = modeList.map(m => `
-    <div class="stats-mode-card">
-      <div class="stats-mode-title">${m.label}</div>
-      <div class="stats-grid">
-        ${scopes.map(sc => `
-          <div class="stats-col">
-            <div class="stats-col-label">${sc.label}</div>
-            ${statCell(sc.data[m.key])}
-          </div>`).join('')}
-      </div>
-    </div>`).join('');
-
   /* ── Poštevanke section ── */
   const [tableRows, speedRows] = await Promise.all([
     fetchStudentTableStats(),

@@ -770,36 +770,23 @@ body.competition {
 
 /* Stats dashboard */
 .stats-box { position: relative; align-items: stretch !important; text-align: left !important; }
-.stats-header { display: flex; align-items: center; gap: 12px; }
+.stats-header { display: flex; align-items: center; gap: 12px; padding-right: 36px; }
+/* Odjava je zgoraj, ob imenu: ko cel razred hkrati zapira račune, je nihče
+   ne sme iskati na dnu dolge statistike. */
+.stats-logout {
+  margin-left: auto; flex-shrink: 0;
+  padding: 8px 14px; border-radius: 10px;
+  background: #f0a500; color: #000;
+  border: 1px solid #ffc94d;
+  box-shadow: 0 1px 6px rgba(240,165,0,0.4);
+  font-size: 0.9rem; font-weight: 700;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+  transition: background .15s;
+}
+.stats-logout:hover { background: #ffb820; }
 .stats-emoji { font-size: 2.6rem; line-height: 1; }
 .stats-username { font-size: 1.4rem; font-weight: 800; color: #f0a500; }
 .stats-subname { font-size: 0.85rem; color: rgba(255,255,255,0.5); }
-.stats-body { display: flex; flex-direction: column; gap: 12px; width: 100%; }
-.stats-mode-card {
-  background: rgba(0,0,0,0.28);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 14px; padding: 12px;
-}
-.stats-mode-title { font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 8px; }
-.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.stats-col { text-align: center; }
-.stats-col-label {
-  font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.06em; color: rgba(255,255,255,0.45); margin-bottom: 5px;
-}
-.stat-cell {
-  background: rgba(0,0,0,0.3); border-radius: 10px;
-  padding: 8px 6px;
-  display: flex; flex-direction: column; gap: 3px;
-}
-.stat-cell.empty {
-  align-items: center; justify-content: center;
-  color: rgba(255,255,255,0.25); font-size: 1.2rem; min-height: 64px;
-}
-.stat-line { font-size: 0.82rem; font-weight: 600; color: #ddd; }
-.stat-ico { font-size: 0.72rem; }
-.stat-pct { color: rgba(255,255,255,0.45); font-size: 0.72rem; }
-
 /* ── Mastery colours (shared: child view + teacher heatmap) ── */
 .m-good { background: #1e7d34; color: #d6ffdb; }
 .m-mid  { background: #b07d12; color: #fff2cf; }
@@ -1192,7 +1179,6 @@ body.competition {
   .profile-btn .profile-name { display: none; }
   .animal-btn { font-size: 1.3rem; }
   .animal-slot { width: 40px; height: 40px; font-size: 1.3rem; }
-  .stat-line { font-size: 0.75rem; }
 }
 @media (max-width: 360px) {
   .quiz-options { grid-template-columns: 1fr; }
