@@ -196,6 +196,7 @@ let pendingTableStats = {};         // { "t_op": {t,op,c,w} }
 let pendingAnswerCount = 0;
 let lastAnswerTs = 0;               // for estimating practice time in quiz/keypad
 let pendingSpeed = {};              // { "t_op": {t,op,n,f} } — see FAST_SECONDS
+let pendingFacts = {};              // { "t_op_k": {t,op,k,c,w,n,f} } — supabase_racuni.sql
 let questionShownTs = 0;            // when the current question appeared
 
 /* Hitrost: cilj poštevanke je priklic na pamet, ne računanje na prste.
@@ -1237,12 +1238,27 @@ function recordTableStat(question, isCorrect) {
   if (!pendingTableStats[key]) pendingTableStats[key] = { t: p.b, op, c: 0, w: 0 };
   if (isCorrect) pendingTableStats[key].c++; else pendingTableStats[key].w++;
 
-  if (!isCorrect || !questionShownTs) return;
-  const sec = (Date.now() - questionShownTs) / 1000;
-  if (sec > SPEED_IGNORE) return;
+  const sec = isCorrect && questionShownTs ? (Date.now() - questionShownTs) / 1000 : null;
+  const timed = sec !== null && sec <= SPEED_IGNORE;
+  recordFactStat(p, op, isCorrect, timed, timed && sec < FAST_SECONDS);
+
+  if (!timed) return;
   if (!pendingSpeed[key]) pendingSpeed[key] = { t: p.b, op, n: 0, f: 0 };
   pendingSpeed[key].n++;
   if (sec < FAST_SECONDS) pendingSpeed[key].f++;
+}
+/* Po posameznih računih (7·1 … 7·10), da bo Brihtometer lahko preveril, ali
+   je otrok rešil cel predal. Račun je število, ki ga poštevanka množi: pri
+   3 × 7 je 3, pri 21 : 7 količnik 3. Kviz se ne beleži: tam lahko otrok
+   odgovor ugane med štirimi, za obvladanje pa šteje samo priklic. */
+function recordFactStat(p, op, isCorrect, timed, fast) {
+  if (mode === 'quiz') return;
+  const k = p.op === 'multiply' ? p.a : p.a / p.b;
+  if (!(k >= 1 && k <= 10 && Number.isInteger(k))) return;
+  const key = p.b + '_' + op + '_' + k;
+  const f = pendingFacts[key] || (pendingFacts[key] = { t: p.b, op, k, c: 0, w: 0, n: 0, f: 0 });
+  if (isCorrect) f.c++; else f.w++;
+  if (timed) { f.n++; if (fast) f.f++; }
 }
 /* time since the previous answer, capped so idle time doesn't inflate it */
 function answerSeconds() {
@@ -1256,15 +1272,17 @@ function answerSeconds() {
    read the stats back (openStatsOverlay) can await it instead of racing it. */
 function flushStats(useKeepalive) {
   if (!profile) {
-    pendingStats = {}; pendingTableStats = {}; pendingSpeed = {}; pendingAnswerCount = 0;
+    pendingStats = {}; pendingTableStats = {}; pendingSpeed = {}; pendingFacts = {}; pendingAnswerCount = 0;
     return Promise.resolve();
   }
   const toSend = pendingStats;
   const toSendTables = pendingTableStats;
   const toSendSpeed = pendingSpeed;
+  const toSendFacts = pendingFacts;
   pendingStats = {};
   pendingTableStats = {};
   pendingSpeed = {};
+  pendingFacts = {};
   pendingAnswerCount = 0;
   const day = getTodayKey();
   const extra = useKeepalive ? { keepalive: true } : undefined;
@@ -1290,6 +1308,14 @@ function flushStats(useKeepalive) {
   if (speedData.length) {
     writes.push(supabaseRPC('add_table_speed', {
       p_student: profile.id, p_day: day, p_data: speedData
+    }, extra));
+  }
+  /* Računi so v svoji tabeli (supabase_racuni.sql). Dokler je ni, klic tiho
+     spodleti, vse ostalo pa se zapiše kot prej. */
+  const factData = Object.keys(toSendFacts).map(k => toSendFacts[k]);
+  if (factData.length) {
+    writes.push(supabaseRPC('add_fact_stats', {
+      p_student: profile.id, p_day: day, p_data: factData
     }, extra));
   }
   return Promise.all(writes);

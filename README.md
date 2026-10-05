@@ -123,6 +123,16 @@ Zato vrstica pove troje:
   trajno stanje, v enem dnevu pa nihče ne nabere petih odgovorov v vsakem
   predalu.
 
+### Vadba po računih (`supabase_racuni.sql`)
+
+Poleg seštevka po poštevanki se beleži tudi vsak račun posebej (7·1 …
+7·10; pri deljenju količnik), z napačnimi in hitrimi odgovori — samo s
+**tipkovnice, tekmovanja in bitke**, ne iz kviza. Zaenkrat se podatki samo
+zbirajo; Brihtometer jih bo uporabil pri višjem pragu za "obvladano" (vsi
+računi predala, vsaj 20 odgovorov, 90 % pravilnih, 80 % hitrih). Dokler
+datoteke ne zaženeš, aplikacija deluje kot prej. Ob zagonu posodobi tudi
+`merge_students`, da se računi ob združitvi učencev ne izgubijo.
+
 ### Izpis za razred (A4)
 
 Gumb **🖨️ Natisni za razred** v učiteljskem pregledu natisne en list za
@@ -212,7 +222,7 @@ Statična stran (brez build koraka), podatki v Supabase.
 - `supabase_razred.sql`, `supabase_scores_guard.sql`, `supabase_nacini.sql`,
   `supabase_hitrost.sql`, `supabase_zdruzi_izbrisi.sql`,
   `supabase_premakni_razred.sql`, `supabase_bitka.sql`,
-  `supabase_bitka_seznam.sql` — migracije za bazo
+  `supabase_bitka_seznam.sql`, `supabase_racuni.sql` — migracije za bazo
 - `.github/workflows/keepalive.yml` — vsake 3 dni pinga bazo, da je
   Supabase ne ustavi zaradi neaktivnosti (brezplačni paket: 7 dni)
 

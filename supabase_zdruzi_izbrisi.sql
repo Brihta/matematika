@@ -81,6 +81,20 @@ begin
            fast  = table_speed.fast  + excluded.fast;
     delete from table_speed where student_id = v_from;
 
+    -- fact_stats (supabase_racuni.sql) — samo če tabela že obstaja, da ta
+    -- datoteka deluje tudi pred supabase_racuni.sql
+    if to_regclass('public.fact_stats') is not null then
+      insert into fact_stats (student_id, day, table_n, op, factor, correct, wrong, timed, fast)
+      select v_into, day, table_n, op, factor, correct, wrong, timed, fast
+        from fact_stats where student_id = v_from
+      on conflict (student_id, day, table_n, op, factor) do update
+         set correct = fact_stats.correct + excluded.correct,
+             wrong   = fact_stats.wrong   + excluded.wrong,
+             timed   = fact_stats.timed   + excluded.timed,
+             fast    = fact_stats.fast    + excluded.fast;
+      delete from fact_stats where student_id = v_from;
+    end if;
+
     -- Ime in razred: če jih ciljni račun nima, jih vzemi od starega
     update students t
        set display_name = coalesce(t.display_name, f.display_name),
