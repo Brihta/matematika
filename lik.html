@@ -551,11 +551,20 @@ function frame(color, inner, gold, winter) {
 }
 const tableArt = (t, op, gold, winter) => frame(TABLE_COLORS[t - 1], txt(56, 86, t, t === 10 ? 50 : 60)
   + `<circle cx="88" cy="32" r="15" fill="#fff" stroke="${OL}" stroke-width="3"/><text x="88" y="40" text-anchor="middle" font-size="24" font-weight="900" fill="${shade(TABLE_COLORS[t - 1])}" font-family="system-ui, sans-serif">${op === 'x' ? '×' : '÷'}</text>`, gold, winter);
+/* progress: število 0–1 (obroček) ali seznam pogojev [true, false, …] —
+   takrat 4 četrtine, vsaka obarvana šele, ko je njen pogoj izpolnjen. */
 function emptyArt(label, progress) {
   const C = 2 * Math.PI * 11;
+  let ring = '';
+  if (Array.isArray(progress)) {
+    const R = 15, CC = 2 * Math.PI * R, seg = CC / progress.length - 5;
+    ring = progress.map((ok, i) => `<circle cx="60" cy="88" r="${R}" fill="none" stroke="${ok ? '#f08c2e' : 'var(--slot-line)'}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${seg.toFixed(1)} ${CC.toFixed(1)}" transform="rotate(${-90 + 2.5 / CC * 360 * 2 + i * 360 / progress.length} 60 88)"/>`).join('');
+  } else if (progress != null) {
+    ring = `<circle cx="60" cy="92" r="11" fill="none" stroke="var(--slot-line)" stroke-width="5" opacity=".5"/><circle cx="60" cy="92" r="11" fill="none" stroke="#f08c2e" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(C * progress).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 60 92)"/>`;
+  }
   return `<svg viewBox="0 0 120 120"><rect x="6" y="6" width="108" height="108" rx="20" fill="var(--slot)" stroke="var(--slot-line)" stroke-width="3" stroke-dasharray="8 6"/>
-    <text x="60" y="66" text-anchor="middle" font-size="${label.length > 3 ? 22 : 34}" font-weight="900" fill="var(--slot-line)" font-family="system-ui, sans-serif">${label}</text>
-    ${progress != null ? `<circle cx="60" cy="92" r="11" fill="none" stroke="var(--slot-line)" stroke-width="5" opacity=".5"/><circle cx="60" cy="92" r="11" fill="none" stroke="#f08c2e" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(C * progress).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 60 92)"/>` : ''}</svg>`;
+    <text x="60" y="${Array.isArray(progress) ? 58 : 66}" text-anchor="middle" font-size="${label.length > 3 ? 22 : 34}" font-weight="900" fill="var(--slot-line)" font-family="system-ui, sans-serif">${label}</text>
+    ${ring}</svg>`;
 }
 const ICON = {
   medal: col => line('M48 14 L58 50', 12) + line('M48 14 L58 50', 7, '#e74c3c') + line('M72 14 L62 50', 12) + line('M72 14 L62 50', 7, '#3a7bd5')
@@ -656,7 +665,8 @@ function apply(st) {
     s.state = got[s.id] || 'none';
     if (s.t) {
       const x = tbl[s.op + s.t];
-      s.prog = x ? [x.n, x.n ? Math.round(x.c / x.n * 100) : 0, x.timed ? Math.round(x.fast / x.timed * 100) : 0, x.cover] : null;
+      /* natančni odstotki — zaokroži se samo za prikaz (89,7 % ni 90 %, kot pravi baza) */
+      s.prog = x ? [+x.n, x.n ? x.c / x.n * 100 : 0, x.timed ? x.fast / x.timed * 100 : 0, +x.cover] : null;
     }
     if (s.streak) s.step = [Math.min(streak, s.streak), s.streak, 'dni zapored'];
     if (s.days) s.step = [Math.min(days, s.days), s.days, 'dni'];
@@ -747,9 +757,16 @@ function slotHTML(s) {
     : `<div class="st">${emptyArt(s.t ? s.label.replace(' ', '') : pad(s.no), s.state === 'pending' ? null : progOf(s))}${s.state === 'pending' ? '<div class="waiting"><span>✉ v ovojnici</span></div>' : ''}</div>`;
   return `<button class="slot" data-st="${s.id}" id="slot-${s.id}">${inner}<div class="lbl">${s.label}</div><div class="num">${pad(s.no)}</div></button>`;
 }
+/* Poštevanka: 4 pogoji (računi, odgovori, pravilni, hitri) — da / ne. Povprečje
+   bi pokazalo 97 %, ko manjka en sam račun, in otrok bi mislil, da je opravil. */
+const tableConds = s => { const [n, a, f, c] = s.prog || [0, 0, 0, 0]; return [c >= MIN_COVER, n >= MIN_N, n > 0 && a >= MIN_ACC, n > 0 && f >= MIN_FAST]; };
 function progOf(s) {
-  if (s.t) { if (!s.prog) return 0; const [n, a, f, c] = s.prog; return Math.min(1, c / MIN_COVER) * .25 + Math.min(1, n / MIN_N) * .25 + (n ? Math.min(1, a / MIN_ACC) * .25 + Math.min(1, f / MIN_FAST) * .25 : 0); }
-  return s.step ? s.step[0] / s.step[1] : null;
+  let p;
+  if (s.t) return tableConds(s);
+  else if (s.step) p = s.step[0] / s.step[1];
+  else return null;
+  /* NaN bi se narisal kot poln obroček — raje prazen. */
+  return Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : 0;
 }
 function rewardBox(p) {
   const id = rewardFor(p.id), done = pageDone(p), left = p.stickers.filter(s => !owned(s)).length;
@@ -842,7 +859,7 @@ function stickerDetail(s) {
   if (owned(s)) return openModal(`<div class="art" style="transform:rotate(${rot(s)})">${s.art(s.state === 'gold')}</div><h3>${s.label}</h3><p>${s.t ? (s.state === 'gold' ? 'Zlata! Poštevanko znaš tudi po 14 dneh.' : 'Obvladaš jo! Ponovi jo čez 14 dni in sličica postane zlata (+20 cekinov).') : s.cond}</p><div class="btns"><button class="btn btn-main" data-do="close">Super</button></div>`);
   if (s.t) {
     const [n, a, f, c] = s.prog || [0, 0, 0, 0];
-    const rows = [[c >= MIN_COVER, `Različnih računov: <b>${c} / 10</b> (vsi)`, c / MIN_COVER], [n >= MIN_N, `Odgovori: <b>${n}</b> (vsaj ${MIN_N})`, n / MIN_N], [n > 0 && a >= MIN_ACC, `Pravilni: <b>${a} %</b> (vsaj ${MIN_ACC} %)`, a / MIN_ACC], [n > 0 && f >= MIN_FAST, `Hitri (pod 3 s): <b>${f} %</b> (vsaj ${MIN_FAST} %)`, f / MIN_FAST]];
+    const rows = [[c >= MIN_COVER, `Različnih računov: <b>${c} / 10</b> (vsi)`, c / MIN_COVER], [n >= MIN_N, `Odgovori: <b>${n}</b> (vsaj ${MIN_N})`, n / MIN_N], [n > 0 && a >= MIN_ACC, `Pravilni: <b>${Math.floor(a)} %</b> (vsaj ${MIN_ACC} %)`, a / MIN_ACC], [n > 0 && f >= MIN_FAST, `Hitri (pod 3 s): <b>${Math.floor(f)} %</b> (vsaj ${MIN_FAST} %)`, f / MIN_FAST]];
     const tip = n === 0 ? 'Začni na tipkovnici — kviz za sličice ne šteje.' : c < MIN_COVER ? `Manjka še ${MIN_COVER - c} ${MIN_COVER - c === 1 ? 'račun' : MIN_COVER - c === 2 ? 'računa' : MIN_COVER - c < 5 ? 'računi' : 'računov'} — vadi celo poštevanko, ne samo lahkih.` : n < MIN_N ? `Še ${MIN_N - n} ${MIN_N - n === 1 ? 'odgovor' : MIN_N - n === 2 ? 'odgovora' : MIN_N - n < 5 ? 'odgovori' : 'odgovorov'} — potem šteje.` : a < MIN_ACC ? 'Skoraj! Še malo bolj natančno.' : 'Pravilno že znaš — zdaj še hitreje.';
     return openModal(`<div class="art">${emptyArt(s.label.replace(' ', ''), progOf(s))}</div><h3>${s.label} — še vadiš</h3>
       <div class="checks">${rows.map(([ok, t, p]) => `<div class="check"><span class="ic ${ok ? 'y' : 'n'}">${ok ? '✓' : ''}</span><div>${t}<div class="bar"><i style="width:${Math.min(100, p * 100)}%"></i></div></div></div>`).join('')}</div>
