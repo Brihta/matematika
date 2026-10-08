@@ -129,6 +129,13 @@ create table if not exists student_avatar (
   updated_at  timestamptz not null default now()
 );
 
+-- Preizkusni način: ti učenci vidijo sezono, še preden jo odpreš za vse.
+-- since = od katerega dne se jim šteje vadba (kot začetek sezone).
+create table if not exists album_testers (
+  student_id uuid primary key references students(id) on delete cascade,
+  since      date not null default current_date
+);
+
 alter table seasons             enable row level security;
 alter table game_chars          enable row level security;
 alter table prosti_dnevi        enable row level security;
@@ -139,6 +146,7 @@ alter table student_stickers    enable row level security;
 alter table coin_ledger         enable row level security;
 alter table student_items       enable row level security;
 alter table student_avatar      enable row level security;
+alter table album_testers       enable row level security;
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- 3. VSEBINA 1. SEZONE (jesen: vitez / vitezinja)
@@ -212,6 +220,23 @@ returns seasons language sql stable security definer set search_path = public as
    where starts is not null and starts <= _album_today() and ends >= _album_today()
    order by starts desc limit 1;
 $$;
+
+-- Sezona za tega učenca: prava, če teče; sicer za preizkuševalca prva
+-- sezona, ki še ni odprta, z začetkom na dan, ko je postal preizkuševalec.
+create or replace function public._album_season_for(p_student uuid)
+returns seasons language plpgsql stable security definer set search_path = public as $$
+declare s seasons; v_since date;
+begin
+  s := _album_season();
+  if s.id is not null then return s; end if;
+  select since into v_since from album_testers where student_id = p_student;
+  if v_since is null then return s; end if;
+  select * into s from seasons
+   where (starts is null or starts > _album_today()) and ends >= _album_today()
+   order by id limit 1;
+  if s.id is not null then s.starts := least(v_since, _album_today()); end if;
+  return s;
+end; $$;
 
 -- Obvladano (odločeno 5. 10. 2026): v obdobju vseh 10 računov vsaj enkrat
 -- pravilno, vsaj 20 odgovorov, vsaj 90 % pravilnih, vsaj 80 % pravilnih
@@ -287,7 +312,7 @@ returns json language plpgsql stable security definer set search_path = public a
 declare s seasons; v_to date; v_char text;
 begin
   if not exists (select 1 from students where id = p_student) then return null; end if;
-  s := _album_season();
+  s := _album_season_for(p_student);
   v_to := least(_album_today(), s.ends);
   select char_id into v_char from student_season_char where student_id = p_student and season = s.id;
 
@@ -340,7 +365,7 @@ returns json language plpgsql security definer set search_path = public as $$
 declare s seasons; v_to date; v_char text; r record; ok boolean; st record;
 begin
   if not exists (select 1 from students where id = p_student) then return null; end if;
-  s := _album_season();
+  s := _album_season_for(p_student);
   if s.id is null then return album_state(p_student); end if;
   v_to := least(_album_today(), s.ends);
   perform pg_advisory_xact_lock(hashtext('album:' || p_student::text));
@@ -410,7 +435,7 @@ returns json language plpgsql security definer set search_path = public as $$
 declare s seasons; v_page text; v_char text; v_item text;
 begin
   if not exists (select 1 from students where id = p_student) then return null; end if;
-  s := _album_season();
+  s := _album_season_for(p_student);
   if s.id is null then return album_state(p_student); end if;
   perform pg_advisory_xact_lock(hashtext('album:' || p_student::text));
 
@@ -449,7 +474,7 @@ declare s seasons; it items; v_coins int; v_err text;
 begin
   if not exists (select 1 from students where id = p_student) then return null; end if;
   perform pg_advisory_xact_lock(hashtext('album:' || p_student::text));
-  s := _album_season();
+  s := _album_season_for(p_student);
   select * into it from items where id = p_item;
 
   if it.id is null or it.price is null or it.price = 0 or s.id is null or it.season > s.id then
@@ -517,7 +542,19 @@ end; $$;
 -- 7. ZA UČITELJA (ročno v SQL Editorju)
 -- ══════════════════════════════════════════════════════════════════════════
 
--- Začetek sezone:
+-- Preizkusni način (sezono vidijo samo izbrani učenci):
+--   insert into album_testers (student_id)
+--   select id from students where lower(username) in ('nik7a', 'lar4')
+--   on conflict do nothing;
+--
+-- Začetek sezone za vse — najprej pobriši, kar so preizkuševalci nabrali
+-- med preizkusom, da vsi začnejo enako:
+--   delete from coin_ledger         where student_id in (select student_id from album_testers);
+--   delete from student_stickers    where student_id in (select student_id from album_testers);
+--   delete from student_items       where student_id in (select student_id from album_testers);
+--   delete from student_season_char where student_id in (select student_id from album_testers);
+--   delete from student_avatar      where student_id in (select student_id from album_testers);
+--   delete from album_testers;
 --   update seasons set starts = current_date where id = 1;
 --
 -- Pregled — kdo ima koliko sličic in cekinov:
