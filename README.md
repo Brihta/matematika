@@ -133,6 +133,33 @@ računi predala, vsaj 20 odgovorov, 90 % pravilnih, 80 % hitrih). Dokler
 datoteke ne zaženeš, aplikacija deluje kot prej. Ob zagonu posodobi tudi
 `merge_students`, da se računi ob združitvi učencev ne izgubijo.
 
+## Album in lik (sezone)
+
+Prijavljen učenec zbira sličice za pravo znanje, sličice prinesejo cekine,
+s cekini opremi sezonskega lika (jesen: vitez / vitezinja). Ob Prijavi je
+gumb z glavo lika in cekini; klik odpre `lik.html` (album, oprema, videz,
+liki) v oknu čez stran. Med vadbo lik spodaj levo poskoči ob pravilnem
+odgovoru; ko baza po vadbi najde novo sličico, se spodaj pojavi obvestilo.
+
+**Vse odloča baza** (`supabase_album.sql`): katere sličice so zaslužene
+(iz odgovorov, ki se že beležijo), cene, stanje cekinov in nakupi.
+Aplikacija pošilja samo odgovore.
+
+- Sličica za poštevanko: v sezoni vseh 10 računov predala vsaj enkrat
+  pravilno, vsaj 20 odgovorov, 90 % pravilnih, 80 % hitreje kot 3 s;
+  tipkovnica, tekmovanje, bitka — kviz ne. Zlata: znaš jo tudi 14 dni pozneje.
+- Zvestoba: šolski dnevi zapored (vikendi in `prosti_dnevi` ne prekinejo).
+- Sličica +20 cekinov, zlata +20. Polna stran albuma odklene predmet, ki ni
+  naprodaj.
+
+Sezona začne, ko jo učitelj odpre v Supabase:
+`update seasons set starts = current_date where id = 1;`
+Do takrat učenci ničesar ne vidijo. Počitnice vpiši v `prosti_dnevi`.
+
+Zasnova, računica in vse odločitve so v lokalni mapi `gamifikacija/`
+(ni na GitHubu). Tam je tudi `test-album.mjs` (preizkus SQL v PGlite) in
+`pglite-harness.js` (preizkus cele strani brez prave baze).
+
 ### Izpis za razred (A4)
 
 Gumb **🖨️ Natisni za razred** v učiteljskem pregledu natisne en list za
@@ -218,11 +245,12 @@ Statična stran (brez build koraka), podatki v Supabase.
 
 - `index.html`, `script.js`, `style.css` — celotna aplikacija
 - `battle.js` — ⚔️ Bitka (naloži se za `script.js`)
+- `album.js`, `lik.html` — album, cekini in lik (naloži se za `battle.js`)
 - `postevanka.json` — računi
 - `supabase_razred.sql`, `supabase_scores_guard.sql`, `supabase_nacini.sql`,
   `supabase_hitrost.sql`, `supabase_zdruzi_izbrisi.sql`,
   `supabase_premakni_razred.sql`, `supabase_bitka.sql`,
-  `supabase_bitka_seznam.sql`, `supabase_racuni.sql` — migracije za bazo
+  `supabase_bitka_seznam.sql`, `supabase_racuni.sql`, `supabase_album.sql` — migracije za bazo
 - `.github/workflows/keepalive.yml` — vsake 3 dni pinga bazo, da je
   Supabase ne ustavi zaradi neaktivnosti (brezplačni paket: 7 dni)
 

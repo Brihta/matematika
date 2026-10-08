@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="sl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brihta — moj lik</title>
+<!--
+  Moj lik: album sličic, oprema (trgovina), videz in liki.
+  Odpre se v oknu čez aplikacijo (album.js) in z bazo govori prek aplikacije:
+  parent.albumApi (ista stran, isti izvor). Vse, kar
+  šteje — katere sličice, koliko cekinov, kaj je kupljeno — odloča baza
+  (supabase_album.sql). Tukaj so samo slike, besedila in prikaz.
+  Zasnova: gamifikacija/README.md (lokalno).
+-->
+<style>
+  :root {
+    --bg: #f6efe3; --card: #ffffff; --paper: #fffaf0; --ink: #2b2233; --muted: #7a7184; --line: #e6dac6;
+    --accent: #f08c2e; --accent-soft: #fff1e2; --purple: #6a4fc0; --purple-soft: #efeafd; --gold: #f4c542; --ok: #3f9a5a;
+    --navaden: #6f8f5e; --redek: #2a7fcf; --epski: #8e44ad; --nagrada: #c0392b;
+    --slot: #f3e8d4; --slot-line: #cdbd9f; --shadow: 0 10px 30px rgba(80, 50, 30, .10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1a22; --card: #26232e; --paper: #2b2733; --ink: #f1ecf6; --muted: #a59db0; --line: #3c3644;
+      --accent-soft: #3a2a1c; --purple-soft: #2e2840; --slot: #34303d; --slot-line: #4c4558; --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: inherit; }
+
+  header { padding-right: 52px; }   /* prostor za ✕ okna v aplikaciji */
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px 60px; }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 0; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+  .brand-mark { width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 1.2rem; }
+  .brand b { display: block; }
+  .season { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px 6px 8px; font-weight: 700; font-size: .9rem; }
+  .season .ico { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); }
+  .season small { color: var(--muted); font-weight: 600; }
+  .wallet { display: flex; align-items: center; gap: 8px; background: var(--card); border: 2px solid var(--gold); border-radius: 999px; padding: 5px 14px 5px 7px; font-weight: 800; font-size: 1.05rem; position: relative; }
+  .coin { width: 24px; height: 24px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff3b0, var(--gold) 60%, #d89936); display: grid; place-items: center; color: #8a5a10; font-size: .75rem; box-shadow: inset 0 0 0 2px #d89936, inset 0 0 0 5px #f4c542, inset 0 0 0 6px #d89936; flex: 0 0 auto; }
+  .wallet.bump { animation: bump .5s; }
+  @keyframes bump { 40% { transform: scale(1.14); } }
+  .plus { position: absolute; right: 10px; top: -4px; color: var(--ok); font-weight: 900; animation: rise 1.1s ease-out forwards; pointer-events: none; }
+  @keyframes rise { to { transform: translateY(-34px); opacity: 0; } }
+  .env-btn { border: 0; background: var(--accent); color: #fff; font-weight: 800; border-radius: 999px; padding: 8px 14px 8px 12px; display: flex; align-items: center; gap: 8px; }
+  .env-btn:disabled { background: var(--line); color: var(--muted); cursor: default; }
+  .env-btn .n { background: #fff; color: var(--accent); border-radius: 999px; min-width: 22px; height: 22px; display: grid; place-items: center; font-size: .8rem; }
+  .pulse { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.06); box-shadow: 0 0 0 8px rgba(240,140,46,.18); } }
+
+  main { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 20px; align-items: start; }
+
+  /* ── lik ── */
+  .stage { position: sticky; top: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 14px; box-shadow: var(--shadow); }
+  .view { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 1; }
+  .view svg { width: 100%; height: 100%; display: block; }
+  .trying { position: absolute; z-index: 2; top: 10px; left: 10px; background: rgba(43,34,51,.8); color: #fff; font-size: .75rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; display: none; }
+  .trying.on { display: block; }
+  .rank { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; margin: 12px 2px 0; }
+  .rank .chev { width: 40px; height: 40px; }
+  .rank { cursor: pointer; border-radius: 12px; }
+  .rank:hover { background: var(--bg); }
+  .aura { position: absolute; inset: 0; pointer-events: none; }
+  .aura svg { width: 100%; height: 100%; }
+  .aura path { animation: twinkle 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes twinkle { 50% { opacity: .2; transform: scale(.6); } }
+  .rank b { display: block; }
+  .rank small { color: var(--muted); font-size: .82rem; }
+  .rank .bar { margin-top: 4px; }
+  .action { margin-top: 12px; min-height: 92px; background: var(--bg); border-radius: 14px; padding: 12px; }
+  .action .hint { color: var(--muted); text-align: center; padding: 20px 0; font-size: .95rem; }
+  .act-title { display: flex; align-items: center; gap: 8px; font-weight: 800; margin-bottom: 10px; flex-wrap: wrap; }
+  .act-note { color: var(--muted); font-size: .88rem; margin: -4px 0 10px; }
+  .btns { display: flex; gap: 8px; }
+  .btn { flex: 1; border: 0; border-radius: 12px; padding: 12px; font-weight: 800; font-size: 1rem; text-decoration: none; text-align: center; }
+  .btn-main { background: var(--accent); color: #fff; }
+  .btn-main:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+  .btn-ok { background: var(--ok); color: #fff; }
+  .btn-purple { background: var(--purple); color: #fff; }
+  .btn-soft { background: var(--card); border: 1px solid var(--line); flex: 0 0 auto; padding: 12px 16px; }
+
+  .bar { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--gold)); border-radius: 999px; transition: width .6s; }
+  .rar { font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; color: #fff; }
+  .rar.navaden { background: var(--navaden); } .rar.redek { background: var(--redek); } .rar.epski { background: var(--epski); } .rar.nagrada { background: var(--nagrada); }
+  .price { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: .9rem; }
+  .price .coin { width: 18px; height: 18px; font-size: .6rem; }
+
+  /* ── desna stran ── */
+  .side { min-width: 0; }
+  .main-tabs { display: flex; gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 5px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
+  .mt { flex: 1; border: 0; background: none; border-radius: 12px; padding: 10px 12px; font-weight: 800; white-space: nowrap; color: var(--muted); }
+  .mt.on { background: var(--purple); color: #fff; }
+  .tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 12px; }
+  .tab { border: 1px solid var(--line); border-bottom: 0; background: var(--card); border-radius: 14px 14px 0 0; padding: 9px 14px 11px; font-weight: 800; font-size: .9rem; white-space: nowrap; display: flex; gap: 6px; align-items: center; color: var(--muted); }
+  .tab small { font-weight: 700; font-size: .72rem; background: var(--bg); padding: 1px 7px; border-radius: 999px; }
+  .tab.on { background: var(--paper); color: var(--ink); transform: translateY(1px); }
+  .tab.full small { background: var(--ok); color: #fff; }
+  .page { background: var(--paper); border: 1px solid var(--line); border-radius: 22px; padding: 20px; box-shadow: var(--shadow);
+          background-image: radial-gradient(rgba(150,120,80,.08) 1px, transparent 1px); background-size: 18px 18px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 18px; box-shadow: var(--shadow); }
+  .page-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; margin-bottom: 16px; }
+  h1 { margin: 0; font-size: 1.45rem; }
+  .desc { color: var(--muted); margin: 6px 0 12px; max-width: 60ch; }
+  .page-prog { display: flex; align-items: center; gap: 10px; font-weight: 800; max-width: 360px; }
+  .page-prog .bar { flex: 1; }
+  .reward { display: flex; align-items: center; gap: 10px; background: var(--card); border: 2px dashed var(--slot-line); border-radius: 16px; padding: 8px 12px 8px 8px; max-width: 280px; text-align: left; }
+  .reward .pic { width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: radial-gradient(circle at 50% 40%, #fff6ea, #f6dcbc); flex: 0 0 auto; }
+  .reward .pic svg { width: 100%; height: 100%; display: block; }
+  .reward.locked .pic svg { filter: grayscale(1); opacity: .5; }
+  .reward b { display: block; font-size: .95rem; }
+  .reward small { color: var(--muted); font-size: .8rem; display: block; }
+  .reward.open { border-style: solid; border-color: var(--ok); }
+  .section-title { font-weight: 800; color: var(--purple); letter-spacing: .08em; text-transform: uppercase; font-size: .72rem; margin: 16px 0 10px; }
+  .sgrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .sgrid.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .sgrid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .slot { border: 0; background: none; padding: 0; text-align: center; }
+  .slot .st { aspect-ratio: 1; position: relative; }
+  .slot .st svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .slot .have svg { transform: rotate(var(--rot)); filter: drop-shadow(0 4px 4px rgba(60,40,20,.18)); }
+  .slot .lbl { font-weight: 800; font-size: .8rem; margin-top: 4px; }
+  .slot .num { color: var(--muted); font-size: .7rem; font-weight: 700; }
+  .slot .waiting { position: absolute; inset: 0; display: grid; place-items: center; }
+  .slot .waiting span { background: var(--accent); color: #fff; font-size: .66rem; font-weight: 800; padding: 3px 7px; border-radius: 999px; animation: pulse 1.4s infinite; }
+  .slot.stuck .have svg { animation: stick .7s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes stick { 0% { transform: scale(1.8) rotate(-18deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: rotate(var(--rot)); } }
+
+  .igrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .card { position: relative; text-align: left; border: 2px solid var(--line); background: var(--card); border-radius: 16px; padding: 8px; transition: transform .12s; }
+  .card:hover { transform: translateY(-2px); }
+  .card.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .card .pic { aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: radial-gradient(circle at 50% 40%, #fff6ea, #f6dcbc); }
+  .card .pic svg { width: 100%; height: 100%; display: block; }
+  .card.lock .pic svg { filter: grayscale(.85); opacity: .55; }
+  .card .nm { font-weight: 800; font-size: .9rem; margin: 8px 2px 6px; }
+  .card .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .tag { position: absolute; top: 14px; right: 14px; font-size: .66rem; font-weight: 800; padding: 3px 8px; border-radius: 999px; }
+  .tag.own { background: var(--purple-soft); color: var(--purple); }
+  .tag.on { background: var(--ok); color: #fff; }
+  .tag.lk { background: #fff; color: var(--nagrada); border: 1px solid var(--line); }
+  .shop-note { color: var(--muted); font-size: .9rem; margin: 0 0 12px; }
+
+  .looks h3 { font-size: .95rem; margin: 14px 0 8px; } .looks h3:first-child { margin-top: 0; }
+  .sw-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .sw { width: 42px; height: 42px; border-radius: 50%; border: 3px solid transparent; box-shadow: inset 0 0 0 2px rgba(0,0,0,.12); }
+  .sw.on { border-color: var(--accent); }
+  .chip { border: 2px solid var(--line); background: var(--card); border-radius: 999px; padding: 8px 14px; font-weight: 700; }
+  .chip.on { border-color: var(--accent); background: var(--accent-soft); }
+
+  .chars { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .ch { border: 2px solid var(--line); border-radius: 18px; padding: 10px; background: var(--card); text-align: center; }
+  .ch.on { border-color: var(--ok); }
+  .ch .pic { aspect-ratio: 1; border-radius: 14px; overflow: hidden; background: radial-gradient(circle at 50% 40%, #fff6ea, #f6dcbc); }
+  .ch .pic svg { width: 100%; height: 100%; display: block; }
+  .ch.future .pic svg { filter: brightness(0) opacity(.18); }
+  .ch b { display: block; margin-top: 8px; font-size: 1.05rem; }
+  .ch small { color: var(--muted); display: block; margin: 2px 0 8px; }
+  .ch .btn { width: 100%; padding: 10px; font-size: .9rem; }
+  .info { background: var(--purple-soft); color: var(--purple); border-radius: 14px; padding: 12px 14px; font-weight: 600; font-size: .92rem; margin-bottom: 14px; }
+
+  .class-hero { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 22px; align-items: center; }
+  .class-hero svg { width: 100%; height: auto; }
+  .big-num { font-size: 2.2rem; font-weight: 900; line-height: 1.05; }
+
+  /* okna */
+  .modal { position: fixed; inset: 0; background: rgba(30,20,35,.55); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50; overflow-y: auto; }
+  .modal.on { display: flex; }
+  .box { background: var(--card); border-radius: 22px; padding: 22px; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.3); margin: auto; }
+  .box.wide { max-width: 640px; }
+  .box .art { width: 170px; height: 170px; margin: 0 auto 8px; border-radius: 18px; overflow: hidden; }
+  .box .art svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .box .art.bgd { background: radial-gradient(circle at 50% 40%, #fff6ea, #f6dcbc); }
+  .box h3 { margin: 6px 0 4px; font-size: 1.25rem; }
+  .box p { color: var(--muted); margin: 4px 0 14px; }
+  .checks { text-align: left; margin: 10px 0 14px; display: grid; gap: 8px; }
+  .check { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; align-items: center; background: var(--bg); border-radius: 12px; padding: 8px 10px; font-size: .92rem; }
+  .check .ic { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 900; font-size: .8rem; }
+  .check .ic.y { background: var(--ok); } .check .ic.n { background: var(--slot-line); }
+  .check .bar { margin-top: 4px; height: 6px; }
+  .tip { background: var(--purple-soft); color: var(--purple); border-radius: 12px; padding: 10px 12px; font-weight: 700; font-size: .92rem; margin-bottom: 14px; }
+  .env-art { width: 220px; margin: 0 auto 6px; }
+  .env-art svg { width: 100%; height: auto; display: block; }
+  .env-art.shake svg { animation: wob .6s ease-in-out infinite; }
+  @keyframes wob { 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+  .reveal svg { animation: reveal .6s cubic-bezier(.2, 1.4, .4, 1); }
+  @keyframes reveal { from { transform: translateY(60px) scale(.4) rotate(-20deg); opacity: 0; } }
+  .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0 16px; }
+  .summary div { background: var(--bg); border-radius: 12px; padding: 10px; }
+  .summary b { display: block; font-size: 1.3rem; }
+  .summary small { color: var(--muted); }
+  .choose { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; text-align: left; }
+  .opt { border: 2px solid var(--line); border-radius: 18px; padding: 10px; background: var(--card); }
+  .opt .pic { aspect-ratio: 1; border-radius: 14px; overflow: hidden; background: radial-gradient(circle at 50% 40%, #fff6ea, #f6dcbc); }
+  .opt .pic svg { width: 100%; height: 100%; display: block; }
+  .opt b { display: block; margin: 8px 0 2px; font-size: 1.05rem; }
+  .opt small { color: var(--muted); display: block; margin-bottom: 10px; min-height: 3.6em; }
+  .opt .btn { width: 100%; }
+  .keepnote { color: var(--muted); font-size: .85rem; margin-top: 12px; }
+
+  .burst { position: fixed; pointer-events: none; z-index: 70; width: 10px; height: 10px; border-radius: 50%; animation: burst .8s ease-out forwards; }
+  @keyframes burst { to { transform: translate(var(--x), var(--y)) scale(.3); opacity: 0; } }
+  .confetti { position: fixed; width: 10px; height: 14px; top: 40%; left: 50%; z-index: 75; pointer-events: none; border-radius: 2px; animation: fly 1.2s ease-out forwards; }
+  @keyframes fly { to { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; } }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 120px); background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 14px; font-weight: 700; transition: transform .25s; z-index: 80; max-width: calc(100% - 32px); }
+  .toast.on { transform: translate(-50%, 0); }
+
+  @media (max-width: 920px) {
+    main { grid-template-columns: minmax(0, 1fr); }
+    .stage { top: 0; z-index: 10; border-radius: 0 0 22px 22px; margin: 0 -16px; padding: 10px 16px; display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; align-items: center; }
+    .stage .view { grid-row: span 2; }
+    .rank { margin: 0; }
+    .action { margin-top: 0; min-height: 0; }
+    .action .hint { padding: 6px 0; }
+    .page-head { grid-template-columns: minmax(0, 1fr); }
+    .sgrid, .sgrid.six { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+  }
+  @media (max-width: 560px) {
+    .stage { grid-template-columns: 120px minmax(0, 1fr); }
+    .rank .chev { display: none; } .rank { grid-template-columns: minmax(0, 1fr); }
+    .btns { flex-direction: column; }
+    .sgrid, .sgrid.six, .sgrid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .slot .lbl { font-size: .7rem; }
+    .igrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .season small, .brand small { display: none; }
+    .choose, .summary { grid-template-columns: minmax(0, 1fr); }
+    .class-hero { grid-template-columns: minmax(0, 1fr); }
+    .class-hero svg { max-width: 180px; margin: 0 auto; display: block; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="season" id="season"></div>
+    <div class="wallet" id="wallet"></div>
+    <button class="env-btn" id="envBtn"></button>
+  </header>
+  <main>
+    <section class="stage">
+      <div class="view"><div class="trying" id="tryingBadge">Preizkušaš</div><div id="stageSvg" style="position:relative;height:100%"></div></div>
+      <div class="rank" id="rank"></div>
+      <div class="action" id="action"></div>
+    </section>
+    <section class="side">
+      <nav class="main-tabs" id="mainTabs"></nav>
+      <div id="view"></div>
+    </section>
+  </main>
+</div>
+<div class="modal" id="modal"><div class="box" id="box"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════ RISANJE ════════════════ */
+const OL = '#3a2a3a';
+function hex(c) { c = c.replace('#', ''); return [0, 2, 4].map(i => parseInt(c.substr(i, 2), 16)); }
+function mix(a, b, t) { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
+const shade = c => mix(c, '#2a1430', .28), light = c => mix(c, '#ffffff', .38);
+let uid = 0;
+function part(d, fill, o = {}) {
+  const w = o.w || 5;
+  let s = `<path d="${d}" fill="${fill}" stroke="${OL}" stroke-width="${w}" stroke-linejoin="round"/>`;
+  if (o.shadow || o.hi) {
+    const id = 'c' + (++uid);
+    s += `<clipPath id="${id}"><path d="${d}"/></clipPath><g clip-path="url(#${id})">`
+       + (o.shadow ? `<path d="${o.shadow}" fill="${shade(fill)}"/>` : '') + (o.hi ? `<path d="${o.hi}" fill="${light(fill)}" opacity=".8"/>` : '')
+       + (o.inner || '') + `</g><path d="${d}" fill="none" stroke="${OL}" stroke-width="${w}" stroke-linejoin="round"/>`;
+  }
+  return s;
+}
+const line = (d, w = 3, c = OL) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+const sparkle = (x, y, r, c = '#fff6b0') => `<path d="M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r} Z" fill="${c}"/>`;
+function star(cx, cy, r, fill, w = 2.5) {
+  const p = [];
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r; p.push((cx + rr * Math.cos(a)).toFixed(1) + ' ' + (cy + rr * Math.sin(a)).toFixed(1)); }
+  return `<path d="M${p.join(' L')} Z" fill="${fill}" stroke="${OL}" stroke-width="${w}" stroke-linejoin="round"/>`;
+}
+const txt = (x, y, s, size, fill = '#fff', sw = 4) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="${size}" font-weight="900" fill="${fill}" stroke="${OL}" stroke-width="${sw}" paint-order="stroke" stroke-linejoin="round" font-family="system-ui, -apple-system, sans-serif">${s}</text>`;
+function grad(stops) {
+  const id = 'g' + (++uid);
+  return { id, def: `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${stops.map((c, i) => `<stop offset="${i / (stops.length - 1)}" stop-color="${c}"/>`).join('')}</linearGradient>` };
+}
+
+/* ── telo ── */
+function hand(x, y, skin, flip) {
+  const f = flip ? -1 : 1;
+  const d = `M${x - 14 * f} ${y - 16} C${x - 25 * f} ${y - 6} ${x - 24 * f} ${y + 14} ${x - 12 * f} ${y + 21} C${x - 2 * f} ${y + 28} ${x + 14 * f} ${y + 24} ${x + 17 * f} ${y + 11} C${x + 19 * f} ${y - 2} ${x + 14 * f} ${y - 15} ${x + 3 * f} ${y - 19} Z`;
+  return part(d, skin, { shadow: `M${x - 30} ${y + 6} L${x + 30} ${y + 6} L${x + 30} ${y + 40} L${x - 30} ${y + 40} Z` }) + line(`M${x + 4 * f} ${y - 8} Q${x + 14 * f} ${y - 4} ${x + 11 * f} ${y + 6}`, 3);
+}
+function legs(pants, boots) {
+  return part('M220 378 L217 446 L249 446 L252 378 Z', pants, { shadow: 'M238 370 L260 370 L260 450 L240 450 Z' })
+       + part('M260 378 L263 446 L295 446 L292 378 Z', pants, { shadow: 'M280 370 L300 370 L300 450 L282 450 Z' })
+       + part('M213 436 L251 436 L253 462 Q254 476 240 476 L213 476 Q203 476 205 464 Z', boots, { shadow: 'M200 462 L260 462 L260 480 L200 480 Z', hi: 'M216 442 L224 442 L222 460 L215 460 Z' })
+       + part('M299 436 L261 436 L259 462 Q258 476 272 476 L299 476 Q309 476 307 464 Z', boots, { shadow: 'M252 462 L312 462 L312 480 L252 480 Z', hi: 'M288 442 L296 442 L297 460 L290 460 Z' })
+       + part('M211 434 L253 434 L253 446 L211 446 Z', light(boots), { w: 4 }) + part('M259 434 L301 434 L301 446 L259 446 Z', light(boots), { w: 4 });
+}
+function arms(col, cuff) {
+  return part('M212 256 C188 262 182 292 178 320 L172 358 Q188 368 202 360 L207 322 C209 302 215 284 224 272 Z', col, { shadow: 'M150 330 L230 300 L230 380 L150 380 Z' })
+       + part('M300 256 C324 262 330 292 334 320 L340 358 Q324 368 310 360 L305 322 C303 302 297 284 288 272 Z', col, { shadow: 'M300 240 L350 240 L350 380 L318 380 Q318 300 300 240 Z' })
+       + part('M172 350 L203 354 L202 364 Q187 372 171 362 Z', cuff, { w: 4 }) + part('M340 350 L309 354 L310 364 Q325 372 341 362 Z', cuff, { w: 4 });
+}
+const FACE = 'M168 150 C168 92 206 62 256 62 C306 62 344 92 344 150 C344 198 314 232 256 234 C198 232 168 198 168 150 Z';
+function head(o, fringe) {
+  const skin = o.skin;
+  let s = part('M240 214 L272 214 L274 258 L238 258 Z', skin, { shadow: 'M230 210 L282 210 L282 238 Q256 250 230 238 Z' })
+        + part('M166 142 C150 138 146 172 160 184 C166 190 174 186 176 180 Z', skin, { w: 4 }) + part('M346 142 C362 138 366 172 352 184 C346 190 338 186 336 180 Z', skin, { w: 4 })
+        + part(FACE, skin, { shadow: 'M306 60 C352 96 356 204 296 244 L370 244 L370 60 Z ' + (fringe ? 'M164 166 C184 140 206 134 228 116 C238 124 242 136 240 152 C258 146 268 132 268 114 C284 122 298 136 304 160 C314 152 320 140 318 124 C332 132 342 146 348 166 L348 110 L164 110 Z' : '') });
+  for (const [x, f] of [[220, -1], [292, 1]]) {
+    s += `<ellipse cx="${x}" cy="160" rx="18" ry="21" fill="#fff" stroke="${OL}" stroke-width="3"/><circle cx="${x + 1}" cy="164" r="14" fill="${o.eye}"/><circle cx="${x + 1}" cy="168" r="10" fill="${shade(o.eye)}" opacity=".6"/><circle cx="${x + 1}" cy="165" r="7" fill="${OL}"/><circle cx="${x - 5}" cy="157" r="5.5" fill="#fff"/><circle cx="${x + 6}" cy="171" r="2.5" fill="#fff"/>`
+       + line(`M${x - 20} 154 Q${x} 132 ${x + 20} 152`, 6) + (o.style === 'dolgi' ? line(`M${x + 19 * f} 150 L${x + 27 * f} 142`, 4) : '')
+       + line(`M${x - 18} ${126 - (f > 0 ? 2 : 0)} Q${x} 114 ${x + 18} ${122 + (f > 0 ? -2 : 2)}`, 7, shade(o.hair));
+  }
+  const m = 'M236 202 Q256 226 276 202 Z', mid = 'm' + (++uid);
+  return s + line('M254 182 Q262 188 255 194', 3, shade(skin))
+    + `<clipPath id="${mid}"><path d="${m}"/></clipPath><path d="${m}" fill="#8a2f3a"/><g clip-path="url(#${mid})"><ellipse cx="256" cy="218" rx="11" ry="7" fill="#ff8a95"/><path d="M236 200 L276 200 L274 207 L238 207 Z" fill="#fff"/></g><path d="${m}" fill="none" stroke="${OL}" stroke-width="4" stroke-linejoin="round"/>`
+    + `<ellipse cx="194" cy="192" rx="16" ry="9" fill="#ff7f8f" opacity=".35"/><ellipse cx="318" cy="192" rx="16" ry="9" fill="#ff7f8f" opacity=".35"/>`;
+}
+const FRINGE = 'M164 150 C158 86 204 50 256 50 C310 50 354 86 348 150 C340 128 330 116 316 108 C318 124 312 136 302 144 C296 120 282 106 266 100 C266 118 256 130 240 136 C242 120 236 108 228 102 C214 116 196 124 178 126 C172 132 166 140 164 150 Z';
+const HAIR = {
+  kratki: { name: 'Kratki', back: 'M160 150 C150 80 200 40 256 40 C312 40 362 80 352 150 Q350 166 340 170 L172 170 Q162 166 160 150 Z', extra: [] },
+  dolgi:  { name: 'Dolgi',  back: 'M160 150 C150 80 200 40 256 40 C312 40 362 80 352 150 L362 300 Q344 318 320 306 L312 236 L200 236 L192 306 Q168 318 150 300 Z', extra: ['M168 200 Q164 250 172 296', 'M344 200 Q348 250 340 296'] }
+};
+const hairBack = o => part(HAIR[o.style].back, o.hair, { shadow: 'M120 30 L400 30 L400 330 L120 330 Z' }) + HAIR[o.style].extra.map(d => line(d, 3, shade(o.hair))).join('');
+const hairFront = o => part(FRINGE, o.hair, { shadow: 'M300 40 C350 70 360 120 352 160 L400 160 L400 40 Z', hi: 'M206 72 Q240 58 276 62 Q244 72 224 90 Z' })
+  + ['M256 54 Q250 80 240 100', 'M300 64 Q308 86 304 106', 'M210 64 Q200 88 196 112'].map(d => line(d, 3, shade(o.hair))).join('');
+
+/* ── oblike predmetov s parametri (ista oblika, druge barve) ── */
+const TORSO = 'M206 250 Q256 238 306 250 L314 320 L322 398 Q256 410 190 398 L198 320 Z';
+function tunic(main, trim) {
+  return part(TORSO, main, { shadow: 'M282 230 Q300 320 290 420 L340 420 L340 230 Z', hi: 'M214 262 L224 262 L218 330 L208 330 Z' })
+    + part('M191 390 Q256 402 321 390 L322 398 Q256 410 190 398 Z', trim, { w: 4 }) + part('M236 248 L256 274 L276 248 Z', '#f3e6c8', { w: 4 })
+    + part('M196 340 Q256 352 316 340 L317 358 Q256 370 195 358 Z', '#6b4226', { shadow: 'M180 352 L330 352 L330 380 L180 380 Z' })
+    + part('M244 343 L268 343 L268 366 L244 366 Z', '#d9a441', { w: 4 });
+}
+function chainmail() {
+  let rows = '';
+  for (let y = 270; y < 400; y += 15) { let d = `M186 ${y}`; for (let x = 186; x < 326; x += 12) d += ` Q${x + 6} ${y + 7} ${x + 12} ${y}`; rows += line(d, 2.2, '#6f7883'); }
+  return part(TORSO, '#a8b1bb', { shadow: 'M282 230 Q300 320 290 420 L340 420 L340 230 Z', inner: rows })
+    + part('M196 340 Q256 352 316 340 L317 358 Q256 370 195 358 Z', '#6b4226', { w: 4 }) + part('M244 343 L268 343 L268 366 L244 366 Z', '#d9a441', { w: 4 })
+    + part('M232 246 Q256 266 280 246 L284 258 Q256 280 228 258 Z', '#8f98a3', { w: 4 });
+}
+function armor(plate, tabard, trim) {
+  return part('M198 326 Q256 346 314 326 L320 398 Q256 410 192 398 Z', '#8f98a3', { shadow: 'M280 320 L330 320 L330 420 L290 420 Z' })
+    + line('M200 350 Q210 358 220 350 Q230 358 240 350 Q250 358 260 350 Q270 358 280 350 Q290 358 300 350 Q308 356 314 350', 2.5)
+    + line('M196 374 Q206 382 216 374 Q226 382 236 374 Q246 382 256 374 Q266 382 276 374 Q286 382 296 374 Q306 382 318 374', 2.5)
+    + part('M204 250 Q256 236 308 250 L314 330 Q256 350 198 330 Z', plate, { shadow: 'M282 236 Q300 300 290 350 L330 350 L330 236 Z', hi: 'M218 262 Q228 296 222 322 L232 322 Q238 294 230 262 Z' })
+    + part('M228 252 L284 252 L290 402 L256 414 L222 402 Z', tabard, { shadow: 'M266 240 L300 240 L300 420 L266 420 Z' })
+    + line('M228 258 L284 258', 3, trim) + star(256, 300, 18, trim)
+    + part('M196 336 Q256 350 316 336 L317 352 Q256 366 195 352 Z', '#6b4226', { w: 4 })
+    + part('M198 246 C172 246 162 274 170 294 Q196 300 222 282 C226 262 214 248 198 246 Z', plate, { shadow: 'M150 280 L230 270 L230 310 L150 310 Z', hi: 'M182 256 Q192 252 200 254 Q190 260 184 270 Z' })
+    + part('M314 246 C340 246 350 274 342 294 Q316 300 290 282 C286 262 298 248 314 246 Z', plate, { shadow: 'M300 236 L360 236 L360 310 L320 310 Z' })
+    + line('M174 284 Q196 290 218 276', 3) + line('M338 284 Q316 290 294 276', 3);
+}
+function robe(col) {
+  return part('M204 250 Q256 236 308 250 L322 330 L344 456 Q256 472 168 456 L190 330 Z', col, { shadow: 'M280 230 Q310 340 300 480 L380 480 L380 230 Z', hi: 'M214 262 L226 262 L206 440 L192 440 Z' })
+    + part('M170 444 Q256 460 342 444 L344 456 Q256 472 168 456 Z', '#f1c40f', { w: 4 }) + line('M256 262 L256 462', 3)
+    + part('M228 246 Q256 270 284 246 L290 258 Q256 286 222 258 Z', '#f1c40f', { w: 4 }) + line('M204 330 Q256 346 308 330', 6, '#f1c40f')
+    + star(222, 392, 9, '#ffe27a') + star(292, 372, 7, '#ffe27a') + star(270, 420, 6, '#ffe27a') + star(232, 302, 5, '#ffe27a')
+    + part('M214 254 C190 258 180 290 172 330 L156 366 Q182 380 210 366 L210 320 Z', col, { shadow: 'M140 340 L220 340 L220 400 L140 400 Z' })
+    + part('M298 254 C322 258 332 290 340 330 L356 366 Q330 380 302 366 L302 320 Z', col, { shadow: 'M300 240 L380 240 L380 400 L330 400 Q330 300 300 240 Z' })
+    + part('M158 360 Q182 374 210 362 L210 370 Q182 384 156 368 Z', '#f1c40f', { w: 4 }) + part('M354 360 Q330 374 302 362 L302 370 Q330 384 356 368 Z', '#f1c40f', { w: 4 });
+}
+function helmet(plume) {
+  return part('M256 50 C250 20 280 2 320 10 C300 16 290 26 300 40 C284 36 270 44 266 52 Z', plume, { shadow: 'M280 20 L330 20 L330 50 L280 50 Z', w: 4 })
+    + part('M162 150 C158 82 204 46 256 46 C308 46 354 82 350 150 L354 212 Q342 238 316 240 L318 140 Q256 118 194 140 L196 240 Q170 238 158 212 Z', '#b9c2cc', { shadow: 'M300 40 C352 80 360 150 356 250 L400 250 L400 40 Z', hi: 'M206 70 Q240 56 272 60 Q240 70 220 96 Z' })
+    + part('M180 126 Q256 102 332 126 L332 144 Q256 120 180 144 Z', '#8f98a3', { w: 4 }) + line('M256 48 L256 110', 3)
+    + `<circle cx="176" cy="206" r="4" fill="${OL}"/><circle cx="336" cy="206" r="4" fill="${OL}"/>`;
+}
+function wizHat(col, band) {
+  return part('M128 92 C128 74 384 74 384 92 C384 110 128 110 128 92 Z', shade(col), { w: 5 })
+    + part('M190 88 C204 54 226 22 262 8 C286 0 312 4 326 20 C300 18 286 30 292 50 C298 66 312 78 322 88 Z', col, { shadow: 'M270 0 C300 40 300 70 330 100 L400 100 L400 0 Z', hi: 'M210 70 Q226 40 246 24 Q232 50 222 80 Z' })
+    + part('M192 80 Q256 96 320 80 L322 92 Q256 108 190 92 Z', band, { w: 4 }) + star(256, 60, 12, '#ffe27a') + sparkle(330, 34, 7) + sparkle(178, 50, 5);
+}
+function sword(blade, guard, glow) {
+  return `<g transform="rotate(16 326 374)">` + (glow ? `<path d="M326 120 L350 170 L350 350 L302 350 L302 170 Z" fill="${glow}" opacity=".3"/>` : '')
+    + part('M314 160 L326 140 L338 160 L338 346 L314 346 Z', blade, { shadow: 'M326 140 L340 140 L340 350 L326 350 Z' })
+    + line('M326 168 L326 336', 2.5, shade(blade)) + part('M294 344 L358 344 L360 358 L292 358 Z', guard, { w: 4 })
+    + part('M320 358 L332 358 L332 394 L320 394 Z', '#6b4226', { w: 4 }) + `<circle cx="326" cy="402" r="8" fill="${guard}" stroke="${OL}" stroke-width="4"/>`
+    + (glow ? sparkle(352, 150, 8) + sparkle(304, 210, 6) : '') + `</g>`;
+}
+function shield(kind) {
+  const S = 'M178 286 C214 286 230 312 230 342 C230 376 206 400 178 404 C150 400 126 376 126 342 C126 312 142 286 178 286 Z';
+  const k = { les: ['#b07a50', '#6b4226'], zvezda: ['#2a6fb0', '#f1c40f'], brihta: ['#f08c2e', '#f4c542'] }[kind];
+  let s = part(S, k[0], { shadow: 'M178 280 L240 280 L240 410 L178 410 Z', hi: 'M146 316 Q156 300 172 296 Q156 310 152 330 Z',
+    inner: kind === 'les' ? line('M150 290 L150 400', 3, '#8a5a3b') + line('M178 286 L178 404', 3, '#8a5a3b') + line('M206 290 L206 400', 3, '#8a5a3b') : '' });
+  s += `<path d="${S}" fill="none" stroke="${k[1]}" stroke-width="5" transform="translate(178 345) scale(.86) translate(-178 -345)"/>`;
+  if (kind === 'les') s += `<circle cx="178" cy="345" r="12" fill="#8f98a3" stroke="${OL}" stroke-width="3"/>`;
+  if (kind === 'zvezda') s += star(178, 344, 22, '#f1c40f');
+  if (kind === 'brihta') s += `<circle cx="178" cy="345" r="24" fill="#fff" stroke="${OL}" stroke-width="3"/>` + txt(178, 357, 'B', 32, '#f08c2e', 0) + sparkle(216, 300, 7);
+  return s;
+}
+function cape(col, trim) {
+  return part('M210 256 L302 256 L348 464 Q256 482 164 464 Z', col, { shadow: 'M256 250 L360 250 L360 490 L256 490 Z' })
+    + (trim ? part('M166 450 Q256 468 346 450 L348 464 Q256 482 164 464 Z', trim, { w: 4 }) : '');
+}
+const owl = () => part('M66 408 L70 380 L88 400 Z', '#8a5a3b', { w: 4 }) + part('M118 408 L114 380 L96 400 Z', '#8a5a3b', { w: 4 })
+  + part('M92 396 C122 396 128 424 128 440 C128 462 112 474 92 474 C72 474 56 462 56 440 C56 424 62 396 92 396 Z', '#8a5a3b', { shadow: 'M98 388 L140 388 L140 480 L98 480 Z', hi: 'M66 420 Q70 406 82 402 Q72 414 70 430 Z' })
+  + part('M92 432 C106 432 112 444 112 454 C112 466 102 472 92 472 C82 472 72 466 72 454 C72 444 78 432 92 432 Z', '#e3c49d', { w: 3 })
+  + [80, 104].map(x => `<circle cx="${x}" cy="420" r="12" fill="#fff" stroke="${OL}" stroke-width="3"/><circle cx="${x}" cy="421" r="8" fill="#f4c542"/><circle cx="${x}" cy="421" r="4.5" fill="${OL}"/><circle cx="${x - 3}" cy="417" r="2" fill="#fff"/>`).join('')
+  + part('M87 432 L97 432 L92 442 Z', '#f08c2e', { w: 3 }) + line('M84 474 L82 482 M90 474 L90 482 M100 474 L102 482', 3, '#f08c2e');
+const cat = () => line('M118 468 C148 468 152 432 136 418', 15) + line('M118 468 C148 468 152 432 136 418', 8, '#f2a65a')
+  + part('M92 410 C118 410 126 440 124 458 C122 474 108 478 92 478 C76 478 62 474 60 458 C58 440 66 410 92 410 Z', '#f2a65a', { shadow: 'M100 400 L140 400 L140 484 L100 484 Z',
+      inner: line('M66 440 L76 442 M64 454 L76 454', 3, '#d9823a') })
+  + `<ellipse cx="80" cy="476" rx="9" ry="6" fill="#fff" stroke="${OL}" stroke-width="3"/><ellipse cx="104" cy="476" rx="9" ry="6" fill="#fff" stroke="${OL}" stroke-width="3"/>`
+  + part('M66 394 L68 360 L86 378 Z', '#f2a65a', { w: 4 }) + part('M118 394 L116 360 L98 378 Z', '#f2a65a', { w: 4 })
+  + `<path d="M71 384 L72 370 L80 378 Z M113 384 L112 370 L104 378 Z" fill="#ffb3c1"/>`
+  + part('M92 372 C114 372 124 386 124 400 C124 418 108 428 92 428 C76 428 60 418 60 400 C60 386 70 372 92 372 Z', '#f2a65a', { shadow: 'M104 360 L140 360 L140 440 L104 440 Z',
+      inner: line('M86 374 L88 386 M98 374 L96 386', 3, '#d9823a') })
+  + `<ellipse cx="81" cy="398" rx="5.5" ry="7.5" fill="${OL}"/><ellipse cx="103" cy="398" rx="5.5" ry="7.5" fill="${OL}"/><circle cx="83" cy="395" r="2" fill="#fff"/><circle cx="105" cy="395" r="2" fill="#fff"/>`
+  + `<path d="M88 407 L96 407 L92 412 Z" fill="#ff8fa3"/>` + line('M92 412 Q88 418 84 416 M92 412 Q96 418 100 416', 2.5)
+  + line('M70 410 L52 406 M70 414 L52 416 M114 410 L132 406 M114 414 L132 416', 2);
+const fox = () => part('M116 470 C162 468 166 410 140 396 C146 428 134 452 110 460 Z', '#e67e22', { w: 4,
+      inner: '<path d="M140 396 C156 404 160 420 156 432 C150 422 144 410 132 404 Z" fill="#fff"/>' })
+  + part('M92 418 C116 418 124 444 122 460 C120 474 106 478 92 478 C78 478 64 474 62 460 C60 444 68 418 92 418 Z', '#e67e22', { shadow: 'M100 410 L130 410 L130 484 L100 484 Z' })
+  + part('M92 430 C102 440 102 462 92 474 C82 462 82 440 92 430 Z', '#fff', { w: 3 })
+  + `<ellipse cx="80" cy="477" rx="8" ry="5" fill="${OL}"/><ellipse cx="104" cy="477" rx="8" ry="5" fill="${OL}"/>`
+  + part('M66 398 L62 360 L86 382 Z', '#e67e22', { w: 4 }) + part('M118 398 L122 360 L98 382 Z', '#e67e22', { w: 4 })
+  + `<path d="M68 388 L66 368 L79 381 Z M116 388 L118 368 L105 381 Z" fill="${OL}" opacity=".7"/>`
+  + part('M92 376 C116 376 124 392 122 404 C120 418 106 428 92 434 C78 428 64 418 62 404 C60 392 68 376 92 376 Z', '#e67e22', { shadow: 'M104 366 L130 366 L130 440 L104 440 Z',
+      inner: '<path d="M62 404 Q80 410 92 434 Q72 428 62 404 Z M122 404 Q104 410 92 434 Q112 428 122 404 Z" fill="#fff"/>' })
+  + `<circle cx="81" cy="400" r="4.5" fill="${OL}"/><circle cx="103" cy="400" r="4.5" fill="${OL}"/><circle cx="82.5" cy="398.5" r="1.6" fill="#fff"/><circle cx="104.5" cy="398.5" r="1.6" fill="#fff"/>`
+  + `<ellipse cx="92" cy="427" rx="5" ry="4" fill="${OL}"/>`;
+const dragon = () => line('M116 470 C150 476 158 452 148 434', 15) + line('M116 470 C150 476 158 452 148 434', 8, '#4caf50')
+  + part('M148 434 L140 418 L158 424 Z', '#f4e08a', { w: 3 })
+  + part('M108 424 C122 392 148 388 156 400 C144 404 146 416 152 424 C138 424 132 432 124 440 Z', '#7fd38a', { w: 4, inner: line('M114 424 L148 400', 2, '#3f8f4a') })
+  + part('M92 412 C118 412 126 440 124 458 C122 474 108 478 92 478 C76 478 62 474 60 458 C58 440 66 412 92 412 Z', '#4caf50', { shadow: 'M100 404 L140 404 L140 484 L100 484 Z' })
+  + part('M92 428 C106 436 108 460 100 474 L84 474 C76 460 78 436 92 428 Z', '#f4e08a', { w: 3, inner: line('M82 446 L102 446 M80 458 L104 458', 2, '#d9b84a') })
+  + `<ellipse cx="78" cy="477" rx="9" ry="5" fill="#3f8f4a" stroke="${OL}" stroke-width="3"/><ellipse cx="106" cy="477" rx="9" ry="5" fill="#3f8f4a" stroke="${OL}" stroke-width="3"/>`
+  + part('M70 380 L58 352 L82 372 Z', '#f4e08a', { w: 3.5 }) + part('M112 378 L124 350 L102 370 Z', '#f4e08a', { w: 3.5 })
+  + part('M90 366 C116 364 128 380 128 396 C128 414 112 426 92 426 C72 426 58 414 58 398 C58 382 68 368 90 366 Z', '#4caf50', { shadow: 'M106 356 L140 356 L140 436 L106 436 Z', hi: 'M70 380 Q80 370 92 370 Q80 376 74 388 Z' })
+  + [80, 104].map(x => `<circle cx="${x}" cy="394" r="9" fill="#fff" stroke="${OL}" stroke-width="2.5"/><circle cx="${x + 1}" cy="395" r="6" fill="#f4c542"/><circle cx="${x + 1}" cy="395" r="3.2" fill="${OL}"/><circle cx="${x - 2}" cy="391" r="1.8" fill="#fff"/>`).join('')
+  + `<circle cx="87" cy="413" r="2" fill="${OL}"/><circle cx="97" cy="413" r="2" fill="${OL}"/>` + line('M82 418 Q92 424 102 418', 2.5)
+  + sparkle(134, 372, 7);
+function bg(kind) {
+  if (kind === 'travnik') { const g = grad(['#bfe6ff', '#fff4dc']); return `<defs>${g.def}</defs><rect width="512" height="512" fill="url(#${g.id})"/><ellipse cx="110" cy="90" rx="44" ry="16" fill="#fff" opacity=".9"/><ellipse cx="400" cy="130" rx="54" ry="18" fill="#fff" opacity=".9"/><path d="M0 380 Q130 330 260 370 T512 360 L512 512 L0 512 Z" fill="#a6d982"/><path d="M0 440 Q180 410 330 436 T512 426 L512 512 L0 512 Z" fill="#86c765"/>`; }
+  if (kind === 'zahod') { const g = grad(['#7a5cc0', '#ff7a8a', '#ffb36b']); return `<defs>${g.def}</defs><rect width="512" height="512" fill="url(#${g.id})"/><circle cx="256" cy="340" r="110" fill="#ffd36b" opacity=".85"/><path d="M0 380 Q120 320 240 370 T512 350 L512 512 L0 512 Z" fill="#6a4a8a"/><path d="M0 440 Q180 404 330 436 T512 424 L512 512 L0 512 Z" fill="#4e3570"/>`; }
+  if (kind === 'sneg') { const g = grad(['#9fc3e8', '#eaf4ff']); const fl = [[60,60],[150,120],[250,40],[360,90],[460,50],[420,200],[80,220],[300,180]]; return `<defs>${g.def}</defs><rect width="512" height="512" fill="url(#${g.id})"/>${fl.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="#fff"/>`).join('')}<path d="M0 360 L90 250 L170 340 L260 230 L360 340 L440 270 L512 330 L512 512 L0 512 Z" fill="#cfe0f2"/><path d="M0 420 Q256 380 512 420 L512 512 L0 512 Z" fill="#ffffff"/>`; }
+  const g = grad(['#cde8ff', '#fff1dc']), c = '#c3badf', d = '#a99fcc';
+  return `<defs>${g.def}</defs><rect width="512" height="512" fill="url(#${g.id})"/>
+    <path d="M40 380 L40 210 L28 210 L28 190 L44 190 L44 202 L56 202 L56 190 L72 190 L72 202 L84 202 L84 190 L100 190 L100 210 L88 210 L88 380 Z" fill="${c}"/>
+    <path d="M424 380 L424 210 L412 210 L412 190 L428 190 L428 202 L440 202 L440 190 L456 190 L456 202 L468 202 L468 190 L484 190 L484 210 L472 210 L472 380 Z" fill="${c}"/>
+    <path d="M64 190 L64 150 L48 150 L64 110 L80 150 L64 150 Z" fill="${d}"/><path d="M448 190 L448 150 L432 150 L448 110 L464 150 L448 150 Z" fill="${d}"/>
+    <path d="M88 380 L88 250 L424 250 L424 380 Z" fill="${d}"/>${[100,140,180,220,260,300,340,380].map(x => `<rect x="${x}" y="236" width="22" height="16" fill="${d}"/>`).join('')}
+    <path d="M0 400 Q256 370 512 400 L512 512 L0 512 Z" fill="#9bd47a"/>`;
+}
+
+/* ════════════════ LIKI IN PREDMETI ════════════════ */
+const CHARS = {
+  /* names in ranks: [moška oblika, ženska oblika] — izbere otrok v "Moj videz". */
+  vitez:    { names: ['Vitez', 'Vitezinja'], season: 1, ranks: [['Mladi vitez', 'Vitez', 'Vitez reda', 'Kraljevi vitez', 'Vitez zlatega ščita', 'Legendarni vitez', 'Veliki mojster reda'],
+                                                           ['Mlada vitezinja', 'Vitezinja', 'Vitezinja reda', 'Kraljeva vitezinja', 'Vitezinja zlatega ščita', 'Legendarna vitezinja', 'Velika mojstrica reda']], starter: { obleka: 'oproda', 'v-roki': 'lesen-mec', ozadje: 'travnik' } },
+  carovnik: { names: ['Čarovnik', 'Čarovnica'], season: 2, ranks: [['Vajenec', 'Čarovnik', 'Mojster urokov', 'Veliki čarovnik', 'Zvezdni čarovnik', 'Legendarni čarovnik', 'Veliki modrec'],
+                                                                ['Vajenka', 'Čarovnica', 'Mojstrica urokov', 'Velika čarovnica', 'Zvezdna čarovnica', 'Legendarna čarovnica', 'Velika modrica']], starter: { obleka: 'halja', ozadje: 'travnik' } }
+};
+/* Čini nad 30 so dosegljivi samo v več sezonah z istim likom — nagrada za zvestobo liku. */
+const RANK_AT = [0, 10, 20, 30, 45, 60, 80];
+const RANK_COLORS = ['#b07a50', '#b9c2cc', '#5a8fe0', '#f4c542', '#8e44ad', '#e0574f', '#3fb8c9'];
+
+const SLOTS = {
+  glava: { name: 'Glava', crop: '126 -6 260 260' }, obleka: { name: 'Oblačila', crop: '106 200 300 300', fixed: true },
+  'v-roki': { name: 'V roki', crop: '186 70 320 320' }, scit: { name: 'Ščit', crop: '86 250 190 190' },
+  hrbet: { name: 'Hrbet', crop: '46 110 420 420' }, spremljevalec: { name: 'Spremljevalci', crop: '26 360 136 136' },
+  ozadje: { name: 'Svetovi', crop: '0 0 512 512', fixed: true }
+};
+/* char: komu pripada (null = skupno vsem likom). season: od katere sezone obstaja.
+   reward: [sezona, stran] — ni naprodaj, odklene ga polna stran albuma. */
+const ITEMS = {
+  oproda:       { slot: 'obleka', char: 'vitez', season: 1, name: 'Preprosta tunika', rarity: 'navaden', price: 0, sleeve: '#8a6a4a', cuff: '#d9b77a', pants: '#5a4a6e', boots: '#7a4a2a', draw: () => tunic('#8a6a4a', '#d9b77a') },
+  verizna:      { slot: 'obleka', char: 'vitez', season: 1, name: 'Verižna srajca', acc: 'Verižno srajco', rarity: 'navaden', price: 80, sleeve: '#a8b1bb', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: chainmail },
+  oklep:        { slot: 'obleka', char: 'vitez', season: 1, name: 'Viteški oklep', rarity: 'redek', price: 220, sleeve: '#b9c2cc', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#b9c2cc', '#c0392b', '#f1c40f') },
+  'zlati-oklep':{ slot: 'obleka', char: 'vitez', season: 2, name: 'Zlati oklep', rarity: 'nagrada', reward: [2, 'bit'], sleeve: '#f4d36b', cuff: '#d9a441', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#f4d36b', '#6a4fc0', '#fff') },
+  'celada-modra': { slot: 'glava', char: 'vitez', season: 1, name: 'Čelada z modrim perjem', acc: 'Čelado z modrim perjem', rarity: 'redek', price: 160, hidesHair: true, draw: () => helmet('#3a7bd5') },
+  celada:       { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška čelada', acc: 'Viteško čelado', rarity: 'nagrada', reward: [1, 'bit'], hidesHair: true, draw: () => helmet('#e74c3c') + sparkle(330, 60, 8) },
+  krona:        { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška krona', acc: 'Viteško krono', rarity: 'nagrada', reward: [1, 'tek'], draw: () =>
+      part('M204 74 L200 30 L232 54 L256 16 L280 54 L312 30 L308 74 Q256 84 204 74 Z', '#f4c542', { shadow: 'M256 10 L330 10 L330 90 L268 90 Z', hi: 'M212 42 L220 48 L218 68 L210 68 Z' })
+      + `<circle cx="256" cy="60" r="8" fill="#e74c3c" stroke="${OL}" stroke-width="3"/><circle cx="228" cy="64" r="5" fill="#3498db" stroke="${OL}" stroke-width="3"/><circle cx="284" cy="64" r="5" fill="#3498db" stroke="${OL}" stroke-width="3"/>` + sparkle(340, 40, 8) },
+  'lesen-mec':  { slot: 'v-roki', char: 'vitez', season: 1, name: 'Lesen meč', rarity: 'navaden', price: 0, draw: () => sword('#c89a6a', '#8a5a3b') },
+  mec:          { slot: 'v-roki', char: 'vitez', season: 1, name: 'Jeklen meč', rarity: 'navaden', price: 100, draw: () => sword('#e3e8ee', '#f1c40f') },
+  'zlati-mec':  { slot: 'v-roki', char: 'vitez', season: 1, name: 'Zlati meč', rarity: 'epski', price: 350, draw: () => sword('#f7dc7a', '#c0392b', '#ffe27a') },
+  'ledeni-mec': { slot: 'v-roki', char: 'vitez', season: 2, name: 'Ledeni meč', rarity: 'nagrada', reward: [2, 'tek'], draw: () => sword('#cdeeff', '#7fb4e6', '#bfe9ff') },
+  'scit-les':   { slot: 'scit', char: 'vitez', season: 1, name: 'Lesen ščit', rarity: 'navaden', price: 60, draw: () => shield('les') },
+  'scit-zvezda':{ slot: 'scit', char: 'vitez', season: 1, name: 'Ščit z zvezdo', rarity: 'redek', price: 150, draw: () => shield('zvezda') },
+  'scit-brihta':{ slot: 'scit', char: 'vitez', season: 1, name: 'Ščit Brihta', rarity: 'nagrada', reward: [1, 'zve'], draw: () => shield('brihta') },
+  plasc:        { slot: 'hrbet', char: 'vitez', season: 1, name: 'Rdeč plašč', rarity: 'redek', price: 120, draw: () => cape('#c0392b') },
+  'plasc-kralj':{ slot: 'hrbet', char: 'vitez', season: 1, name: 'Kraljevi plašč', rarity: 'epski', price: 300, draw: () => cape('#6a4fc0', '#f4c542') },
+  'plasc-zima': { slot: 'hrbet', char: 'vitez', season: 2, name: 'Zimski plašč', rarity: 'nagrada', reward: [2, 'post'], draw: () => cape('#e9eef5', '#ffffff') },
+  halja:        { slot: 'obleka', char: 'carovnik', season: 2, name: 'Čarovniška halja', acc: 'Čarovniško haljo', rarity: 'navaden', price: 0, robe: true, pants: '#3a3550', boots: '#4a3060', draw: () => robe('#5a4fc0') },
+  'halja-noc':  { slot: 'obleka', char: 'carovnik', season: 2, name: 'Nočna halja', acc: 'Nočno haljo', rarity: 'nagrada', reward: [2, 'bit'], robe: true, pants: '#2a2550', boots: '#2a2040', draw: () => robe('#2f2a6e') },
+  klobuk:       { slot: 'glava', char: 'carovnik', season: 2, name: 'Čarovniški klobuk', rarity: 'navaden', price: 100, draw: () => wizHat('#5a4fc0', '#f1c40f') },
+  'klobuk-noc': { slot: 'glava', char: 'carovnik', season: 2, name: 'Zvezdni klobuk', rarity: 'nagrada', reward: [2, 'tek'], draw: () => wizHat('#2f2a6e', '#7fe0ff') },
+  palica:       { slot: 'v-roki', char: 'carovnik', season: 2, name: 'Čarobna palica', acc: 'Čarobno palico', rarity: 'nagrada', reward: [2, 'post'], draw: () => `<g transform="translate(-6 -12)"><circle cx="368" cy="116" r="44" fill="#9ff0ff" opacity=".25"/>`
+      + line('M318 476 L364 150', 18) + line('M318 476 L364 150', 10, '#8a5a3b') + line('M352 150 C340 134 344 116 356 108', 7) + line('M378 150 C390 134 386 116 376 108', 7)
+      + part('M368 82 L386 116 L368 150 L350 116 Z', '#7fe0ff', { shadow: 'M368 82 L390 116 L368 150 Z', hi: 'M362 96 L368 88 L364 112 L358 112 Z', w: 4 }) + sparkle(404, 84, 8) + sparkle(334, 92, 6) + `</g>` },
+  svetilka:     { slot: 'v-roki', char: 'carovnik', season: 2, name: 'Svetilka', acc: 'Svetilko', rarity: 'navaden', price: 60, draw: () =>
+      `<circle cx="326" cy="430" r="44" fill="#ffd75e" opacity=".25"/>` + line('M326 374 L326 400', 5)
+      + part('M308 398 L344 398 L344 408 L308 408 Z', '#3a3550', { w: 4 }) + part('M311 408 L341 408 L341 452 L311 452 Z', '#ffd75e', { w: 4 }) + line('M326 410 L326 450', 3) + part('M308 452 L344 452 L344 461 L308 461 Z', '#3a3550', { w: 4 }) },
+  sova:         { slot: 'spremljevalec', char: null, season: 1, name: 'Sovica Brihta', acc: 'Sovico Brihta', rarity: 'nagrada', reward: [1, 'post'], draw: owl },
+  mucek:        { slot: 'spremljevalec', char: null, season: 1, name: 'Mucek', acc: 'Mucka', rarity: 'navaden', price: 90, draw: cat },
+  lisicka:      { slot: 'spremljevalec', char: null, season: 1, name: 'Lisička', acc: 'Lisičko', rarity: 'redek', price: 180, draw: fox },
+  /* Napoved: vidi se že jeseni, dobi se v zimi (polna stran Zvestoba). */
+  zmajcek:      { slot: 'spremljevalec', char: null, season: 1, name: 'Zmajček', acc: 'Zmajčka', rarity: 'nagrada', reward: [2, 'zve'], draw: dragon },
+  travnik:      { slot: 'ozadje', char: null, season: 1, name: 'Travnik', rarity: 'navaden', price: 0, draw: () => bg('travnik') },
+  zahod:        { slot: 'ozadje', char: null, season: 1, name: 'Sončni zahod', rarity: 'nagrada', reward: [1, 'pog'], draw: () => bg('zahod') },
+  grad:         { slot: 'ozadje', char: null, season: 1, name: 'Grad', rarity: 'nagrada', reward: [1, 'razred'], draw: () => bg('grad') },
+  sneg:         { slot: 'ozadje', char: null, season: 2, name: 'Zimska dežela', acc: 'Zimsko deželo', rarity: 'redek', price: 120, draw: () => bg('sneg') }
+};
+const acc = it => it.acc || it.name;
+/* Valuta: cekin. Sklanjatev po številu: 1 cekin, 2 cekina, 3–4 cekini, 5+ cekinov (tudi 101, 102 …). */
+function cek(n) { const m = Math.abs(n) % 100; return m === 1 ? 'cekin' : m === 2 ? 'cekina' : m === 3 || m === 4 ? 'cekini' : 'cekinov'; }
+/* Oblika imena sledi izbiri otroka: g('obvladal', 'obvladala'). */
+const F = () => S.look.form === 'f';
+const g = (m, f) => F() ? f : m;
+const cname = ch => CHARS[ch].names[F() ? 1 : 0];
+
+function hero(look, eq, viewBox = '0 0 512 512', noBg) {
+  const it = s => eq[s] ? ITEMS[eq[s]] : null;
+  const out = it('obleka') || ITEMS.oproda, hat = it('glava'), hide = hat && hat.hidesHair;
+  let s = !noBg && it('ozadje') ? it('ozadje').draw() : '';
+  s += `<ellipse cx="256" cy="480" rx="112" ry="14" fill="rgba(60,30,40,.18)"/>`;
+  if (it('hrbet')) s += it('hrbet').draw();
+  if (!hide) s += hairBack(look);
+  s += legs(out.pants, out.boots);
+  if (!out.robe) s += arms(out.sleeve, out.cuff);
+  s += out.draw() + head(look, !hide);
+  if (!hide) s += hairFront(look);
+  if (hat) s += hat.draw();
+  if (it('v-roki')) s += it('v-roki').draw();
+  s += hand(186, 374, look.skin, true) + hand(326, 374, look.skin, false);
+  if (it('scit')) s += it('scit').draw();
+  if (it('spremljevalec')) s += it('spremljevalec').draw();
+  return `<svg viewBox="${viewBox}" aria-hidden="true">${s}</svg>`;
+}
+const itemPic = (id, eq) => { const it = ITEMS[id]; return hero(S.look, { ...eq, [it.slot]: id, ...(it.slot === 'ozadje' ? {} : { ozadje: null }) }, SLOTS[it.slot].crop); };
+
+/* ════════════════ SLIČICE ════════════════ */
+const TABLE_COLORS = ['#7cc35d', '#3fb8c9', '#5a8fe0', '#8a6fe0', '#e06fb4', '#f08c2e', '#e0574f', '#d9a441', '#3f9a8a', '#b05ad9'];
+function frame(color, inner, gold, winter) {
+  const g = 'g' + (++uid), sh = 's' + (++uid);
+  return `<svg viewBox="0 0 120 120"><defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${light(color)}"/><stop offset="1" stop-color="${color}"/></linearGradient><clipPath id="${sh}"><rect x="13" y="13" width="94" height="94" rx="16"/></clipPath></defs>
+    <rect x="4" y="4" width="112" height="112" rx="22" fill="${gold ? '#f4c542' : winter ? '#dff0ff' : '#fff'}" stroke="${OL}" stroke-width="3"/>
+    <rect x="13" y="13" width="94" height="94" rx="16" fill="url(#${g})"/>
+    <g clip-path="url(#${sh})"><circle cx="26" cy="30" r="16" fill="#fff" opacity=".18"/><circle cx="98" cy="96" r="22" fill="#fff" opacity=".14"/>${inner}<path d="M13 58 L58 13 L74 13 L13 74 Z" fill="#fff" opacity=".18"/></g>
+    <rect x="13" y="13" width="94" height="94" rx="16" fill="none" stroke="${OL}" stroke-width="3"/>
+    ${gold ? sparkle(104, 14, 9) + sparkle(14, 104, 7) + `<circle cx="22" cy="22" r="11" fill="#f4c542" stroke="${OL}" stroke-width="2.5"/>` + star(22, 22, 7, '#fff', 1.5) : ''}
+    ${winter ? sparkle(104, 14, 8, '#fff') : ''}</svg>`;
+}
+const tableArt = (t, op, gold, winter) => frame(TABLE_COLORS[t - 1], txt(56, 86, t, t === 10 ? 50 : 60)
+  + `<circle cx="88" cy="32" r="15" fill="#fff" stroke="${OL}" stroke-width="3"/><text x="88" y="40" text-anchor="middle" font-size="24" font-weight="900" fill="${shade(TABLE_COLORS[t - 1])}" font-family="system-ui, sans-serif">${op === 'x' ? '×' : '÷'}</text>`, gold, winter);
+function emptyArt(label, progress) {
+  const C = 2 * Math.PI * 11;
+  return `<svg viewBox="0 0 120 120"><rect x="6" y="6" width="108" height="108" rx="20" fill="var(--slot)" stroke="var(--slot-line)" stroke-width="3" stroke-dasharray="8 6"/>
+    <text x="60" y="66" text-anchor="middle" font-size="${label.length > 3 ? 22 : 34}" font-weight="900" fill="var(--slot-line)" font-family="system-ui, sans-serif">${label}</text>
+    ${progress != null ? `<circle cx="60" cy="92" r="11" fill="none" stroke="var(--slot-line)" stroke-width="5" opacity=".5"/><circle cx="60" cy="92" r="11" fill="none" stroke="#f08c2e" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(C * progress).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 60 92)"/>` : ''}</svg>`;
+}
+const ICON = {
+  medal: col => line('M48 14 L58 50', 12) + line('M48 14 L58 50', 7, '#e74c3c') + line('M72 14 L62 50', 12) + line('M72 14 L62 50', 7, '#3a7bd5')
+    + part('M60 46 C76 46 86 58 86 72 C86 88 74 98 60 98 C46 98 34 88 34 72 C34 58 44 46 60 46 Z', col, { w: 3, shadow: 'M62 40 L92 40 L92 104 L62 104 Z' }) + star(60, 72, 10, light(col), 2),
+  flame: n => part('M60 18 C80 42 92 58 88 80 C85 98 72 106 60 106 C44 106 32 96 32 78 C32 62 44 54 48 40 C52 52 56 56 62 58 C60 46 56 32 60 18 Z', '#f08c2e', { w: 3, shadow: 'M64 10 L100 10 L100 110 L64 110 Z' })
+    + part('M60 58 C70 70 76 78 74 88 C72 98 66 102 60 102 C52 102 46 96 46 88 C46 78 54 72 60 58 Z', '#f4c542', { w: 2.5 }) + txt(60, 98, n, n.length > 1 ? 22 : 26, '#fff', 3),
+  swords: () => [['M30 30 L82 82', 'M74 90 L90 74', 88], ['M90 30 L38 82', 'M30 74 L46 90', 32]].map(([b, g, px]) => line(b, 11) + line(b, 6, '#e3e8ee') + line(g, 9) + line(g, 5, '#f4c542') + `<circle cx="${px}" cy="90" r="6" fill="#f4c542" stroke="${OL}" stroke-width="2.5"/>`).join(''),
+  crown: () => part('M28 86 L24 40 L44 58 L60 28 L76 58 L96 40 L92 86 Z', '#f4c542', { w: 3, shadow: 'M60 20 L100 20 L100 90 L66 90 Z' }) + `<circle cx="60" cy="72" r="7" fill="#e74c3c" stroke="${OL}" stroke-width="2.5"/>`,
+  podium: () => part('M46 52 L74 52 L74 98 L46 98 Z', '#f4c542', { w: 3 }) + part('M20 66 L46 66 L46 98 L20 98 Z', '#c3cad3', { w: 3 }) + part('M74 74 L100 74 L100 98 L74 98 Z', '#d99a5a', { w: 3 }) + txt(60, 86, '1', 26, '#fff', 3) + star(60, 34, 12, '#fff6b0'),
+  trophy: () => line('M40 34 Q20 36 24 56 Q28 70 44 68', 8) + line('M40 34 Q20 36 24 56 Q28 70 44 68', 4, '#f4c542') + line('M80 34 Q100 36 96 56 Q92 70 76 68', 8) + line('M80 34 Q100 36 96 56 Q92 70 76 68', 4, '#f4c542')
+    + part('M36 24 L84 24 L80 64 Q60 84 40 64 Z', '#f4c542', { w: 3, shadow: 'M60 18 L90 18 L90 90 L60 90 Z' }) + part('M42 92 L78 92 L80 102 L40 102 Z', '#d9a441', { w: 2.5 }) + line('M60 78 L60 92', 8) + star(60, 46, 10, '#fff6b0', 2),
+  people: () => [[28, 62, '#e06fb4'], [92, 62, '#5a8fe0'], [44, 50, '#7cc35d'], [76, 50, '#d9a441'], [60, 44, '#f08c2e']].map(([x, y, c]) => part(`M${x - 13} ${y + 44} C${x - 13} ${y + 20} ${x + 13} ${y + 20} ${x + 13} ${y + 44} Z`, c, { w: 2.5 }) + `<circle cx="${x}" cy="${y + 8}" r="10" fill="#f7d2b4" stroke="${OL}" stroke-width="2.5"/>`).join(''),
+  stopwatch: () => part('M54 16 L66 16 L66 26 L54 26 Z', '#c3cad3', { w: 2.5 }) + part('M60 26 C82 26 96 42 96 64 C96 86 80 102 60 102 C40 102 24 86 24 64 C24 42 38 26 60 26 Z', '#fff', { w: 3 }) + line('M60 64 L60 40', 4) + line('M60 64 L76 72', 4, '#e74c3c'),
+  arrow: () => line('M28 62 L50 48 L66 54 L94 24', 9) + line('M28 62 L50 48 L66 54 L94 24', 5, '#3f9a5a') + part('M84 22 L98 20 L96 34 Z', '#3f9a5a', { w: 2.5 }) + line('M22 92 L98 92', 3),
+  board: () => part('M26 26 L94 26 L94 98 L26 98 Z', '#fff', { w: 3 }) + part('M26 26 L94 26 L94 42 L26 42 Z', '#6a4fc0', { w: 3 }) + [54, 68, 82].map((y, i) => line(`M36 ${y} L${i ? 62 : 70} ${y}`, 6, i ? '#c3cad3' : '#f4c542')).join(''),
+  calendar: n => part('M24 30 L96 30 L96 100 L24 100 Z', '#fff', { w: 3 }) + part('M24 30 L96 30 L96 48 L24 48 Z', '#e0574f', { w: 3 }) + line('M42 22 L42 36', 6) + line('M78 22 L78 36', 6) + txt(60, 88, n, 32, '#3f9a5a', 3),
+  mountain: () => part('M12 100 L48 38 L66 64 L80 46 L108 100 Z', '#8a9bb8', { w: 3, shadow: 'M62 30 L112 30 L112 104 L62 104 Z' })
+    + part('M48 38 L38 56 L46 52 L52 58 L58 50 Z', '#fff', { w: 2.5 }) + line('M48 38 L48 14', 3) + part('M48 14 L68 21 L48 28 Z', '#e0574f', { w: 2.5 }),
+  hello: () => star(60, 60, 34, '#f4c542', 3) + `<circle cx="50" cy="56" r="4" fill="${OL}"/><circle cx="70" cy="56" r="4" fill="${OL}"/>` + line('M50 68 Q60 76 70 68', 3),
+  flake: () => [0, 60, 120].map(a => `<g transform="rotate(${a} 60 60)">` + line('M60 24 L60 96', 7, OL) + line('M60 24 L60 96', 3, '#fff') + line('M50 32 L60 42 L70 32', 3, '#fff') + line('M50 88 L60 78 L70 88', 3, '#fff') + `</g>`).join('')
+};
+
+/* ── album po sezonah ── */
+/* Prag za "obvladano" (odločeno 5. 10. 2026, velja za sličice IN Brihtometer):
+   vseh 10 računov predala vsaj enkrat pravilno, vsaj 20 odgovorov, 90 % pravilnih,
+   80 % pravilnih pod 3 s. Štejejo samo tipkovnica, tekmovanje in bitka (ne kviz). */
+/* ════════════════ ALBUM: besedila in slike sličic ════════════════
+   Stanje (katere sličice ima otrok, napredek, cekini) pride iz baze —
+   supabase_album.sql. Tukaj so samo imena, pogoji in slike. */
+const MIN_N = 20, MIN_ACC = 90, MIN_FAST = 80, MIN_COVER = 10, COIN_PER = 20;
+const PAGE_NAMES = { post: 'Poštevanke', tek: 'Tekmovanje', bit: 'Bitka', zve: 'Zvestoba', pog: 'Pogum' };
+/* Strani, ki jih baza že podeljuje. Tekmovanje, Bitka, Pogum in razredni cilj: 2. del. */
+const PAGES_LIVE = ['post', 'zve'];
+
+function buildAlbum() {
+  const pages = [];
+  let no = 0;
+  const add = p => { p.stickers.forEach(s => { s.no = ++no; s.page = p.id; s.state = 'none'; }); pages.push(p); };
+  add({ id: 'post', name: 'Poštevanke',
+    get desc() { return 'Sličico dobiš, ko poštevanko obvladaš v Brihtometru: vseh 10 računov vsaj enkrat pravilno, vsaj 20 odgovorov, 90 % pravilnih in 80 % hitreje kot v 3 sekundah. Šteje tipkovnica, tekmovanje in bitka — kviz ne. Zlata: znaš jo tudi 14 dni pozneje. Šteje samo, kar pokažeš v tej sezoni — tudi pri poštevankah, ki si jih ' + g('znal', 'znala') + ' že prej.'; },
+    sections: [['x', 'Množenje ×'], ['d', 'Deljenje ÷']],
+    stickers: ['x', 'd'].flatMap(op => Array.from({ length: 10 }, (_, i) => {
+      const t = i + 1;
+      return { id: `${op}${t}`, sec: op, t, op, label: `${t} ${op === 'x' ? '×' : '÷'}`, art: g => tableArt(t, op, g) };
+    })) });
+  add({ id: 'zve', name: 'Zvestoba', desc: 'Šolski dnevi zapored. Vikendi in počitnice niza ne prekinejo.', stickers: [
+    { id: 'z0', label: 'Dobrodošlica', cond: 'Prijavi se prvič.', art: g => frame('#f4c542', ICON.hello(), g) },
+    { id: 'z1', label: '3 dni', cond: 'Vadi 3 šolske dni zapored.', streak: 3, art: g => frame('#e0574f', ICON.flame('3'), g) },
+    { id: 'z2', label: 'Cel teden', cond: 'Vadi 5 šolskih dni zapored.', streak: 5, art: g => frame('#e06fb4', ICON.flame('5'), g) },
+    { id: 'z3', label: '10 dni', cond: 'Vadi 10 šolskih dni zapored.', streak: 10, art: g => frame('#8a6fe0', ICON.flame('10'), g) },
+    { id: 'z4', label: '20 dni', cond: 'Vadi 20 šolskih dni zapored.', streak: 20, art: g => frame('#5a8fe0', ICON.flame('20'), g) },
+    { id: 'z5', label: '50 dni vadbe', cond: 'Vadi 50 različnih dni (dan šteje, ko imaš vsaj 10 pravilnih).', days: 50, art: g => frame('#3f9a8a', ICON.calendar('50'), g) }
+  ] });
+  return pages;
+}
+
+/* ════════════════ STANJE ════════════════ */
+const SEASONS = { 1: { name: 'Jesen', ico: '🍂' }, 2: { name: 'Zima', ico: '❄️' } };
+const S = {
+  srv: null, error: null,
+  view: 'album', page: 'post', trying: null,
+  look: { skin: '#f7d2b4', hair: '#5a3a24', eye: '#4a8a3c', style: 'kratki', form: 'm' },
+  equip: {}, active: 'vitez', seasonChar: 'vitez', coins: 0, owned: new Set(),
+  album: buildAlbum()
+};
+const $ = id => document.getElementById(id);
+const EQ = () => S.equip[S.active] || (S.equip[S.active] = {});
+const ALL = () => S.album.flatMap(p => p.stickers);
+const owned = s => s.state === 'have' || s.state === 'gold';
+const pageDone = p => p.stickers.every(owned);
+const rot = s => ((s.no * 37) % 9 - 4) + 'deg';
+const pad = n => '#' + String(n).padStart(2, '0');
+const nSlic = n => n === 1 ? 'sličica' : n === 2 ? 'sličici' : n < 5 ? 'sličice' : 'sličic';
+const seasonId = () => S.srv && S.srv.season ? S.srv.season.id : 1;
+const rewardFor = page => Object.keys(ITEMS).find(id => ITEMS[id].reward && ITEMS[id].reward[0] === seasonId() && ITEMS[id].reward[1] === page
+  && (!ITEMS[id].char || ITEMS[id].char === S.seasonChar));
+function rankInfo(ch = S.active) {
+  const n = (S.srv && S.srv.ranks && S.srv.ranks[ch]) || 0, r = CHARS[ch].ranks[F() ? 1 : 0], top = RANK_AT.length - 1;
+  let i = 0; while (i < top && n >= RANK_AT[i + 1]) i++;
+  return { n, i, name: r[i], next: r[i + 1], need: i < top ? RANK_AT[i + 1] - n : 0, frac: i < top ? (n - RANK_AT[i]) / (RANK_AT[i + 1] - RANK_AT[i]) : 1 };
+}
+
+/* Odgovor baze → stanje strani. Kliče se po vsakem klicu v bazo. */
+function apply(st) {
+  if (!st || st.unreachable) { S.error = 'Album se ni naložil. Preveri internetno povezavo in poskusi znova.'; return render(); }
+  S.srv = st; S.error = null;
+  S.coins = st.coins || 0;
+  S.owned = new Set(st.items || []);
+  S.seasonChar = st.char || 'vitez';
+  const a = st.avatar || {};
+  S.look = { skin: a.skin || S.look.skin, hair: a.hair || S.look.hair, eye: a.eye || S.look.eye, style: a.style || S.look.style, form: a.form || S.look.form };
+  S.equip = a.equip || {};
+  S.active = a.active_char || S.seasonChar;
+  const got = {}; (st.stickers || []).forEach(x => { got[x.id] = x.gold ? 'gold' : x.state; });
+  const tbl = {}; (st.tables || []).forEach(x => { tbl[x.op + x.t] = x; });
+  const streak = (st.streak && st.streak.best) || 0, days = st.practice_days || 0;
+  ALL().forEach(s => {
+    s.state = got[s.id] || 'none';
+    if (s.t) {
+      const x = tbl[s.op + s.t];
+      s.prog = x ? [x.n, x.n ? Math.round(x.c / x.n * 100) : 0, x.timed ? Math.round(x.fast / x.timed * 100) : 0, x.cover] : null;
+    }
+    if (s.streak) s.step = [Math.min(streak, s.streak), s.streak, 'dni zapored'];
+    if (s.days) s.step = [Math.min(days, s.days), s.days, 'dni'];
+  });
+  try { parent.albumChanged && parent.albumChanged(st); } catch (e) {}
+  render();
+}
+
+/* Klic v bazo prek aplikacije (album.js: albumApi — supabaseRPC in prijavljen učenec). */
+const api = () => { try { return parent.albumApi; } catch (e) { return null; } };
+async function rpc(fn, extra) {
+  const p = api() && api().profile();
+  if (!p) { S.error = 'Za album se prijavi.'; render(); return null; }
+  return api().rpc(fn, { p_student: p.id, ...(extra || {}) });
+}
+let saveTimer = null;
+function saveAvatar() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const st = await rpc('album_set_avatar', { p_avatar: { ...S.look, active_char: S.active, equip: S.equip } });
+    if (st && !st.unreachable) apply(st);
+  }, 400);
+}
+
+/* ════════════════ IZRIS ════════════════ */
+function previewEq() { const e = { ...EQ() }; if (S.trying) e[ITEMS[S.trying].slot] = S.trying; return e; }
+/* Prvi štirje čini: 1–4 trakovi. Čini nad 30: zvezda in pike (1–3). */
+function chevrons(i) {
+  let s = `<svg class="chev" viewBox="0 0 40 40"><path d="M20 2 L36 8 L36 22 Q36 34 20 38 Q4 34 4 22 L4 8 Z" fill="${RANK_COLORS[i]}" stroke="${OL}" stroke-width="2.5"/>`;
+  if (i < 4) s += Array.from({ length: i + 1 }, (_, k) => `<path d="M12 ${26 - k * 6} L20 ${21 - k * 6} L28 ${26 - k * 6}" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
+  else s += star(20, 17, 9, '#fff6b0', 1.5) + Array.from({ length: i - 3 }, (_, k) => `<circle cx="${20 + (k - (i - 4) / 2) * 7}" cy="31" r="2.6" fill="#fff"/>`).join('');
+  return s + `</svg>`;
+}
+function ladder() {
+  const r = rankInfo(), names = CHARS[S.active].ranks[F() ? 1 : 0];
+  openModal(`<h3>Pot čina: ${cname(S.active)}</h3><p>Vsaka sličica šteje. Čini nad 30 so za tiste, ki pri liku ostanejo več sezon.</p>
+    <div class="checks">${names.map((nm, i) => `<div class="check" style="${i === r.i ? 'outline:2px solid var(--accent)' : ''}"><span>${chevrons(i).replace('class="chev"', 'width="26" height="26"')}</span><div><b>${nm}</b>${i === r.i ? ' · <b style="color:var(--accent)">ti</b>' : ''}<br><small style="color:var(--muted)">${RANK_AT[i]} sličic${i >= 4 ? ' · več sezon · lik dobi sijaj' : ''}</small></div></div>`).join('')}</div>
+    <p>Imaš <b>${r.n}</b> ${nSlic(r.n)} s tem likom.</p><div class="btns"><button class="btn btn-main" data-do="close">V redu</button></div>`);
+}
+
+function renderHeader() {
+  const se = S.srv && S.srv.season, info = se ? SEASONS[se.id] || {} : {};
+  $('season').innerHTML = se
+    ? `<span class="ico">${info.ico || '⭐'}</span><span>Sezona ${se.id}: ${se.name} · ${cname(S.active)} <small>· še ${se.days_left} ${se.days_left === 1 ? 'dan' : se.days_left === 2 ? 'dneva' : se.days_left < 5 ? 'dnevi' : 'dni'}</small></span>`
+    : `<span class="ico">⭐</span><span>Brihtov album</span>`;
+  $('wallet').innerHTML = `<span class="coin"></span><span id="coins">${S.coins}</span><small style="font-weight:600;color:var(--muted);font-size:.8rem">${cek(S.coins)}</small>`;
+  const pend = ALL().filter(s => s.state === 'pending').length, b = $('envBtn');
+  b.disabled = !pend; b.classList.toggle('pulse', !!pend);
+  b.innerHTML = pend ? `✉ Nove sličice <span class="n">${pend}</span>` : '✉ Ni novih';
+}
+
+function renderStage() {
+  const ri = rankInfo().i;
+  /* Čini nad 30: okoli lika se pojavi sijaj (več iskric pri višjem činu). */
+  const glow = ri >= 4 ? `<div class="aura"><svg viewBox="0 0 512 512"><circle cx="256" cy="270" r="200" fill="${RANK_COLORS[ri]}" opacity=".12"/>${[[90,120],[420,110],[70,300],[440,320],[150,60],[370,420],[120,430],[400,220],[256,30]].slice(0, (ri - 3) * 3).map(([x, y], k) => sparkle(x, y, 10 + (k % 3) * 4).replace('<path', `<path style="animation-delay:${k * .3}s"`)).join('')}</svg></div>` : '';
+  $('stageSvg').innerHTML = hero(S.look, previewEq()) + glow;
+  const t = S.trying && ITEMS[S.trying];
+  $('tryingBadge').classList.toggle('on', !!t && EQ()[t.slot] !== S.trying);
+  const r = rankInfo();
+  $('rank').innerHTML = `${chevrons(r.i)}<div><b>${r.name}</b><small>${r.next ? `še ${r.need} ${nSlic(r.need)} do čina ${r.next}` : 'Najvišji čin!'}</small><div class="bar"><i style="width:${r.frac * 100}%"></i></div></div>`;
+  const a = $('action');
+  if (!t) { a.innerHTML = `<div class="hint">${S.view === 'trgovina' ? 'Tapni predmet, da ga preizkusiš.' : 'Sličice prinesejo cekine in višji čin.'}</div>`; return; }
+  const own = S.owned.has(S.trying), on = EQ()[t.slot] === S.trying;
+  let body;
+  if (t.reward && !own) {
+    const [rs, rp] = t.reward, later = rs > seasonId(), live = PAGES_LIVE.includes(rp);
+    const pg = !later && live ? S.album.find(p => p.id === rp) : null;
+    body = `<div class="act-note">${pg ? `Ni naprodaj — nagrada za polno stran <b>${pg.name}</b> (${pg.stickers.filter(owned).length}/${pg.stickers.length}).`
+      : later ? `Pride v sezoni ${rs} (${(SEASONS[rs] || {}).name || ''}) — nagrada za polno stran <b>${PAGE_NAMES[rp]}</b>.`
+      : rp === 'razred' ? 'Nagrada za ves razred, ko dosežete skupni cilj — kmalu.'
+      : `Ni naprodaj — nagrada za polno stran <b>${PAGE_NAMES[rp]}</b>. Ta stran pride kmalu.`}</div>
+      <div class="btns">${pg ? `<button class="btn btn-purple" data-go="${pg.id}">Pojdi na stran</button>` : ''}<button class="btn btn-soft" data-do="cancel">Zapri</button></div>`;
+  } else if (!own) {
+    const short = t.price - S.coins;
+    body = `<div class="btns">${short > 0 ? `<button class="btn btn-main" disabled>Manjka še ${short} ${cek(short)}</button>` : `<button class="btn btn-main" data-do="buy">Kupi za ${t.price} ${cek(t.price)}</button>`}<button class="btn btn-soft" data-do="cancel">Prekliči</button></div>`;
+  } else if (!on) body = `<div class="btns"><button class="btn btn-ok" data-do="wear">Obleči</button><button class="btn btn-soft" data-do="cancel">Zapri</button></div>`;
+  else body = `<div class="btns">${SLOTS[t.slot].fixed ? `<button class="btn btn-main" disabled>Oblečeno</button>` : `<button class="btn btn-main" data-do="off">Sleči</button>`}<button class="btn btn-soft" data-do="cancel">Zapri</button></div>`;
+  a.innerHTML = `<div class="act-title">${t.name} <span class="rar ${t.rarity}">${t.rarity}</span>${!own && !t.reward && t.price ? `<span class="price"><span class="coin"></span>${t.price}</span>` : ''}</div>${body}`;
+}
+
+function renderTabs() {
+  $('mainTabs').innerHTML = [['album', '📒 Album'], ['trgovina', '🛡️ Oprema'], ['videz', '🙂 Moj videz'], ['liki', '⭐ Moji liki']]
+    .map(([k, n]) => `<button class="mt ${S.view === k ? 'on' : ''}" data-view="${k}">${n}</button>`).join('');
+}
+
+function slotHTML(s) {
+  const inner = owned(s) ? `<div class="st have" style="--rot:${rot(s)}">${s.art(s.state === 'gold')}</div>`
+    : `<div class="st">${emptyArt(s.t ? s.label.replace(' ', '') : pad(s.no), s.state === 'pending' ? null : progOf(s))}${s.state === 'pending' ? '<div class="waiting"><span>✉ v ovojnici</span></div>' : ''}</div>`;
+  return `<button class="slot" data-st="${s.id}" id="slot-${s.id}">${inner}<div class="lbl">${s.label}</div><div class="num">${pad(s.no)}</div></button>`;
+}
+function progOf(s) {
+  if (s.t) { if (!s.prog) return 0; const [n, a, f, c] = s.prog; return Math.min(1, c / MIN_COVER) * .25 + Math.min(1, n / MIN_N) * .25 + (n ? Math.min(1, a / MIN_ACC) * .25 + Math.min(1, f / MIN_FAST) * .25 : 0); }
+  return s.step ? s.step[0] / s.step[1] : null;
+}
+function rewardBox(p) {
+  const id = rewardFor(p.id), done = pageDone(p), left = p.stickers.filter(s => !owned(s)).length;
+  if (!id) return '';
+  return `<button class="reward ${done ? 'open' : 'locked'}" data-try="${id}"><div class="pic">${itemPic(id, EQ())}</div><div><small>${done ? 'Odklenjeno!' : 'Ko je stran polna'}</small><b>${ITEMS[id].name}</b><small>${done ? 'Tvoje — v opremi.' : `še ${left} ${nSlic(left)}`}</small></div></button>`;
+}
+
+function renderAlbum() {
+  const tabs = S.album.map(p => `<button class="tab ${S.page === p.id ? 'on' : ''} ${pageDone(p) ? 'full' : ''}" data-page="${p.id}">${p.name} <small>${p.stickers.filter(owned).length}/${p.stickers.length}</small></button>`).join('');
+  const p = S.album.find(x => x.id === S.page) || S.album[0], h = p.stickers.filter(owned).length, n = p.stickers.length;
+  const cols = n === 6 ? 'six' : n === 8 || n === 4 ? 'four' : '';
+  const body = `<div class="page-head"><div><h1>${p.name}</h1><p class="desc">${p.desc}</p><div class="page-prog"><span>${h} / ${n}</span><div class="bar"><i style="width:${h / n * 100}%"></i></div></div></div>${rewardBox(p)}</div>`
+    + (p.sections ? p.sections.map(([k, t]) => `<div class="section-title">${t}</div><div class="sgrid">${p.stickers.filter(s => s.sec === k).map(slotHTML).join('')}</div>`).join('')
+                  : `<div class="sgrid ${cols}">${p.stickers.map(slotHTML).join('')}</div>`)
+    + `<p class="shop-note" style="margin-top:18px">Strani Tekmovanje, Bitka in Pogum pridejo kmalu.</p>`;
+  $('view').innerHTML = `<nav class="tabs">${tabs}</nav><section class="page">${body}</section>`;
+}
+
+function renderShop() {
+  const ids = Object.keys(ITEMS).filter(id => { const it = ITEMS[id]; return it.season <= seasonId() && (!it.char || it.char === S.active); });
+  const order = ['obleka', 'glava', 'v-roki', 'scit', 'hrbet', 'spremljevalec', 'ozadje'];
+  const groups = order.map(sl => [sl, ids.filter(id => ITEMS[id].slot === sl)]).filter(([, l]) => l.length);
+  $('view').innerHTML = `<div class="panel"><p class="shop-note">Oprema za: <b>${cname(S.active)}</b>. Predmeti z oznako <span class="rar nagrada">nagrada</span> niso naprodaj — odklene jih polna stran albuma.</p>`
+    + groups.map(([sl, l]) => `<div class="section-title">${SLOTS[sl].name}</div><div class="igrid">${l.map(id => {
+      const it = ITEMS[id], own = S.owned.has(id), on = EQ()[it.slot] === id, lock = it.reward && !own;
+      return `<button class="card ${S.trying === id ? 'sel' : ''} ${lock ? 'lock' : ''}" data-try="${id}"><div class="pic">${itemPic(id, EQ())}</div>
+        ${on ? '<span class="tag on">Oblečeno</span>' : own ? '<span class="tag own">Tvoje</span>' : lock ? '<span class="tag lk">🔒 Nagrada</span>' : ''}
+        <div class="nm">${it.name}</div><div class="row"><span class="rar ${it.rarity}">${it.rarity}</span>${own || lock ? '' : it.price ? `<span class="price"><span class="coin"></span>${it.price}</span>` : '<b style="color:var(--ok);font-size:.85rem">Brezplačno</b>'}</div></button>`;
+    }).join('')}</div>`).join('') + `</div>`;
+}
+
+function renderLook() {
+  const O = { skin: ['#f7d2b4', '#efc29e', '#d9a47c', '#c98d62', '#8d5a3b'], hair: ['#5a3a24', '#2b1d2e', '#d9a441', '#c0392b', '#8a8f9a', '#e9e4ef'], eye: ['#4a8a3c', '#2a7fcf', '#6a4fc0', '#7a4a2a', '#3a3a3a'] };
+  const sw = k => O[k].map(v => `<button class="sw ${S.look[k] === v ? 'on' : ''}" data-look="${k}" data-val="${v}" style="background:${v}"></button>`).join('');
+  const nm = CHARS[S.active].names;
+  $('view').innerHTML = `<div class="panel looks"><h3>Moj lik je</h3><div class="sw-row">${['m', 'f'].map((v, i) => `<button class="chip ${S.look.form === v ? 'on' : ''}" data-look="form" data-val="${v}">${nm[i]}</button>`).join('')}</div><h3>Koža</h3><div class="sw-row">${sw('skin')}</div><h3>Barva las</h3><div class="sw-row">${sw('hair')}</div>
+    <h3>Frizura</h3><div class="sw-row">${Object.keys(HAIR).map(v => `<button class="chip ${S.look.style === v ? 'on' : ''}" data-look="style" data-val="${v}">${HAIR[v].name}</button>`).join('')}</div>
+    <h3>Oči</h3><div class="sw-row">${sw('eye')}</div><p class="shop-note" style="margin-top:14px">✓ Videz je brezplačen in velja za vse tvoje like.</p></div>`;
+}
+
+function renderChars() {
+  const mine = (S.srv && S.srv.chars) || [];
+  const cards = Object.entries(CHARS).map(([k, c]) => {
+    const have = mine.includes(k), on = S.active === k;
+    const preview = hero(S.look, have ? (S.equip[k] || {}) : { ...c.starter });
+    if (!have) return `<div class="ch future"><div class="pic">${preview}</div><b>${cname(k)}</b><small>Sezona ${c.season}: ${(SEASONS[c.season] || {}).name || ''}</small><button class="btn btn-soft" disabled>Pride v sezoni ${c.season}</button></div>`;
+    return `<div class="ch ${on ? 'on' : ''}"><div class="pic">${preview}</div><b>${cname(k)}</b><small>${on ? 'Aktiven lik' : rankInfo(k).name}</small>
+      ${on ? '<button class="btn btn-ok" disabled>Igraš s tem likom</button>' : `<button class="btn btn-main" data-switch="${k}">Preklopi</button>`}</div>`;
+  }).join('') + `<div class="ch future"><div class="pic">${hero(S.look, { obleka: 'oproda' })}</div><b>???</b><small>Sezona 3: pomlad</small><button class="btn btn-soft" disabled>Skrivnost</button></div>`;
+  $('view').innerHTML = `<div class="panel"><div class="info">Vsaki dve meseci pride nov lik. Ob koncu sezone izbereš: ostaneš pri svojem liku ali začneš z novim. Stari liki ostanejo tvoji z vso opremo. Spremljevalci in svetovi so skupni vsem likom.</div><div class="chars">${cards}</div></div>`;
+}
+
+function render() {
+  if (!S.srv || S.error) {
+    $('view').innerHTML = `<div class="panel"><p class="shop-note" style="font-size:1rem">${S.error || 'Nalagam album …'}</p></div>`;
+    if (S.error && S.srv) return;
+    if (!S.srv) { $('stageSvg').innerHTML = hero(S.look, {}); return; }
+  }
+  if (!S.srv.season) {
+    renderHeader(); renderTabs();
+    $('stageSvg').innerHTML = hero(S.look, EQ());
+    $('view').innerHTML = `<div class="panel"><p class="shop-note" style="font-size:1rem">Sezona se še ni začela. Kmalu!</p></div>`;
+    return;
+  }
+  renderHeader(); renderStage(); renderTabs();
+  ({ album: renderAlbum, trgovina: renderShop, videz: renderLook, liki: renderChars })[S.view]();
+}
+
+/* ════════════════ OKNA IN DEJANJA ════════════════ */
+function openModal(html, wide) { $('box').className = 'box' + (wide ? ' wide' : ''); $('box').innerHTML = html; $('modal').classList.add('on'); }
+function closeModal() { $('modal').classList.remove('on'); }
+function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 2600); }
+function bumpWallet(n) {
+  const w = $('wallet'); w.classList.remove('bump'); void w.offsetWidth; w.classList.add('bump');
+  if (n > 0) { const p = document.createElement('span'); p.className = 'plus'; p.textContent = `+${n}`; w.appendChild(p); setTimeout(() => p.remove(), 1100); }
+}
+function burst(el) {
+  const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.width / 2, cols = ['#f4c542', '#f08c2e', '#6a4fc0', '#7fe0ff', '#ff7f8f'];
+  for (let i = 0; i < 18; i++) { const d = document.createElement('span'), a = i / 18 * Math.PI * 2, dist = 50 + Math.random() * 40; d.className = 'burst'; d.style.left = cx + 'px'; d.style.top = cy + 'px'; d.style.background = cols[i % 5]; d.style.setProperty('--x', Math.cos(a) * dist + 'px'); d.style.setProperty('--y', Math.sin(a) * dist + 'px'); document.body.appendChild(d); setTimeout(() => d.remove(), 900); }
+}
+function confetti() {
+  const cols = ['#f08c2e', '#f4c542', '#6a4fc0', '#3f9a5a', '#ff7f8f', '#7fe0ff'];
+  for (let i = 0; i < 40; i++) { const p = document.createElement('span'), a = Math.random() * Math.PI * 2, d = 120 + Math.random() * 280; p.className = 'confetti'; p.style.background = cols[i % 6]; p.style.setProperty('--x', Math.cos(a) * d + 'px'); p.style.setProperty('--y', Math.sin(a) * d - 120 + 'px'); p.style.setProperty('--r', (Math.random() * 720 - 360) + 'deg'); document.body.appendChild(p); setTimeout(() => p.remove(), 1300); }
+}
+/* Povezava "vadi" odpre vajo v aplikaciji (to okno je odprto čez njo). */
+const practiceHref = (t, op) => `./?p=${t}&op=${op}&mode=tipkovnica`;
+
+function stickerDetail(s) {
+  if (s.state === 'pending') return openModal(`<div class="art">${emptyArt(pad(s.no), null)}</div><h3>${s.label}</h3><p>Ta sličica te že čaka v ovojnici!</p><div class="btns"><button class="btn btn-main" data-do="env">✉ Odpri ovojnico</button><button class="btn btn-soft" data-do="close">Zapri</button></div>`);
+  if (owned(s)) return openModal(`<div class="art" style="transform:rotate(${rot(s)})">${s.art(s.state === 'gold')}</div><h3>${s.label}</h3><p>${s.t ? (s.state === 'gold' ? 'Zlata! Poštevanko znaš tudi po 14 dneh.' : 'Obvladaš jo! Ponovi jo čez 14 dni in sličica postane zlata (+20 cekinov).') : s.cond}</p><div class="btns"><button class="btn btn-main" data-do="close">Super</button></div>`);
+  if (s.t) {
+    const [n, a, f, c] = s.prog || [0, 0, 0, 0];
+    const rows = [[c >= MIN_COVER, `Različnih računov: <b>${c} / 10</b> (vsi)`, c / MIN_COVER], [n >= MIN_N, `Odgovori: <b>${n}</b> (vsaj ${MIN_N})`, n / MIN_N], [n > 0 && a >= MIN_ACC, `Pravilni: <b>${a} %</b> (vsaj ${MIN_ACC} %)`, a / MIN_ACC], [n > 0 && f >= MIN_FAST, `Hitri (pod 3 s): <b>${f} %</b> (vsaj ${MIN_FAST} %)`, f / MIN_FAST]];
+    const tip = n === 0 ? 'Začni na tipkovnici — kviz za sličice ne šteje.' : c < MIN_COVER ? `Manjka še ${MIN_COVER - c} ${MIN_COVER - c === 1 ? 'račun' : MIN_COVER - c === 2 ? 'računa' : MIN_COVER - c < 5 ? 'računi' : 'računov'} — vadi celo poštevanko, ne samo lahkih.` : n < MIN_N ? `Še ${MIN_N - n} ${MIN_N - n === 1 ? 'odgovor' : MIN_N - n === 2 ? 'odgovora' : MIN_N - n < 5 ? 'odgovori' : 'odgovorov'} — potem šteje.` : a < MIN_ACC ? 'Skoraj! Še malo bolj natančno.' : 'Pravilno že znaš — zdaj še hitreje.';
+    return openModal(`<div class="art">${emptyArt(s.label.replace(' ', ''), progOf(s))}</div><h3>${s.label} — še vadiš</h3>
+      <div class="checks">${rows.map(([ok, t, p]) => `<div class="check"><span class="ic ${ok ? 'y' : 'n'}">${ok ? '✓' : ''}</span><div>${t}<div class="bar"><i style="width:${Math.min(100, p * 100)}%"></i></div></div></div>`).join('')}</div>
+      <div class="tip">${tip} Sličica prinese +${COIN_PER} ${cek(COIN_PER)}.</div><div class="btns"><a class="btn btn-main" href="${practiceHref(s.t, s.op)}" target="_top">Vadi ${s.label} zdaj</a><button class="btn btn-soft" data-do="close">Zapri</button></div>`);
+  }
+  const [a, b, unit] = s.step || [0, 1, ''];
+  openModal(`<div class="art">${emptyArt(pad(s.no), s.step ? a / b : null)}</div><h3>${s.label}</h3><p>${s.cond}</p>
+    ${s.step ? `<div class="checks"><div class="check"><span class="ic n"></span><div><b>${a} / ${b}</b> ${unit}<div class="bar"><i style="width:${a / b * 100}%"></i></div></div></div></div>` : ''}
+    <div class="btns"><button class="btn btn-soft" data-do="close">V redu</button></div>`);
+}
+
+const envSvg = open => `<svg viewBox="0 0 220 160">${open ? part('M20 60 L110 6 L200 60 Z', '#e9b37a', { w: 4 }) : ''}${part('M20 60 L200 60 L200 150 L20 150 Z', '#f6cf9f', { w: 4, shadow: 'M110 60 L210 60 L210 160 L110 160 Z' })}${line('M20 150 L110 96 L200 150', 4)}${open ? '' : part('M20 60 L110 116 L200 60 Z', '#e9b37a', { w: 4 })}<circle cx="110" cy="${open ? 30 : 104}" r="16" fill="#e0574f" stroke="${OL}" stroke-width="3"/>${star(110, open ? 30 : 104, 8, '#f4c542', 1.5)}</svg>`;
+function openEnvelope() {
+  if (!ALL().some(s => s.state === 'pending')) return;
+  openModal(`<div class="env-art shake" id="envArt">${envSvg(false)}</div><h3>Nova sličica!</h3><p>Zaslužena z veliko vaje. Čestitam!</p><div class="btns"><button class="btn btn-main" data-do="reveal">Odpri</button></div>`);
+}
+function reveal() {
+  const s = ALL().find(x => x.state === 'pending'), p = S.album.find(x => x.id === s.page);
+  openModal(`<div class="art reveal" style="width:190px;height:190px">${s.art(false)}</div><h3>${s.label}</h3><p>Stran <b>${p.name}</b> · ${pad(s.no)} · <b>+${COIN_PER} ${cek(COIN_PER)}</b></p><div class="btns"><button class="btn btn-main" data-do="stick" data-id="${s.id}">Prilepi v album</button></div>`);
+}
+async function stick(id) {
+  const s = ALL().find(x => x.id === id), p = S.album.find(x => x.id === s.page), before = rankInfo(S.seasonChar).i, coins = S.coins;
+  closeModal();
+  const st = await rpc('album_stick', { p_sticker: id });
+  if (!st || st.unreachable) return toast('Sličice ni bilo mogoče prilepiti. Poskusi znova.');
+  S.view = 'album'; S.page = p.id; apply(st);
+  const el = $('slot-' + id);
+  if (el) { el.classList.add('stuck'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => burst(el), 350); }
+  setTimeout(() => bumpWallet(S.coins - coins), 350);
+  const after = rankInfo(S.seasonChar);
+  if (st.unlocked) setTimeout(() => pageReward(p, st.unlocked), 1100);
+  else if (after.i > before) setTimeout(() => { confetti(); toast(`Nov čin: ${after.name}!`); }, 900);
+}
+function pageReward(p, id) {
+  confetti();
+  openModal(`<div class="art bgd reveal" style="width:200px;height:200px">${itemPic(id, EQ())}</div><h3>Stran ${p.name} je polna!</h3><p>Odklenjeno: <b>${ITEMS[id].name}</b>. Tega ni mogoče kupiti — samo zaslužiti.</p>
+    <div class="btns"><button class="btn btn-ok" data-do="wearNow" data-id="${id}">Obleci zdaj</button><button class="btn btn-soft" data-do="close">Kasneje</button></div>`);
+}
+function askBuy() {
+  const it = ITEMS[S.trying];
+  openModal(`<div class="art bgd">${itemPic(S.trying, EQ())}</div><h3>Kupiš ${acc(it)}?</h3><p>Stane ${it.price} ${cek(it.price)}. Ostalo ti bo <b>${S.coins - it.price} ${cek(S.coins - it.price)}</b>.</p><div class="btns"><button class="btn btn-main" data-do="confirm">Da, kupi</button><button class="btn btn-soft" data-do="close">Ne</button></div>`);
+}
+const BUY_ERR = { PREMALO: 'Premalo cekinov.', ZE_IMAS: 'To že imaš.', NI_NAPRODAJ: 'Tega ni mogoče kupiti.', NI_ZA_TVOJ_LIK: 'To ni za tvojega lika.' };
+async function buy() {
+  const id = S.trying, it = ITEMS[id];
+  closeModal();
+  const st = await rpc('album_buy', { p_item: id });
+  if (!st || st.unreachable) return toast('Nakup ni uspel. Preveri povezavo in poskusi znova.');
+  if (st.error) { apply(st); return toast(BUY_ERR[st.error] || 'Nakup ni uspel.'); }
+  apply(st);
+  EQ()[it.slot] = id; render(); saveAvatar();
+  confetti(); bumpWallet(0); toast(`Kupljeno: ${it.name}`);
+}
+
+document.addEventListener('click', e => {
+  if (e.target.id === 'modal') return closeModal();
+  if (e.target.closest('#rank') && S.srv && S.srv.season) return ladder();
+  const b = e.target.closest('button');
+  if (!b || !S.srv) return;
+  if (b.id === 'envBtn') return openEnvelope();
+  if (b.dataset.view) { S.view = b.dataset.view; if (b.dataset.view !== 'trgovina') S.trying = null; return render(); }
+  if (b.dataset.page) { S.page = b.dataset.page; return render(); }
+  if (b.dataset.st) return stickerDetail(ALL().find(s => s.id === b.dataset.st));
+  if (b.dataset.try) { S.trying = S.trying === b.dataset.try ? null : b.dataset.try; return render(); }
+  if (b.dataset.look) { S.look[b.dataset.look] = b.dataset.val; render(); return saveAvatar(); }
+  if (b.dataset.go) { S.view = 'album'; S.page = b.dataset.go; S.trying = null; return render(); }
+  if (b.dataset.switch) { S.active = b.dataset.switch; S.trying = null; toast(`Zdaj igraš kot ${cname(S.active).toLowerCase()}.`); render(); return saveAvatar(); }
+  const it = S.trying && ITEMS[S.trying];
+  switch (b.dataset.do) {
+    case 'close': return closeModal();
+    case 'env': return openEnvelope();
+    case 'reveal': { const a = $('envArt'); a.classList.remove('shake'); a.innerHTML = envSvg(true); return setTimeout(reveal, 450); }
+    case 'stick': return stick(b.dataset.id);
+    case 'cancel': S.trying = null; break;
+    case 'buy': return askBuy();
+    case 'confirm': return buy();
+    case 'wear': EQ()[it.slot] = S.trying; toast(`Oblečeno: ${it.name}`); saveAvatar(); break;
+    case 'off': delete EQ()[it.slot]; S.trying = null; saveAvatar(); break;
+    case 'wearNow': { const r = ITEMS[b.dataset.id]; EQ()[r.slot] = b.dataset.id; S.trying = null; closeModal(); toast(`Oblečeno: ${r.name}`); saveAvatar(); break; }
+    case 'form': S.look.form = b.dataset.val; closeModal(); markFormChosen(); saveAvatar(); break;
+    default: return;
+  }
+  render();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+/* Prvi obisk: otrok izbere, kako se lik imenuje (vitez / vitezinja). Vpraša se
+   enkrat na napravo; izbiro lahko kadarkoli spremeni v "Moj videz". */
+const formKey = () => 'brihta_lik_oblika_' + ((api() && api().profile() && api().profile().id) || '');
+function markFormChosen() { try { localStorage.setItem(formKey(), '1'); } catch (e) {} }
+function askFormOnce() {
+  let asked = false; try { asked = !!localStorage.getItem(formKey()); } catch (e) {}
+  if (asked || !S.srv || !S.srv.season) return;
+  const ch = S.seasonChar;
+  openModal(`<h3>Kdo boš to ${(S.srv.season.name || '').toLowerCase() === 'jesen' ? 'jesen' : 'sezono'}?</h3><p>Izberi ime svojega lika. Spremeniš ga lahko kadarkoli v "Moj videz".</p>
+    <div class="choose">${['m', 'f'].map((v, i) => `<div class="opt"><div class="pic">${hero(S.look, EQ())}</div><b>${CHARS[ch].names[i]}</b><button class="btn ${i ? 'btn-purple' : 'btn-main'}" data-do="form" data-val="${v}">Sem ${CHARS[ch].names[i].toLowerCase()}</button></div>`).join('')}</div>`, true);
+}
+
+/* Ob odprtju: baza preveri pogoje (nove sličice v ovojnico, zlate) in vrne stanje. */
+async function load() {
+  render();
+  const st = await rpc('album_sync');
+  apply(st);
+  askFormOnce();
+}
+/* Za album.js: ponovno preverjanje ob odprtju in po vadbi; stanje za glavo na gumbu in lika med vadbo. */
+window.albumReload = load;
+window.S = S;
+load();
+</script>
+</body>
+</html>
