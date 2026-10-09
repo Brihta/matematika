@@ -149,6 +149,10 @@ Aplikacija pošilja samo odgovore.
   pravilno, vsaj 20 odgovorov, 90 % pravilnih, 80 % hitreje kot 3 s;
   tipkovnica, tekmovanje, bitka — kviz ne. Zlata: znaš jo tudi 14 dni pozneje.
 - Zvestoba: šolski dnevi zapored (vikendi in `prosti_dnevi` ne prekinejo).
+- Tekmovanje: prva igra, medalje za najboljšo igro v sezoni (10, 20, 40, 55,
+  75 točk — iz 1.066 iger: polovica ≥ 23, 3 % ≥ 74), 5-krat izboljšan rekord,
+  dnevna lestvica. Igre se zapisujejo po učencu (`comp_rounds`, preveri jih
+  baza); javna lestvica `scores` ostane, kot je.
 - Sličica +20 cekinov, zlata +20. Polna stran albuma odklene predmet, ki ni
   naprodaj.
 

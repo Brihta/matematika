@@ -10,9 +10,10 @@
 -- in nakupe. Ključ v script.js je javen, zato do tabel ni neposrednega
 -- dostopa (RLS brez pravil) — vse gre prek funkcij spodaj, kot povsod drugje.
 --
--- V TEM DELU: sezone, strani Poštevanke in Zvestoba, cekini, trgovina,
--- videz lika. Tekmovanje, Bitka, Pogum in razredni cilj pridejo v 2. delu:
--- za tekmovanje in bitko baza zdaj nima varnih podatkov po učencu.
+-- V TEM DELU: sezone, strani Poštevanke, Zvestoba in Tekmovanje, cekini,
+-- trgovina, videz lika. Bitka, Pogum in razredni cilj pridejo kasneje.
+-- Tekmovanje ima svoj zapis po učencu (comp_rounds): javna lestvica
+-- "scores" ni vezana na učenca, zato sličice ne gradijo na njej.
 --
 -- Zahteva: supabase_racuni.sql (tabela fact_stats).
 -- Zaženi v Supabase → SQL Editor (celo datoteko naenkrat). Varno jo je
@@ -48,16 +49,25 @@ create table if not exists prosti_dnevi (
 --   table   — poštevanka t, operacija op obvladana v tej sezoni (fact_stats)
 --   days    — vsaj n različnih dni vadbe v sezoni (dan = vsaj 10 pravilnih)
 --   streak  — vsaj n šolskih dni vadbe zapored v sezoni
+--   comp_first   — vsaj eno tekmovanje v sezoni
+--   comp_score   — najboljša igra v sezoni vsaj n točk
+--   comp_records — n-krat izboljšan osebni rekord v sezoni
+--   comp_board   — vsaj enkrat med 10 najboljšimi dneva (lestvica)
 create table if not exists album_stickers (
   season  smallint not null references seasons(id),
   id      text     not null,
   page    text     not null,       -- 'post', 'zve' (2. del: 'tek', 'bit', 'pog')
-  kind    text     not null check (kind in ('welcome', 'table', 'days', 'streak')),
+  kind    text     not null,
   t       smallint,
   op      text check (op in ('x', 'd')),
   n       int,
   primary key (season, id)
 );
+
+-- Pravilo za vrste sličic (tudi za tabelo, ustvarjeno s prejšnjo različico).
+alter table album_stickers drop constraint if exists album_stickers_kind_check;
+alter table album_stickers add constraint album_stickers_kind_check check (kind in
+  ('welcome', 'table', 'days', 'streak', 'comp_first', 'comp_score', 'comp_records', 'comp_board'));
 
 -- Predmeti. Cena null = ni naprodaj (nagrada). Cena 0 = dobi ga vsak.
 -- char_id null = skupno vsem likom (spremljevalci, svetovi).
@@ -136,6 +146,19 @@ create table if not exists album_testers (
   since      date not null default current_date
 );
 
+-- Tekmovanje: vsaka igra prijavljenega učenca. Piše samo add_comp_round, ki
+-- preveri, da je rezultat mogoč. Javna lestvica (scores) ostane, kot je.
+create table if not exists comp_rounds (
+  id         bigserial primary key,
+  student_id uuid not null references students(id) on delete cascade,
+  day        date not null,
+  score      int  not null check (score between 0 and 300),
+  correct    int  not null check (correct >= 0),
+  wrong      int  not null check (wrong >= 0),
+  created_at timestamptz not null default now()
+);
+create index if not exists comp_rounds_student on comp_rounds (student_id, day);
+
 alter table seasons             enable row level security;
 alter table game_chars          enable row level security;
 alter table prosti_dnevi        enable row level security;
@@ -147,6 +170,7 @@ alter table coin_ledger         enable row level security;
 alter table student_items       enable row level security;
 alter table student_avatar      enable row level security;
 alter table album_testers       enable row level security;
+alter table comp_rounds         enable row level security;
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- 3. VSEBINA 1. SEZONE (jesen: vitez / vitezinja)
@@ -175,6 +199,19 @@ insert into album_stickers (season, id, page, kind, n) values
   (1, 'z3', 'zve', 'streak', 10),
   (1, 'z4', 'zve', 'streak', 20),
   (1, 'z5', 'zve', 'days', 50)
+on conflict (season, id) do update set page = excluded.page, kind = excluded.kind, n = excluded.n;
+
+-- Tekmovanje. Meje iz 1.066 iger (sept.–okt. 2026): četrtina iger ≥ 12 točk,
+-- polovica ≥ 23, četrtina najboljših ≥ 41, 10 % ≥ 57, 3 % ≥ 74.
+insert into album_stickers (season, id, page, kind, n) values
+  (1, 't0', 'tek', 'comp_first',   null),
+  (1, 't1', 'tek', 'comp_score',   10),    -- lesena
+  (1, 't2', 'tek', 'comp_score',   20),    -- železna
+  (1, 't3', 'tek', 'comp_score',   40),    -- bronasta
+  (1, 't4', 'tek', 'comp_score',   55),    -- srebrna
+  (1, 't5', 'tek', 'comp_score',   75),    -- zlata
+  (1, 't6', 'tek', 'comp_records', 5),
+  (1, 't7', 'tek', 'comp_board',   null)
 on conflict (season, id) do update set page = excluded.page, kind = excluded.kind, n = excluded.n;
 
 -- Predmeti 1. sezone (cene iz gamifikacija/README.md).
@@ -302,6 +339,28 @@ language sql stable security definer set search_path = public as $$
                     order by last_rn desc limit 1), 0);
 $$;
 
+-- Tekmovanje v obdobju: koliko iger, najboljša igra, kolikokrat je otrok
+-- izboljšal svoj rekord (primerja z vsemi prejšnjimi igrami, tudi pred
+-- sezono) in ali je bil kakšen dan med 10 najboljšimi na lestvici dneva —
+-- z rezultatom, ki ga potrjuje tudi njegova igra v comp_rounds.
+create or replace function public._album_comp(p_student uuid, p_from date, p_to date)
+returns table(rounds int, best int, records int, board boolean)
+language sql stable security definer set search_path = public as $$
+  with r as (
+    select id, day, score,
+           max(score) over (order by created_at, id
+                            rows between unbounded preceding and 1 preceding) as prev_best
+      from comp_rounds where student_id = p_student and day <= p_to
+  )
+  select (select count(*)::int from r where day >= p_from),
+         (select coalesce(max(score), 0)::int from r where day >= p_from),
+         (select count(*)::int from r where day >= p_from and prev_best is not null and score > prev_best),
+         exists (select 1 from (select distinct day from r where day >= p_from) d
+                  where exists (select 1 from get_daily_board(d.day) b
+                                  join students st on st.id = p_student and lower(st.username) = lower(b.name)
+                                 where b.score <= (select max(r2.score) from r r2 where r2.day = d.day)));
+$$;
+
 -- ══════════════════════════════════════════════════════════════════════════
 -- 5. STANJE ZA APLIKACIJO
 -- ══════════════════════════════════════════════════════════════════════════
@@ -350,7 +409,10 @@ begin
                 (select count(*) from _album_practice_days(p_student, s.starts, v_to)) end,
     'streak', case when s.id is null then null else
                 (select json_build_object('best', best, 'current', now_len)
-                   from _album_streak(p_student, s.starts, v_to)) end
+                   from _album_streak(p_student, s.starts, v_to)) end,
+    'comp', case when s.id is null then null else
+                (select json_build_object('rounds', rounds, 'best', best, 'records', records, 'board', board)
+                   from _album_comp(p_student, s.starts, v_to)) end
   );
 end; $$;
 
@@ -358,11 +420,33 @@ end; $$;
 -- 6. DEJANJA (kliče aplikacija)
 -- ══════════════════════════════════════════════════════════════════════════
 
+-- Konec tekmovanja (script.js, endCompetition): zapiše igro prijavljenega
+-- učenca. Zavrne nemogoče: več kot 300 točk, več točk kot 3 × pravilni
+-- (največji množilnik), več kot 150 odgovorov v 60 s, igro izven 7–20 h
+-- po slovenskem času in več kot 40 iger na dan.
+create or replace function public.add_comp_round(
+  p_student uuid, p_score int, p_correct int, p_wrong int)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_hour int := extract(hour from now() at time zone 'Europe/Ljubljana');
+begin
+  if not exists (select 1 from students where id = p_student) then return; end if;
+  if p_score is null or p_correct is null or p_wrong is null
+     or p_score < 0 or p_score > 300 or p_correct < 0 or p_wrong < 0
+     or p_correct + p_wrong > 150 or p_score > 3 * p_correct then return; end if;
+  -- odprto 7:00–19:00; igra, začeta ob 18:59, se konča po 19:00
+  if (v_hour < 7 or v_hour >= 20)
+     and coalesce(current_setting('album.vsaka_ura', true), '') <> 'da' then return; end if;
+  if (select count(*) from comp_rounds
+       where student_id = p_student and day = _album_today()) >= 40 then return; end if;
+  insert into comp_rounds (student_id, day, score, correct, wrong)
+  values (p_student, _album_today(), p_score, p_correct, p_wrong);
+end; $$;
+
 -- Ob odprtju albuma: preveri vse pogoje in nove sličice položi v ovojnico,
 -- podeli zlate. Vrne stanje. Varno je klicati poljubnokrat.
 create or replace function public.album_sync(p_student uuid)
 returns json language plpgsql security definer set search_path = public as $$
-declare s seasons; v_to date; v_char text; r record; ok boolean; st record;
+declare s seasons; v_to date; v_char text; r record; ok boolean; st record; c record;
 begin
   if not exists (select 1 from students where id = p_student) then return null; end if;
   s := _album_season_for(p_student);
@@ -390,6 +474,8 @@ begin
          active_char = coalesce(a.active_char, v_char)
    where a.student_id = p_student and not (a.equip ? v_char);
 
+  select * into c from _album_comp(p_student, s.starts, v_to);
+
   -- nove sličice → ovojnica
   for r in select * from album_stickers a
             where a.season = s.id
@@ -401,6 +487,10 @@ begin
       when 'table'   then _album_mastered(p_student, r.t, r.op, s.starts, v_to)
       when 'days'    then (select count(*) from _album_practice_days(p_student, s.starts, v_to)) >= r.n
       when 'streak'  then (select best from _album_streak(p_student, s.starts, v_to)) >= r.n
+      when 'comp_first'   then c.rounds >= 1
+      when 'comp_score'   then c.best >= r.n
+      when 'comp_records' then c.records >= r.n
+      when 'comp_board'   then c.board
       else false end;
     if ok then
       insert into student_stickers (student_id, season, sticker_id) values (p_student, s.id, r.id)
@@ -555,6 +645,7 @@ end; $$;
 --   delete from student_season_char where student_id in (select student_id from album_testers);
 --   delete from student_avatar      where student_id in (select student_id from album_testers);
 --   delete from album_testers;
+--   (igre v comp_rounds ostanejo: v sezoni štejejo samo igre od začetka sezone)
 --   update seasons set starts = current_date where id = 1;
 --
 -- Pregled — kdo ima koliko sličic in cekinov:

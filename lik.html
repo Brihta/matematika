@@ -596,8 +596,8 @@ const ICON = {
    supabase_album.sql. Tukaj so samo imena, pogoji in slike. */
 const MIN_N = 20, MIN_ACC = 90, MIN_FAST = 80, MIN_COVER = 10, COIN_PER = 20;
 const PAGE_NAMES = { post: 'Poštevanke', tek: 'Tekmovanje', bit: 'Bitka', zve: 'Zvestoba', pog: 'Pogum' };
-/* Strani, ki jih baza že podeljuje. Tekmovanje, Bitka, Pogum in razredni cilj: 2. del. */
-const PAGES_LIVE = ['post', 'zve'];
+/* Strani, ki jih baza že podeljuje. Bitka, Pogum in razredni cilj pridejo kasneje. */
+const PAGES_LIVE = ['post', 'tek', 'zve'];
 
 function buildAlbum() {
   const pages = [];
@@ -610,6 +610,17 @@ function buildAlbum() {
       const t = i + 1;
       return { id: `${op}${t}`, sec: op, t, op, label: `${t} ${op === 'x' ? '×' : '÷'}`, art: g => tableArt(t, op, g) };
     })) });
+  /* Meje iz 1.066 iger (sept.–okt. 2026) — gl. supabase_album.sql. Šteje najboljša igra v sezoni. */
+  add({ id: 'tek', name: 'Tekmovanje', desc: 'Medalje so tvoje osebne meje — tekmuješ s seboj. Šteje tvoja najboljša igra v sezoni.', stickers: [
+    { id: 't0', label: 'Prvo tekmovanje', cond: 'Odigraj eno tekmovanje.', art: g => frame('#5a8fe0', ICON.stopwatch(), g) },
+    { id: 't1', label: 'Lesena medalja', cond: 'Doseži 10 točk v eni igri.', best: 10, art: g => frame('#d9b48f', ICON.medal('#a07850'), g) },
+    { id: 't2', label: 'Železna medalja', cond: 'Doseži 20 točk v eni igri.', best: 20, art: g => frame('#aab2bd', ICON.medal('#909090'), g) },
+    { id: 't3', label: 'Bronasta medalja', cond: 'Doseži 40 točk v eni igri.', best: 40, art: g => frame('#e0b86a', ICON.medal('#c8a000'), g) },
+    { id: 't4', label: 'Srebrna medalja', cond: 'Doseži 55 točk v eni igri.', best: 55, art: g => frame('#7fb4e6', ICON.medal('#2a7fcf'), g) },
+    { id: 't5', label: 'Zlata medalja', cond: 'Doseži 75 točk v eni igri.', best: 75, art: g => frame('#f08a8a', ICON.medal('#c0392b'), g) },
+    { id: 't6', label: 'Rekorder', cond: 'Izboljšaj svoj osebni rekord 5-krat.', records: 5, art: g => frame('#7cc35d', ICON.arrow(), g) },
+    { id: 't7', label: 'Na lestvici', cond: 'Pridi na dnevno lestvico (10 najboljših dneva). Rezultat shrani na koncu igre.', art: g => frame('#8a6fe0', ICON.board(), g) }
+  ] });
   add({ id: 'zve', name: 'Zvestoba', desc: 'Šolski dnevi zapored. Vikendi in počitnice niza ne prekinejo.', stickers: [
     { id: 'z0', label: 'Dobrodošlica', cond: 'Prijavi se prvič.', art: g => frame('#f4c542', ICON.hello(), g) },
     { id: 'z1', label: '3 dni', cond: 'Vadi 3 šolske dni zapored.', streak: 3, art: g => frame('#e0574f', ICON.flame('3'), g) },
@@ -660,7 +671,7 @@ function apply(st) {
   S.active = a.active_char || S.seasonChar;
   const got = {}; (st.stickers || []).forEach(x => { got[x.id] = x.gold ? 'gold' : x.state; });
   const tbl = {}; (st.tables || []).forEach(x => { tbl[x.op + x.t] = x; });
-  const streak = (st.streak && st.streak.best) || 0, days = st.practice_days || 0;
+  const streak = (st.streak && st.streak.best) || 0, days = st.practice_days || 0, comp = st.comp || {};
   ALL().forEach(s => {
     s.state = got[s.id] || 'none';
     if (s.t) {
@@ -670,6 +681,8 @@ function apply(st) {
     }
     if (s.streak) s.step = [Math.min(streak, s.streak), s.streak, 'dni zapored'];
     if (s.days) s.step = [Math.min(days, s.days), s.days, 'dni'];
+    if (s.best) s.step = [Math.min(comp.best || 0, s.best), s.best, 'točk (tvoj rekord v sezoni)'];
+    if (s.records) s.step = [Math.min(comp.records || 0, s.records), s.records, 'izboljšav'];
   });
   try { parent.albumChanged && parent.albumChanged(st); } catch (e) {}
   render();
@@ -781,7 +794,7 @@ function renderAlbum() {
   const body = `<div class="page-head"><div><h1>${p.name}</h1><p class="desc">${p.desc}</p><div class="page-prog"><span>${h} / ${n}</span><div class="bar"><i style="width:${h / n * 100}%"></i></div></div></div>${rewardBox(p)}</div>`
     + (p.sections ? p.sections.map(([k, t]) => `<div class="section-title">${t}</div><div class="sgrid">${p.stickers.filter(s => s.sec === k).map(slotHTML).join('')}</div>`).join('')
                   : `<div class="sgrid ${cols}">${p.stickers.map(slotHTML).join('')}</div>`)
-    + `<p class="shop-note" style="margin-top:18px">Strani Tekmovanje, Bitka in Pogum pridejo kmalu.</p>`;
+    + `<p class="shop-note" style="margin-top:18px">Strani Bitka in Pogum pridejo kmalu.</p>`;
   $('view').innerHTML = `<nav class="tabs">${tabs}</nav><section class="page">${body}</section>`;
 }
 
