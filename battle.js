@@ -436,6 +436,11 @@ function btEnter(res) {
   SFX.levelUp();
   bt = { code: res.state.code, token: res.token };
   btSave();
+  /* Album (supabase_album.sql): "ta igralec sem jaz". Žeton pozna samo ta
+     naprava, baza preveri še, da je ime igralca učenčevo uporabniško ime.
+     Izid bitke potem zapiše baza sama, ko se bitka konča. Če funkcije v
+     bazi še ni, klic tiho spodleti in bitka deluje kot prej. */
+  if (profile) supabaseRPC('battle_claim', { p_code: bt.code, p_token: bt.token, p_student: profile.id });
   // runde, ki so se odigrale pred vstopom, niso naše
   btPlayedRound = res.state.round;
   btApply(res.state);

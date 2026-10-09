@@ -153,6 +153,11 @@ Aplikacija pošilja samo odgovore.
   75 točk — iz 1.066 iger: polovica ≥ 23, 3 % ≥ 74), 5-krat izboljšan rekord,
   dnevna lestvica. Igre se zapisujejo po učencu (`comp_rounds`, preveri jih
   baza); javna lestvica `scores` ostane, kot je.
+- Bitka: prva bitka, 10 bitk, stopničke (vsaj 4 igralci), 5 različnih
+  sošolcev, zmaga, gostitelj bitke z vsaj 3 igralci. Prijavljen učenec ob
+  vstopu potrdi, da je on ta igralec (`battle_claim`, s skrivnim žetonom
+  igralca); izid ob koncu bitke zapiše baza sama (`battle_log`, sprožilec na
+  `battles`). Šteje bitka z vsaj 5 odgovori.
 - Sličica +20 cekinov, zlata +20. Polna stran albuma odklene predmet, ki ni
   naprodaj.
 

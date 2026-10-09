@@ -10,8 +10,8 @@
 -- in nakupe. Ključ v script.js je javen, zato do tabel ni neposrednega
 -- dostopa (RLS brez pravil) — vse gre prek funkcij spodaj, kot povsod drugje.
 --
--- V TEM DELU: sezone, strani Poštevanke, Zvestoba in Tekmovanje, cekini,
--- trgovina, videz lika. Bitka, Pogum in razredni cilj pridejo kasneje.
+-- V TEM DELU: sezone, strani Poštevanke, Zvestoba, Tekmovanje in Bitka,
+-- cekini, trgovina, videz lika. Pogum in razredni cilj pridejo kasneje.
 -- Tekmovanje ima svoj zapis po učencu (comp_rounds): javna lestvica
 -- "scores" ni vezana na učenca, zato sličice ne gradijo na njej.
 --
@@ -53,6 +53,12 @@ create table if not exists prosti_dnevi (
 --   comp_score   — najboljša igra v sezoni vsaj n točk
 --   comp_records — n-krat izboljšan osebni rekord v sezoni
 --   comp_board   — vsaj enkrat med 10 najboljšimi dneva (lestvica)
+--   battle_first  — vsaj ena odigrana bitka
+--   battle_count  — vsaj n odigranih bitk
+--   battle_podium — med prvimi tremi v bitki z vsaj 4 igralci
+--   battle_mates  — igral z vsaj n različnimi sošolci (prijavljenimi)
+--   battle_win    — zmaga v bitki (vsaj 2 igralca)
+--   battle_host   — gostitelj bitke z vsaj 3 igralci
 create table if not exists album_stickers (
   season  smallint not null references seasons(id),
   id      text     not null,
@@ -67,7 +73,8 @@ create table if not exists album_stickers (
 -- Pravilo za vrste sličic (tudi za tabelo, ustvarjeno s prejšnjo različico).
 alter table album_stickers drop constraint if exists album_stickers_kind_check;
 alter table album_stickers add constraint album_stickers_kind_check check (kind in
-  ('welcome', 'table', 'days', 'streak', 'comp_first', 'comp_score', 'comp_records', 'comp_board'));
+  ('welcome', 'table', 'days', 'streak', 'comp_first', 'comp_score', 'comp_records', 'comp_board',
+   'battle_first', 'battle_count', 'battle_podium', 'battle_mates', 'battle_win', 'battle_host'));
 
 -- Predmeti. Cena null = ni naprodaj (nagrada). Cena 0 = dobi ga vsak.
 -- char_id null = skupno vsem likom (spremljevalci, svetovi).
@@ -159,6 +166,26 @@ create table if not exists comp_rounds (
 );
 create index if not exists comp_rounds_student on comp_rounds (student_id, day);
 
+-- Bitka (supabase_bitka.sql): igralci so doslej le imena in bitke se po
+-- 12 urah pobrišejo. student_id poveže igralca z računom — nastavi ga
+-- battle_claim, ki ga pokliče naprava, ki ima skrivni žeton igralca.
+-- battle_log je trajni dnevnik: zapiše ga baza sama, ko se bitka konča.
+alter table battle_players add column if not exists student_id uuid references students(id) on delete set null;
+create table if not exists battle_log (
+  student_id uuid    not null references students(id) on delete cascade,
+  battle_id  uuid    not null,
+  round      int     not null,
+  day        date    not null,
+  place      int     not null,         -- 1 = zmaga (izenačeni delijo mesto)
+  players    int     not null,
+  host       boolean not null,
+  mates      text[]  not null default '{}',   -- uporabniška imena prijavljenih soigralcev
+  correct    int     not null,
+  wrong      int     not null,
+  created_at timestamptz not null default now(),
+  primary key (student_id, battle_id, round)
+);
+
 alter table seasons             enable row level security;
 alter table game_chars          enable row level security;
 alter table prosti_dnevi        enable row level security;
@@ -171,6 +198,7 @@ alter table student_items       enable row level security;
 alter table student_avatar      enable row level security;
 alter table album_testers       enable row level security;
 alter table comp_rounds         enable row level security;
+alter table battle_log          enable row level security;
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- 3. VSEBINA 1. SEZONE (jesen: vitez / vitezinja)
@@ -212,6 +240,16 @@ insert into album_stickers (season, id, page, kind, n) values
   (1, 't5', 'tek', 'comp_score',   75),    -- zlata
   (1, 't6', 'tek', 'comp_records', 5),
   (1, 't7', 'tek', 'comp_board',   null)
+on conflict (season, id) do update set page = excluded.page, kind = excluded.kind, n = excluded.n;
+
+-- Bitka. Večina sličic je za sodelovanje, ena za zmago.
+insert into album_stickers (season, id, page, kind, n) values
+  (1, 'b0', 'bit', 'battle_first',  null),
+  (1, 'b1', 'bit', 'battle_count',  10),
+  (1, 'b2', 'bit', 'battle_podium', null),
+  (1, 'b3', 'bit', 'battle_mates',  5),
+  (1, 'b4', 'bit', 'battle_win',    null),
+  (1, 'b5', 'bit', 'battle_host',   null)
 on conflict (season, id) do update set page = excluded.page, kind = excluded.kind, n = excluded.n;
 
 -- Predmeti 1. sezone (cene iz gamifikacija/README.md).
@@ -361,6 +399,47 @@ language sql stable security definer set search_path = public as $$
                                  where b.score <= (select max(r2.score) from r r2 where r2.day = d.day)));
 $$;
 
+-- Bitke v obdobju (iz battle_log).
+create or replace function public._album_battle(p_student uuid, p_from date, p_to date)
+returns table(battles int, wins int, podiums int, hosted int, mates int)
+language sql stable security definer set search_path = public as $$
+  select count(*)::int,
+         (count(*) filter (where place = 1 and players >= 2))::int,
+         (count(*) filter (where place <= 3 and players >= 4))::int,
+         (count(*) filter (where host and players >= 3))::int,
+         (select count(distinct m)::int from battle_log b2, unnest(b2.mates) m
+           where b2.student_id = p_student and b2.day between p_from and p_to)
+    from battle_log
+   where student_id = p_student and day between p_from and p_to;
+$$;
+
+-- Ko se bitka konča (status → 'finished', _battle_tidy), zapiši izid vsakega
+-- prijavljenega igralca, ki je res igral (vsaj 5 odgovorov). Mesto in število
+-- igralcev štejejo vse igralce, tudi neprijavljene. Sprožilec je tukaj, ne v
+-- supabase_bitka.sql, zato bitka deluje enako, tudi če tega dela ni.
+create or replace function public._battle_log_round()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.status = 'finished' and old.status is distinct from 'finished' then
+    insert into battle_log (student_id, battle_id, round, day, place, players, host, mates, correct, wrong)
+    select x.student_id, new.id, new.round, _album_today(), x.place, x.players,
+           x.id = new.host_player,
+           coalesce((select array_agg(distinct lower(s2.username))
+                       from battle_players p2 join students s2 on s2.id = p2.student_id
+                      where p2.battle_id = new.id and p2.id <> x.id and p2.student_id <> x.student_id), '{}'),
+           x.correct, x.wrong
+      from (select p.*, rank() over (order by p.score desc, p.correct desc)::int as place,
+                   (count(*) over ())::int as players
+              from battle_players p where p.battle_id = new.id) x
+     where x.student_id is not null and x.correct + x.wrong >= 5
+    on conflict do nothing;
+  end if;
+  return new;
+end; $$;
+drop trigger if exists battle_log_round on battles;
+create trigger battle_log_round after update on battles
+  for each row execute function _battle_log_round();
+
 -- ══════════════════════════════════════════════════════════════════════════
 -- 5. STANJE ZA APLIKACIJO
 -- ══════════════════════════════════════════════════════════════════════════
@@ -412,7 +491,10 @@ begin
                    from _album_streak(p_student, s.starts, v_to)) end,
     'comp', case when s.id is null then null else
                 (select json_build_object('rounds', rounds, 'best', best, 'records', records, 'board', board)
-                   from _album_comp(p_student, s.starts, v_to)) end
+                   from _album_comp(p_student, s.starts, v_to)) end,
+    'battle', case when s.id is null then null else
+                (select json_build_object('battles', battles, 'wins', wins, 'podiums', podiums, 'hosted', hosted, 'mates', mates)
+                   from _album_battle(p_student, s.starts, v_to)) end
   );
 end; $$;
 
@@ -442,11 +524,22 @@ begin
   values (p_student, _album_today(), p_score, p_correct, p_wrong);
 end; $$;
 
+-- Prijavljen učenec po vstopu v bitko (battle.js, btEnter): "ta igralec sem
+-- jaz". Velja le, če žeton res pripada igralcu te bitke (pozna ga samo
+-- njegova naprava) in je ime igralca učenčevo uporabniško ime.
+create or replace function public.battle_claim(p_code text, p_token uuid, p_student uuid)
+returns void language sql security definer set search_path = public as $$
+  update battle_players p set student_id = p_student
+    from battles b
+   where b.id = p.battle_id and b.code = trim(p_code) and p.token = p_token
+     and exists (select 1 from students s where s.id = p_student and lower(s.username) = lower(p.name));
+$$;
+
 -- Ob odprtju albuma: preveri vse pogoje in nove sličice položi v ovojnico,
 -- podeli zlate. Vrne stanje. Varno je klicati poljubnokrat.
 create or replace function public.album_sync(p_student uuid)
 returns json language plpgsql security definer set search_path = public as $$
-declare s seasons; v_to date; v_char text; r record; ok boolean; st record; c record;
+declare s seasons; v_to date; v_char text; r record; ok boolean; st record; c record; bt record;
 begin
   if not exists (select 1 from students where id = p_student) then return null; end if;
   s := _album_season_for(p_student);
@@ -475,6 +568,7 @@ begin
    where a.student_id = p_student and not (a.equip ? v_char);
 
   select * into c from _album_comp(p_student, s.starts, v_to);
+  select * into bt from _album_battle(p_student, s.starts, v_to);
 
   -- nove sličice → ovojnica
   for r in select * from album_stickers a
@@ -491,6 +585,12 @@ begin
       when 'comp_score'   then c.best >= r.n
       when 'comp_records' then c.records >= r.n
       when 'comp_board'   then c.board
+      when 'battle_first'  then bt.battles >= 1
+      when 'battle_count'  then bt.battles >= r.n
+      when 'battle_podium' then bt.podiums >= 1
+      when 'battle_mates'  then bt.mates >= r.n
+      when 'battle_win'    then bt.wins >= 1
+      when 'battle_host'   then bt.hosted >= 1
       else false end;
     if ok then
       insert into student_stickers (student_id, season, sticker_id) values (p_student, s.id, r.id)
@@ -645,7 +745,8 @@ end; $$;
 --   delete from student_season_char where student_id in (select student_id from album_testers);
 --   delete from student_avatar      where student_id in (select student_id from album_testers);
 --   delete from album_testers;
---   (igre v comp_rounds ostanejo: v sezoni štejejo samo igre od začetka sezone)
+--   (igre v comp_rounds in bitke v battle_log ostanejo: v sezoni štejejo
+--    samo tiste od začetka sezone)
 --   update seasons set starts = current_date where id = 1;
 --
 -- Pregled — kdo ima koliko sličic in cekinov:
