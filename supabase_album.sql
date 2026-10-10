@@ -283,6 +283,8 @@ insert into items (id, season, char_id, slot, price, reward_season, reward_page)
   ('lisicka',      1, null,    'spremljevalec', 180,  null, null),
   ('zmajcek',      1, null,    'spremljevalec', null, 2, 'zve'),
   ('travnik',      1, null,    'ozadje',        0,    null, null),
+  ('bojisce',      1, null,    'ozadje',        150,  null, null),   -- bojišče s šotori in prapori, dodano 11. 10. 2026
+  ('zmajeva-gora', 1, null,    'ozadje',        300,  null, null),   -- gora z zmajem, dodano 11. 10. 2026
   ('zahod',        1, null,    'ozadje',        null, 1, 'pog'),
   ('grad',         1, null,    'ozadje',        null, 1, 'razred')
 on conflict (id) do update set season = excluded.season, char_id = excluded.char_id, slot = excluded.slot,
