@@ -305,10 +305,10 @@ function arms(col, cuff) {
        + part('M172 350 L203 354 L202 364 Q187 372 171 362 Z', cuff, { w: 4 }) + part('M340 350 L309 354 L310 364 Q325 372 341 362 Z', cuff, { w: 4 });
 }
 const FACE = 'M168 150 C168 92 206 62 256 62 C306 62 344 92 344 150 C344 198 314 232 256 234 C198 232 168 198 168 150 Z';
-function head(o, fringe) {
+function head(o, fringe, noEars) {
   const skin = o.skin;
   let s = part('M240 214 L272 214 L274 258 L238 258 Z', skin, { shadow: 'M230 210 L282 210 L282 238 Q256 250 230 238 Z' })
-        + part('M166 142 C150 138 146 172 160 184 C166 190 174 186 176 180 Z', skin, { w: 4 }) + part('M346 142 C362 138 366 172 352 184 C346 190 338 186 336 180 Z', skin, { w: 4 })
+        + (noEars ? '' : part('M166 142 C150 138 146 172 160 184 C166 190 174 186 176 180 Z', skin, { w: 4 }) + part('M346 142 C362 138 366 172 352 184 C346 190 338 186 336 180 Z', skin, { w: 4 }))
         + part(FACE, skin, { shadow: 'M306 60 C352 96 356 204 296 244 L370 244 L370 60 Z ' + (fringe ? 'M164 166 C184 140 206 134 228 116 C238 124 242 136 240 152 C258 146 268 132 268 114 C284 122 298 136 304 160 C314 152 320 140 318 124 C332 132 342 146 348 166 L348 110 L164 110 Z' : '') });
   for (const [x, f] of [[220, -1], [292, 1]]) {
     s += `<ellipse cx="${x}" cy="160" rx="18" ry="21" fill="#fff" stroke="${OL}" stroke-width="3"/><circle cx="${x + 1}" cy="164" r="14" fill="${o.eye}"/><circle cx="${x + 1}" cy="168" r="10" fill="${shade(o.eye)}" opacity=".6"/><circle cx="${x + 1}" cy="165" r="7" fill="${OL}"/><circle cx="${x - 5}" cy="157" r="5.5" fill="#fff"/><circle cx="${x + 6}" cy="171" r="2.5" fill="#fff"/>`
@@ -400,18 +400,21 @@ function greatHelm() {
    viden skozi odprtino; ob njej je ozek pas temnejše podloge. */
 function hood() {
   const C = '#3b3d4a', LINING = '#23242d', FOLD = '#2a2b35';
-  const OUT = 'M256 32 C322 38 374 100 372 190 C370 226 358 244 354 252 C386 268 400 298 402 334 Q330 362 256 360 Q182 362 110 334 C112 298 126 268 158 252 C154 244 142 226 140 190 C138 100 190 38 256 32 Z';
+  /* Širina: obris in gube stisnemo proti sredini (82 %), podlogo malo (97 %); odprtina za obraz ostane. */
+  const sq = (d, k) => d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (m, x, y) => `${+(256 + (x - 256) * k).toFixed(1)} ${y}`);
+  const K = .82;
+  const OUT = sq('M256 32 C322 38 374 100 372 190 C370 226 358 244 354 252 C386 268 400 298 402 334 Q330 362 256 360 Q182 362 110 334 C112 298 126 268 158 252 C154 244 142 226 140 190 C138 100 190 38 256 32 Z', K);
   // odprtina sledi obrazu (FACE) in je spodaj vedno znotraj njega — skozi njo se ne vidi ozadje
   const HOLE = 'M256 102 C308 102 332 144 332 184 C330 212 304 228 256 230 C208 228 182 212 180 184 C180 144 204 102 256 102 Z';
-  const RIM = 'M256 90 C318 90 346 138 346 184 C346 226 314 248 256 250 C198 248 166 226 166 184 C166 138 194 90 256 90 Z';
+  const RIM = sq('M256 90 C318 90 346 138 346 184 C346 226 314 248 256 250 C198 248 166 226 166 184 C166 138 194 90 256 90 Z', .97);
   const eo = d => `fill-rule="evenodd" clip-rule="evenodd" d="${d}`;
   let s = part(OUT + ' ' + HOLE, C, {
-    shadow: 'M306 30 C364 70 390 150 380 250 C400 280 410 310 410 370 L460 370 L460 30 Z',
-    hi: 'M170 176 C168 110 200 64 240 48 C206 76 190 116 186 178 Z',
-    inner: line('M158 252 Q196 266 222 270', 3, FOLD) + line('M354 252 Q316 266 290 270', 3, FOLD)
-         + line('M184 292 Q196 318 190 350', 3, FOLD) + line('M328 292 Q316 318 322 350', 3, FOLD)
+    shadow: sq('M306 30 C364 70 390 150 380 250 C400 280 410 310 410 370 L460 370 L460 30 Z', K),
+    hi: sq('M170 176 C168 110 200 64 240 48 C206 76 190 116 186 178 Z', K),
+    inner: line(sq('M158 252 Q196 266 222 270', K), 3, FOLD) + line(sq('M354 252 Q316 266 290 270', K), 3, FOLD)
+         + line(sq('M184 292 Q196 318 190 350', K), 3, FOLD) + line(sq('M328 292 Q316 318 322 350', K), 3, FOLD)
          + line('M256 252 L256 352', 3, FOLD) + line('M256 36 Q262 66 256 90', 3, FOLD)
-  }).replace(/<path d="M256 32/g, '<path fill-rule="evenodd" clip-rule="evenodd" d="M256 32');   // odprtina za obraz
+  }).replace(/<path d="M256 32/g, '<path fill-rule="evenodd" clip-rule="evenodd" d="M256 32');   // odprtina za obraz (M256 32 ostane na sredini)
   // podloga ob obrazu: obroč med RIM in HOLE
   s += `<path ${eo(RIM + ' ' + HOLE)}" fill="${LINING}"/>`;
   s += `<path d="${HOLE}" fill="none" stroke="${OL}" stroke-width="3"/>`;
@@ -616,7 +619,8 @@ function hero(look, eq, viewBox = '0 0 512 512', noBg) {
   s += out.draw();
   /* Zaprt šlem (hidesFace) pokrije vso glavo — glave ne rišemo, šlem je zato
      lahko manjši in sedi na ramenih. */
-  if (!(hat && hat.hidesFace)) s += head(look, !hide);
+  /* Pod kapuco (oblačilo, ki skrije lase in gre čez glavo) ušes ne rišemo — kapuca je zato lahko tesno ob obrazu. */
+  if (!(hat && hat.hidesFace)) s += head(look, !hide, !!(out.over && out.hidesHair));
   if (!hide) s += hairFront(look);
   /* Oblačilo z delom čez glavo (kapuca): telo je narisano zgoraj, kapuca in
      ovratnik pa šele po glavi — in pred pokrivalom, da gre krona čez kapuco. */
