@@ -372,8 +372,12 @@ function helmet(plume) {
     + `<circle cx="176" cy="206" r="4" fill="${OL}"/><circle cx="336" cy="206" r="4" fill="${OL}"/>`;
 }
 /* Veliki šlem (zaprt, ploščat vrh) s pozlačenim križem — pokrije ves obraz,
-   skozi reže se vidita le očesi. */
+   skozi reže se vidita le očesi. Glava pod njim se ne riše (hidesFace), zato
+   je pomanjšan na 80 % z vrhom ramen kot sidriščem. */
 function greatHelm() {
+  return `<g transform="translate(256 258) scale(.8) translate(-256 -258)">${greatHelmShape()}</g>`;
+}
+function greatHelmShape() {
   const B = '#e2b544', BD = '#b8862a';                       // medenina
   const HELM = 'M150 104 Q150 60 198 56 L314 56 Q362 60 362 104 L366 214 Q350 256 256 274 Q162 256 146 214 Z';
   const rivet = (x, y, r = 4) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#eef1f4" stroke="${OL}" stroke-width="2"/>`;
@@ -504,7 +508,7 @@ const ITEMS = {
   verizna:      { slot: 'obleka', char: 'vitez', season: 1, name: 'Verižna srajca', acc: 'Verižno srajco', rarity: 'navaden', price: 80, sleeve: '#a8b1bb', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: chainmail },
   oklep:        { slot: 'obleka', char: 'vitez', season: 1, name: 'Viteški oklep', rarity: 'redek', price: 220, sleeve: '#b9c2cc', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#b9c2cc', '#c0392b', '#f1c40f') },
   'zlati-oklep':{ slot: 'obleka', char: 'vitez', season: 2, name: 'Zlati oklep', rarity: 'nagrada', reward: [2, 'bit'], sleeve: '#f4d36b', cuff: '#d9a441', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#f4d36b', '#6a4fc0', '#fff') },
-  'veliki-slem': { slot: 'glava', char: 'vitez', season: 1, name: 'Veliki šlem z zlatim križem', acc: 'Veliki šlem z zlatim križem', rarity: 'epski', price: 300, hidesHair: true, draw: greatHelm },
+  'veliki-slem': { slot: 'glava', char: 'vitez', season: 1, name: 'Veliki šlem z zlatim križem', acc: 'Veliki šlem z zlatim križem', rarity: 'epski', price: 300, hidesHair: true, hidesFace: true, draw: greatHelm },
   'celada-modra': { slot: 'glava', char: 'vitez', season: 1, name: 'Čelada z modrim perjem', acc: 'Čelado z modrim perjem', rarity: 'redek', price: 160, hidesHair: true, draw: () => helmet('#3a7bd5') },
   celada:       { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška čelada', acc: 'Viteško čelado', rarity: 'nagrada', reward: [1, 'bit'], hidesHair: true, draw: () => helmet('#e74c3c') + sparkle(330, 60, 8) },
   krona:        { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška krona', acc: 'Viteško krono', rarity: 'nagrada', reward: [1, 'tek'], draw: () =>
@@ -557,7 +561,10 @@ function hero(look, eq, viewBox = '0 0 512 512', noBg) {
   if (!hide) s += hairBack(look);
   s += legs(out.pants, out.boots);
   if (!out.robe) s += arms(out.sleeve, out.cuff);
-  s += out.draw() + head(look, !hide);
+  s += out.draw();
+  /* Zaprt šlem (hidesFace) pokrije vso glavo — glave ne rišemo, šlem je zato
+     lahko manjši in sedi na ramenih. */
+  if (!(hat && hat.hidesFace)) s += head(look, !hide);
   if (!hide) s += hairFront(look);
   if (hat) s += hat.draw();
   if (it('v-roki')) s += it('v-roki').draw();
