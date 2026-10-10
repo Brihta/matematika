@@ -863,8 +863,11 @@ end; $$;
 -- zmanjšajo), se mu odpre vojaška služba. Odtlej vsaka igra tekmovanja in
 -- bitke prinese cekine glede na to, kako blizu je SVOJI meri — počasnejši
 -- otrok zasluži enako kot hitrejši, če se trudi po svojih močeh.
---   Nabor:   prve 3 igre (posebej tekmovanje, posebej bitka) → 5 cekinov.
 --   Mera:    povprečje 3 najboljših rezultatov v zadnjih 30 dneh (vsaj 10).
+--            Štejejo tudi igre pred odprtjem službe.
+--   Nabor:   dokler v zadnjih 30 dneh ni vsaj 3 iger te vrste → 5 cekinov.
+--            (Bitke pred 10. 10. 2026 nimajo zapisanih točk, zato pri bitki
+--            nabor ostane, dokler otrok ne odigra 3 novih.)
 --            Raste z otrokom; če en mesec igra slabše, se prilagodi.
 --   Plačilo: pod 70 % mere 0 · od 70 % 3 · od 85 % 6 · od 95 % 10 ·
 --            nad mero 15 + 1 za vsako točko čez (skupaj največ 25).
@@ -886,20 +889,26 @@ language sql stable security definer set search_path = public as $$
   select (_album_season_for(p_student)).id is not null and _vojska_earned(p_student) >= _vojska_prag();
 $$;
 
--- Mera: povprečje 3 najboljših v zadnjih 30 dneh, brez igre p_skip (ki se ravno ocenjuje).
+-- Igre te vrste v zadnjih 30 dneh (z rezultatom), brez igre p_skip.
+create or replace function public._vojska_games(p_student uuid, p_kind text, p_skip text)
+returns table(score int) language sql stable security definer set search_path = public as $$
+  select a.score from (
+    select score, id::text as ref, day from comp_rounds
+     where p_kind = 'tek' and student_id = p_student
+    union all
+    select score, battle_id || ':' || round, day from battle_log
+     where p_kind = 'bit' and student_id = p_student and score is not null
+  ) a
+  where a.day > _album_today() - 30 and a.ref is distinct from p_skip;
+$$;
+
+-- Mera: povprečje 3 najboljših v zadnjih 30 dneh, brez igre p_skip (ki se
+-- ravno ocenjuje). Prazna, dokler ni vsaj 3 iger (nabor).
 create or replace function public._vojska_measure(p_student uuid, p_kind text, p_skip text)
 returns numeric language sql stable security definer set search_path = public as $$
   select greatest(10, round(avg(score), 2)) from (
-    select score from (
-      select score, id::text as ref, day from comp_rounds
-       where p_kind = 'tek' and student_id = p_student
-      union all
-      select score, battle_id || ':' || round, day from battle_log
-       where p_kind = 'bit' and student_id = p_student and score is not null
-    ) a
-    where day > _album_today() - 30 and ref is distinct from p_skip
-    order by score desc limit 3) t
-  having count(*) > 0;
+    select score from _vojska_games(p_student, p_kind, p_skip) order by score desc limit 3) t
+  having count(*) >= 3;
 $$;
 
 create or replace function public._vojska_pay(p_score int, p_measure numeric) returns int
@@ -922,10 +931,8 @@ begin
   if exists (select 1 from vojska_rounds where student_id = p_student and kind = p_kind and ref = p_ref) then
     return null;
   end if;
-  -- nabor: prve 3 igre te vrste; tudi če v 30 dneh ni nobene igre (ponovni nabor)
-  if (select count(*) from vojska_rounds where student_id = p_student and kind = p_kind) >= 3 then
-    v_m := _vojska_measure(p_student, p_kind, p_ref);
-  end if;
+  -- nabor: v zadnjih 30 dneh je manj kot 3 iger te vrste (mere še ni)
+  v_m := _vojska_measure(p_student, p_kind, p_ref);
   v_coins := case when v_m is null then 5 else _vojska_pay(p_score, v_m) end;
   if v_coins > 0 and (select count(*) from vojska_rounds
                        where student_id = p_student and day = _album_today() and coins > 0) >= _vojska_cap() then
@@ -937,8 +944,8 @@ begin
     insert into coin_ledger (student_id, amount, reason, ref)
     values (p_student, v_coins, 'vojska', p_kind || ':' || p_ref) on conflict do nothing;
   end if;
-  select coalesce(sum(coins), 0)::int, greatest(0, 3 - count(*) filter (where kind = p_kind))::int
-    into v_total, v_left from vojska_rounds where student_id = p_student;
+  select coalesce(sum(coins), 0)::int into v_total from vojska_rounds where student_id = p_student;
+  v_left := greatest(0, 3 - (select count(*) from _vojska_games(p_student, p_kind, null)))::int;
   return json_build_object('kind', p_kind, 'score', p_score, 'measure', v_m, 'coins', v_coins,
                            'capped', v_capped, 'nabor', v_m is null, 'nabor_left', v_left, 'total', v_total);
 end; $$;
@@ -951,9 +958,9 @@ returns json language sql stable security definer set search_path = public as $$
     'prag', _vojska_prag(), 'cap', _vojska_cap(),
     'total', (select coalesce(sum(coins), 0)::int from vojska_rounds where student_id = p_student),
     'today', (select count(*)::int from vojska_rounds where student_id = p_student and day = _album_today() and coins > 0),
-    'tek', json_build_object('nabor_left', greatest(0, 3 - (select count(*) from vojska_rounds where student_id = p_student and kind = 'tek'))::int,
+    'tek', json_build_object('nabor_left', greatest(0, 3 - (select count(*) from _vojska_games(p_student, 'tek', null)))::int,
                              'measure', _vojska_measure(p_student, 'tek', null)),
-    'bit', json_build_object('nabor_left', greatest(0, 3 - (select count(*) from vojska_rounds where student_id = p_student and kind = 'bit'))::int,
+    'bit', json_build_object('nabor_left', greatest(0, 3 - (select count(*) from _vojska_games(p_student, 'bit', null)))::int,
                              'measure', _vojska_measure(p_student, 'bit', null)),
     'recent', coalesce((select json_agg(json_build_object('kind', kind, 'ref', ref, 'day', day, 'score', score,
                                                           'measure', measure, 'coins', coins) order by seq desc)

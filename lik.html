@@ -1197,7 +1197,7 @@ function renderVojska() {
   const card = (kind, title, play, href) => {
     const k = v[kind], m = k.measure == null ? null : Number(k.measure);
     let body;
-    if (k.nabor_left > 0 || m == null) body = `<p>${k.nabor_left > 0 ? `<b>Nabor:</b> še ${k.nabor_left} ${k.nabor_left === 1 ? 'igra' : k.nabor_left === 2 ? 'igri' : 'igre'}.` : '<b>Ponovni nabor.</b>'} Vsaka prinese 5 ${cek(5)}. Pokaži, kaj znaš — iz nabora dobiš svojo mero.</p>`;
+    if (k.nabor_left > 0 || m == null) body = `<p>${k.nabor_left > 0 ? `<b>Nabor:</b> še ${k.nabor_left} ${k.nabor_left === 1 ? 'igra' : k.nabor_left === 2 ? 'igri' : 'igre'}.` : '<b>Ponovni nabor.</b>'} Vsaka prinese 5 ${cek(5)}. Mera se izračuna iz tvojih zadnjih iger (30 dni) — za to potrebuješ vsaj 3.${kind === 'bit' ? ' Točke bitk se zapisujejo od 10. 10. 2026.' : ''}</p>`;
     else {
       const fl = Math.floor(m), t95 = Math.ceil(.95 * m), t85 = Math.ceil(.85 * m), t70 = Math.ceil(.7 * m);
       const rng = (a, b) => a >= b ? `${a}` : `${a}–${b}`;
