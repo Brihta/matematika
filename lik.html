@@ -557,6 +557,34 @@ function shield(kind) {
   if (kind === 'brihta') s += `<circle cx="178" cy="345" r="24" fill="#fff" stroke="${OL}" stroke-width="3"/>` + txt(178, 357, 'B', 32, '#f08c2e', 0) + sparkle(216, 300, 7);
   return s;
 }
+/* Vikinški ščit: okrogel, pozlačen rob s srebrnimi spojkami, lesene deske,
+   rdeč križ X in v sredini ovnova glava z zavitimi rogovi. */
+function vikingShield() {
+  const cx = 178, cy = 345, G = '#c9a24a', W = '#a8724e', WD = '#7e4f33', R = '#8e3b3b', SI = '#d6dce2', HORN = '#a5603a';
+  const circ = r => `M${cx} ${cy - r} A${r} ${r} 0 1 1 ${cx - .01} ${cy - r} Z`;
+  let s = part(circ(62), G, { shadow: `M${cx} 270 L250 270 L250 420 L${cx} 420 Z`, hi: 'M126 330 Q134 298 162 288 Q140 304 134 334 Z' });
+  // deske in križ (porezano na lesen krog)
+  const planks = [140, 160, 178, 196, 216].map(x => line(`M${x} 280 L${x} 410`, 2.5, WD)).join('');
+  const cross = [45, -45].map(a => `<rect x="${cx - 9}" y="${cy - 60}" width="18" height="120" fill="${R}" stroke="${OL}" stroke-width="2.5" transform="rotate(${a} ${cx} ${cy})"/>`).join('');
+  const studs = [[146, 312], [146, 378], [210, 312], [210, 378], [134, 345], [222, 345], [178, 298], [178, 392]]
+    .map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="3.2" ry="2.6" fill="${SI}" stroke="${OL}" stroke-width="1.5"/>`).join('');
+  s += part(circ(50), W, { w: 3.5, shadow: `M${cx + 6} 290 L240 290 L240 400 L${cx + 6} 400 Z`, inner: planks + cross + studs });
+  // srebrne spojke na robu
+  for (const a of [-135, -45, 45, 135]) s += `<g transform="rotate(${a} ${cx} ${cy})">${line(`M${cx} ${cy - 64} L${cx} ${cy - 46}`, 8)}${line(`M${cx} ${cy - 63} L${cx} ${cy - 47}`, 4.5, SI)}`
+    + `<circle cx="${cx}" cy="${cy - 55}" r="3" fill="${SI}" stroke="${OL}" stroke-width="1.5"/></g>`;
+  // ovnova glava
+  s += `<circle cx="${cx}" cy="${cy}" r="26" fill="${G}" stroke="${OL}" stroke-width="3"/>`;
+  for (const f of [-1, 1]) {
+    const d = `M${cx + 6 * f} 330 C${cx + 26 * f} 318 ${cx + 38 * f} 336 ${cx + 30 * f} 350 C${cx + 24 * f} 360 ${cx + 12 * f} 354 ${cx + 16 * f} 344`;
+    s += line(d, 11) + line(d, 6.5, HORN) + line(`M${cx + 22 * f} 334 L${cx + 26 * f} 330 M${cx + 30 * f} 340 L${cx + 35 * f} 338`, 1.5, '#6e3a20');
+  }
+  s += part(`M${cx} 326 C${cx + 12} 326 ${cx + 15} 338 ${cx + 13} 350 C${cx + 11} 362 ${cx + 6} 370 ${cx} 371 C${cx - 6} 370 ${cx - 11} 362 ${cx - 13} 350 C${cx - 15} 338 ${cx - 12} 326 ${cx} 326 Z`, '#ece6dc',
+         { w: 3, shadow: `M${cx + 2} 320 L${cx + 20} 320 L${cx + 20} 376 L${cx + 2} 376 Z`, inner: line(`M${cx - 5} 352 L${cx - 4} 362 M${cx + 5} 352 L${cx + 4} 362`, 1.5, '#b7aea2') });
+  s += part(`M${cx - 10} 330 C${cx - 8} 320 ${cx - 2} 324 ${cx} 320 C${cx + 2} 324 ${cx + 8} 320 ${cx + 10} 330 C${cx + 4} 334 ${cx - 4} 334 ${cx - 10} 330 Z`, '#e3c27a', { w: 2.5 });   // kodri
+  s += line(`M${cx - 9} 342 L${cx - 3} 345 M${cx + 9} 342 L${cx + 3} 345`, 2.5)
+     + `<circle cx="${cx - 3}" cy="365" r="1.6" fill="${OL}"/><circle cx="${cx + 3}" cy="365" r="1.6" fill="${OL}"/>`;
+  return s;
+}
 function cape(col, trim) {
   return part('M210 256 L302 256 L348 464 Q256 482 164 464 Z', col, { shadow: 'M256 250 L360 250 L360 490 L256 490 Z' })
     + (trim ? part('M166 450 Q256 468 346 450 L348 464 Q256 482 164 464 Z', trim, { w: 4 }) : '');
@@ -653,6 +681,7 @@ const ITEMS = {
   'ledeni-mec': { slot: 'v-roki', char: 'vitez', season: 2, name: 'Ledeni meč', rarity: 'nagrada', reward: [2, 'tek'], draw: () => sword('#cdeeff', '#7fb4e6', '#bfe9ff') },
   'scit-les':   { slot: 'scit', char: 'vitez', season: 1, name: 'Lesen ščit', rarity: 'navaden', price: 60, draw: () => shield('les') },
   'scit-zvezda':{ slot: 'scit', char: 'vitez', season: 1, name: 'Ščit z zvezdo', rarity: 'redek', price: 150, draw: () => shield('zvezda') },
+  'scit-viking':{ slot: 'scit', char: 'vitez', season: 1, name: 'Vikinški ščit', rarity: 'epski', price: 200, crop: '106 273 144 144', draw: vikingShield },
   'scit-brihta':{ slot: 'scit', char: 'vitez', season: 1, name: 'Ščit Brihta', rarity: 'nagrada', reward: [1, 'zve'], draw: () => shield('brihta') },
   plasc:        { slot: 'hrbet', char: 'vitez', season: 1, name: 'Rdeč plašč', rarity: 'redek', price: 120, draw: () => cape('#c0392b') },
   'plasc-kralj':{ slot: 'hrbet', char: 'vitez', season: 1, name: 'Kraljevi plašč', rarity: 'epski', price: 300, draw: () => cape('#6a4fc0', '#f4c542') },
