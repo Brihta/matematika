@@ -965,7 +965,9 @@ function buildAlbum() {
   ] });
   /* Pogum (gamifikacija/README.md): trud pri najtežji poštevanki — štejejo tudi napačni odgovori. */
   add({ id: 'pog', name: 'Pogum',
-    get desc() { return 'Sličice za trud pri tvoji najtežji poštevanki. ' + (POG() ? `Zdaj je to <b>${pogL()}</b> — tista, pri kateri imaš najnižjo točnost. Ostane ista vso sezono.` : 'Izbrana bo, ko začneš vaditi poštevanko, ki je še nimaš v albumu.') + ' Šteje trud, tudi napačni odgovori.'; },
+    get desc() { return 'Sličice za trud pri tvoji najtežji poštevanki. ' + (POG() ? `Zdaj je to <b>${pogL()}</b> — tista, pri kateri imaš najnižjo točnost. Ostane ista vso sezono.`
+      : S.album[0].stickers.every(x => x.state !== 'none') ? 'Imaš vse poštevanke, zato si Pogum že dokazal' + g('', 'a') + ' — vse štiri sličice so tvoje.'
+      : 'Izbrana bo, ko začneš vaditi poštevanko, ki je še nimaš v albumu.') + ' Šteje trud, tudi napačni odgovori.'; },
     stickers: [
     { id: 'p0', label: 'Korak naprej', pog: 'step', get cond() { return `Odgovori 20-krat pri svoji najtežji poštevanki${POG() ? ` (${pogL()})` : ''}. Štejejo odgovori od izbire naprej, tudi napačni.`; }, art: g => frame('#8a6fe0', ICON.steps(), g) },
     { id: 'p1', label: 'Trije tedni', pog: 'weeks', get cond() { return `V treh različnih tednih vadi ${POG() ? pogL() : 'svojo najtežjo poštevanko'} (vsaj 20 odgovorov na teden).`; }, art: g => frame('#e06fb4', ICON.calendar('3'), g) },

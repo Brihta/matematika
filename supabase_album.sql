@@ -661,7 +661,7 @@ $$;
 -- podeli zlate. Vrne stanje. Varno je klicati poljubnokrat.
 create or replace function public.album_sync(p_student uuid)
 returns json language plpgsql security definer set search_path = public as $$
-declare s seasons; v_to date; v_char text; r record; ok boolean; st record; c record; bt record; pg record;
+declare s seasons; v_to date; v_char text; r record; ok boolean; st record; c record; bt record; pg record; v_all boolean;
 begin
   if not exists (select 1 from students where id = p_student) then return null; end if;
   s := _album_season_for(p_student);
@@ -693,6 +693,10 @@ begin
   select * into bt from _album_battle(p_student, s.starts, v_to);
   perform _album_pogum_choose(p_student, s.id, s.starts, v_to);
   select * into pg from _album_pogum(p_student, s.id, s.starts, v_to);
+  -- Kdor ima že vseh 20 poštevank, nima več najtežje — Pogum je dokazal: vse 4 sličice.
+  v_all := (select count(*) from student_stickers ss join album_stickers a on a.season = ss.season and a.id = ss.sticker_id
+             where ss.student_id = p_student and ss.season = s.id and a.kind = 'table')
+         = (select count(*) from album_stickers where season = s.id and kind = 'table');
 
   -- nove sličice → ovojnica
   for r in select * from album_stickers a
@@ -715,10 +719,10 @@ begin
       when 'battle_mates'  then bt.mates >= r.n
       when 'battle_win'    then bt.wins >= 1
       when 'battle_host'   then bt.hosted >= 1
-      when 'pogum_step'  then pg.new_n >= r.n
-      when 'pogum_weeks' then pg.weeks >= r.n
-      when 'pogum_gain'  then pg.new_n >= 20 and pg.new_acc >= least(pg.base_acc + r.n, 95)
-      when 'pogum_beat'  then pg.mastered
+      when 'pogum_step'  then v_all or pg.new_n >= r.n
+      when 'pogum_weeks' then v_all or pg.weeks >= r.n
+      when 'pogum_gain'  then v_all or (pg.new_n >= 20 and pg.new_acc >= least(pg.base_acc + r.n, 95))
+      when 'pogum_beat'  then v_all or pg.mastered
       else false end;
     if ok then
       insert into student_stickers (student_id, season, sticker_id) values (p_student, s.id, r.id)

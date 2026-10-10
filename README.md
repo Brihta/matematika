@@ -163,7 +163,8 @@ Aplikacija pošilja samo odgovore.
   Izbere se enkrat na sezono (`student_pogum`) in ostane ista. Sličice:
   20 odgovorov po izbiri · 3 različni tedni z vsaj 20 odgovori · točnost
   +10 odstotnih točk (do 95 %, vsaj 20 novih odgovorov) · poštevanka
-  obvladana. Štejejo tudi napačni odgovori. Polna stran: svet Sončni zahod.
+  obvladana. Štejejo tudi napačni odgovori. Kdor ima vseh 20 poštevank,
+  dobi vse 4. Polna stran: svet Sončni zahod.
 - Sličica +20 cekinov, zlata +20. Polna stran albuma odklene predmet, ki ni
   naprodaj.
 - **Vojaška služba** (zavihek Služba): odpre se, ko učenec s sličicami
