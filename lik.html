@@ -371,37 +371,28 @@ function helmet(plume) {
     + part('M180 126 Q256 102 332 126 L332 144 Q256 120 180 144 Z', '#8f98a3', { w: 4 }) + line('M256 48 L256 110', 3)
     + `<circle cx="176" cy="206" r="4" fill="${OL}"/><circle cx="336" cy="206" r="4" fill="${OL}"/>`;
 }
-/* Viteška bojna čelada: zaprt veliki šlem (ploščat vrh) s pozlačenim križem — pokrije ves obraz,
-   skozi reže se vidita le očesi. Glava pod njim se ne riše (hidesFace).
-   Višina kot pri glavi, širina 78 %: X() vse vodoravne mere stisne proti
-   sredini, kovice ostanejo okrogle in črte enako debele. */
+/* Viteška bojna čelada: koničast zaprt šlem s pozlačenim križem (reži za
+   oči v vodoravnem kraku, luknjice za dihanje). Glava se pod njim ne riše
+   (hidesFace), zato je šlem manjši od glave: 136 × 180 namesto 176 × 172. */
 function greatHelm() {
-  const K = .78, X = x => +(256 + (x - 256) * K).toFixed(1);
-  const sx = d => d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (m, x, y) => `${X(+x)} ${y}`);
-  const B = '#e2b544';                                        // medenina
-  const HELM = sx('M150 104 Q150 60 198 56 L314 56 Q362 60 362 104 L366 214 Q350 256 256 274 Q162 256 146 214 Z');
-  const rivet = (x, y, r = 4) => `<circle cx="${X(x)}" cy="${y}" r="${r}" fill="#eef1f4" stroke="${OL}" stroke-width="2"/>`;
-  const slot = (x, h) => `<rect x="${X(x)}" y="192" width="5" height="${h}" rx="2.5" fill="${OL}"/>`;
+  const B = '#e2b544', CU = '#c9844a';                          // medenina, bakrene kovice
+  const HELM = 'M256 80 C234 86 196 112 190 150 L188 214 C190 234 222 248 256 260 C290 248 322 234 324 214 L322 150 C316 112 278 86 256 80 Z';
+  const rivet = (x, y, r = 3.4) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${CU}" stroke="${OL}" stroke-width="2"/>`;
+  const holes = [[206, 198], [220, 198], [234, 198], [210, 214], [225, 214], [214, 230], [229, 230]];
   let s = part(HELM, '#c3cad3', {
-    shadow: sx('M300 50 C352 80 372 160 368 280 L420 280 L420 50 Z'),
-    hi: sx('M170 92 Q176 70 198 64 Q184 84 182 140 L174 140 Z'),
-    inner: [184, 197, 210, 223].map(x => slot(x, x === 223 ? 30 : 42)).join('')
-         + [284, 297, 310, 323].map(x => slot(x, x === 284 ? 30 : 42)).join('')
+    shadow: 'M262 70 C300 90 330 130 330 200 L330 270 L262 270 Z',
+    hi: 'M200 150 C204 120 222 100 240 92 C224 112 214 132 210 170 L208 214 L200 214 Z',
+    inner: holes.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2" fill="${OL}"/><circle cx="${512 - x}" cy="${y}" r="3.2" fill="${OL}"/>`).join('')
+         + line('M198 224 C222 242 240 250 256 256 C272 250 290 242 314 224', 2, '#8f98a3')   // spodnji rob lica
   });
-  // vodoravni pas z režama za oči
-  s += part(sx('M152 144 L360 144 L360 176 L152 176 Z'), B, { w: 4, shadow: sx('M152 166 L360 166 L360 176 L152 176 Z') });
-  s += `<rect x="${X(180)}" y="152" width="${X(234) - X(180)}" height="15" rx="3" fill="#1d1620"/><rect x="${X(278)}" y="152" width="${X(332) - X(278)}" height="15" rx="3" fill="#1d1620"/>`;
-  s += `<circle cx="${X(212)}" cy="159" r="3.5" fill="#fff"/><circle cx="${X(300)}" cy="159" r="3.5" fill="#fff"/>`;   // očesi v temi
-  // okrasna loka nad očmi
-  const arcL = sx('M176 140 C176 118 200 112 214 122 C222 128 230 124 236 118'), arcR = sx('M336 140 C336 118 312 112 298 122 C290 128 282 124 276 118');
-  s += line(arcL, 9) + line(arcL, 5, B) + line(arcR, 9) + line(arcR, 5, B);
-  // navpični pas križa s cvetnim zaključkom spodaj (ostane enako širok)
-  s += part('M245 56 L267 56 L267 236 Q281 238 283 252 Q270 256 266 262 L256 276 L246 262 Q242 256 229 252 Q231 238 245 236 Z', B,
-            { w: 4, shadow: 'M258 50 L290 50 L290 280 L258 280 Z', hi: 'M249 62 L254 62 L254 140 L249 140 Z' });
-  // kovice
-  s += [[256, 72], [256, 100], [256, 128], [256, 196], [256, 222], [256, 248]].map(([x, y]) => rivet(x, y)).join('');
-  s += [166, 198, 314, 346].map(x => rivet(x, 160, 3.5)).join('');
-  s += [[178, 78], [216, 66], [296, 66], [334, 78], [160, 200], [352, 200]].map(([x, y]) => rivet(x, y, 3.5)).join('');
+  // vodoravni krak križa z režama za oči
+  s += part('M194 158 L318 158 L324 163 L324 180 L318 185 L194 185 L188 180 L188 163 Z', B, { w: 3.5, shadow: 'M188 176 L324 176 L324 186 L188 186 Z' });
+  s += `<rect x="202" y="166" width="38" height="11" rx="2" fill="#1d1620"/><rect x="272" y="166" width="38" height="11" rx="2" fill="#1d1620"/>`;
+  s += `<circle cx="222" cy="171.5" r="3" fill="#fff"/><circle cx="290" cy="171.5" r="3" fill="#fff"/>`;   // očesi v temi
+  // navpični krak s koničastima koncema in razcepi
+  s += part('M256 90 L265 100 L265 116 L276 123 L265 123 L265 228 L276 235 L265 235 L265 246 L256 256 L247 246 L247 235 L236 235 L247 228 L247 123 L236 123 L247 116 L247 100 Z', B,
+            { w: 3.5, shadow: 'M257 84 L282 84 L282 262 L257 262 Z', hi: 'M249 104 L253 104 L253 156 L249 156 Z' });
+  s += [[256, 100], [240, 121], [272, 121], [240, 233], [272, 233], [256, 247], [194, 165], [194, 178], [318, 165], [318, 178]].map(([x, y]) => rivet(x, y)).join('');
   return s;
 }
 /* Kapuca z ovratnikom čez ramena (temno sukno), narisana kot EN kos blaga:
@@ -566,7 +557,7 @@ const ITEMS = {
   verizna:      { slot: 'obleka', char: 'vitez', season: 1, name: 'Verižna srajca', acc: 'Verižno srajco', rarity: 'navaden', price: 80, sleeve: '#a8b1bb', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: chainmail },
   oklep:        { slot: 'obleka', char: 'vitez', season: 1, name: 'Viteški oklep', rarity: 'redek', price: 220, sleeve: '#b9c2cc', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#b9c2cc', '#c0392b', '#f1c40f') },
   'zlati-oklep':{ slot: 'obleka', char: 'vitez', season: 2, name: 'Zlati oklep', rarity: 'nagrada', reward: [2, 'bit'], sleeve: '#f4d36b', cuff: '#d9a441', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#f4d36b', '#6a4fc0', '#fff') },
-  'veliki-slem': { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška bojna čelada', acc: 'Viteško bojno čelado', rarity: 'epski', price: 300, hidesHair: true, hidesFace: true, crop: '136 44 240 240', draw: greatHelm },
+  'veliki-slem': { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška bojna čelada', acc: 'Viteško bojno čelado', rarity: 'epski', price: 300, hidesHair: true, hidesFace: true, crop: '146 60 220 220', draw: greatHelm },
   kapuca:        { slot: 'obleka', char: null, season: 1, name: 'Kapuca', acc: 'Kapuco', rarity: 'redek', price: 120, hidesHair: true, crop: '86 30 340 340',
                    sleeve: '#3b3d4a', cuff: '#2a2b35', pants: '#4a4e69', boots: '#6b4226', draw: () => tunic('#3b3d4a', '#2a2b35'), over: hood },
   'celada-modra': { slot: 'glava', char: 'vitez', season: 1, name: 'Čelada z modrim perjem', acc: 'Čelado z modrim perjem', rarity: 'redek', price: 160, hidesHair: true, draw: () => helmet('#3a7bd5') },
@@ -629,7 +620,10 @@ function hero(look, eq, viewBox = '0 0 512 512', noBg) {
   if (!hide) s += hairFront(look);
   /* Oblačilo z delom čez glavo (kapuca): telo je narisano zgoraj, kapuca in
      ovratnik pa šele po glavi — in pred pokrivalom, da gre krona čez kapuco. */
-  if (out.over) s += out.over();
+  if (out.over) {
+    if (hat && hat.hidesFace) s += `<path d="${FACE}" fill="#1d1e26"/>`;   // glave ni: v kapuci je tema, ne ozadje
+    s += out.over();
+  }
   if (hat) s += hat.draw();
   if (it('v-roki')) s += it('v-roki').draw();
   s += hand(186, 374, look.skin, true) + hand(326, 374, look.skin, false);
