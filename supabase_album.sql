@@ -189,7 +189,7 @@ create table if not exists battle_log (
 -- Frizure (videz je brezplačen). Pravilo tudi za tabelo, ustvarjeno s prejšnjo različico.
 alter table student_avatar drop constraint if exists student_avatar_style_check;
 alter table student_avatar add constraint student_avatar_style_check
-  check (style in ('kratki', 'dolgi', 'kitke', 'cop'));
+  check (style in ('kratki', 'dolgi', 'kitke', 'cop', 'irokeza', 'viking'));
 
 alter table seasons             enable row level security;
 alter table game_chars          enable row level security;
@@ -725,7 +725,7 @@ begin
     skin  = case when p_avatar->>'skin' ~ '^#[0-9a-fA-F]{6}$' then p_avatar->>'skin' else a.skin end,
     hair  = case when p_avatar->>'hair' ~ '^#[0-9a-fA-F]{6}$' then p_avatar->>'hair' else a.hair end,
     eye   = case when p_avatar->>'eye'  ~ '^#[0-9a-fA-F]{6}$' then p_avatar->>'eye'  else a.eye  end,
-    style = case when p_avatar->>'style' in ('kratki', 'dolgi', 'kitke', 'cop') then p_avatar->>'style' else a.style end,
+    style = case when p_avatar->>'style' in ('kratki', 'dolgi', 'kitke', 'cop', 'irokeza', 'viking') then p_avatar->>'style' else a.style end,
     active_char = case when exists (select 1 from student_season_char
                                      where student_id = p_student and char_id = p_avatar->>'active_char')
                        then p_avatar->>'active_char' else a.active_char end,

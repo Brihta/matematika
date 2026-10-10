@@ -312,7 +312,7 @@ function head(o, fringe, noEars) {
         + part(FACE, skin, { shadow: 'M306 60 C352 96 356 204 296 244 L370 244 L370 60 Z ' + (fringe ? 'M164 166 C184 140 206 134 228 116 C238 124 242 136 240 152 C258 146 268 132 268 114 C284 122 298 136 304 160 C314 152 320 140 318 124 C332 132 342 146 348 166 L348 110 L164 110 Z' : '') });
   for (const [x, f] of [[220, -1], [292, 1]]) {
     s += `<ellipse cx="${x}" cy="160" rx="18" ry="21" fill="#fff" stroke="${OL}" stroke-width="3"/><circle cx="${x + 1}" cy="164" r="14" fill="${o.eye}"/><circle cx="${x + 1}" cy="168" r="10" fill="${shade(o.eye)}" opacity=".6"/><circle cx="${x + 1}" cy="165" r="7" fill="${OL}"/><circle cx="${x - 5}" cy="157" r="5.5" fill="#fff"/><circle cx="${x + 6}" cy="171" r="2.5" fill="#fff"/>`
-       + line(`M${x - 20} 154 Q${x} 132 ${x + 20} 152`, 6) + (o.style !== 'kratki' ? line(`M${x + 19 * f} 150 L${x + 27 * f} 142`, 4) : '')
+       + line(`M${x - 20} 154 Q${x} 132 ${x + 20} 152`, 6) + (['dolgi', 'kitke', 'cop'].includes(o.style) ? line(`M${x + 19 * f} 150 L${x + 27 * f} 142`, 4) : '')
        + line(`M${x - 18} ${126 - (f > 0 ? 2 : 0)} Q${x} 114 ${x + 18} ${122 + (f > 0 ? -2 : 2)}`, 7, shade(o.hair));
   }
   const m = 'M236 202 Q256 226 276 202 Z', mid = 'm' + (++uid);
@@ -328,8 +328,37 @@ const HAIR = {
   kitke:  { name: 'Kitke',  back: 'M160 150 C150 80 200 40 256 40 C312 40 362 80 352 150 Q350 166 340 170 L172 170 Q162 166 160 150 Z', extra: [], mid: o => braid(o, 170, 196, 146, 318) + braid(o, 342, 196, 366, 318) },
   /* Čop: zvezani lasje za glavo, padajo na desno (back: za glavo). */
   cop:    { name: 'Čop',    back: 'M160 150 C150 80 200 40 256 40 C312 40 362 80 352 150 Q350 166 340 170 L172 170 Q162 166 160 150 Z M314 84 C372 58 412 112 404 186 C398 240 378 274 352 292 C368 244 368 184 346 136 C338 118 328 102 314 92 Z', extra: ['M352 110 C380 140 388 190 376 250', 'M340 128 C362 160 368 210 360 262'],
-            tie: [322, 88] }
+            tie: [322, 88] },
+  /* Irokeza: obrite strani (rahla senca) in greben bodic po sredini — brez zadnjih las in brez šiški. */
+  irokeza: { name: 'Irokeza', back: '', extra: [], noFringe: true, front: o => mohawk(o) },
+  /* Viking: dolgi skodrani lasje do ramen, preča na sredini, kodri ob obrazu, brada z brki. */
+  viking:  { name: 'Viking', back: 'M158 150 C148 80 200 38 256 38 C312 38 364 80 354 150 C366 190 352 214 366 240 C354 260 370 282 356 302 Q338 318 318 306 L312 236 L200 236 L194 306 Q174 318 156 302 C142 282 158 260 146 240 C160 214 146 190 158 150 Z',
+             extra: ['M170 196 C162 220 176 240 166 262 C160 280 170 292 166 300', 'M342 196 C350 220 336 240 346 262 C352 280 342 292 346 300'],
+             noFringe: true, front: o => vikingFront(o), beard: o => beard(o) }
 };
+function mohawk(o) {
+  const d = shade(o.hair);
+  return `<path d="M170 150 C170 110 192 80 228 70 L228 100 C202 106 184 126 178 150 Z M342 150 C342 110 320 80 284 70 L284 100 C310 106 328 126 334 150 Z" fill="${o.hair}" opacity=".28"/>`
+    + part('M230 96 L222 56 L238 66 L236 28 L250 48 L256 10 L262 48 L276 28 L274 66 L290 56 L282 96 C272 88 240 88 230 96 Z', o.hair,
+           { w: 4, shadow: 'M258 0 L300 0 L300 100 L258 100 Z', hi: 'M244 70 L248 44 L252 70 Z' })
+    + line('M246 90 L242 66', 2.5, d) + line('M266 90 L270 66', 2.5, d);
+}
+function vikingFront(o) {
+  const d = shade(o.hair);
+  return part('M164 150 C158 88 204 52 256 52 C308 52 354 88 348 150 C344 128 330 108 300 98 C284 94 268 100 258 112 C246 100 228 94 210 98 C184 106 168 128 164 150 Z', o.hair,
+              { shadow: 'M300 40 C350 70 360 120 352 160 L400 160 L400 40 Z', hi: 'M206 72 Q236 58 250 62 Q232 70 220 86 Z' })
+    + line('M256 54 L258 110', 3, d) + line('M226 66 Q214 84 206 100', 3, d) + line('M288 66 Q300 84 308 100', 3, d)
+    // kodri ob obrazu
+    + part('M164 144 C150 172 168 194 156 222 C152 236 162 244 168 232 C178 212 166 192 178 168 Z', o.hair, { w: 3.5 })
+    + part('M348 144 C362 172 344 194 356 222 C360 236 350 244 344 232 C334 212 346 192 334 168 Z', o.hair, { w: 3.5 });
+}
+function beard(o) {
+  const d = shade(o.hair);
+  return part('M178 186 C182 212 196 236 214 250 C224 270 236 288 256 298 C276 288 288 270 298 250 C316 236 330 212 334 186 C322 206 306 214 290 210 C280 222 268 228 256 228 C244 228 232 222 222 210 C206 214 190 206 178 186 Z', o.hair,
+              { w: 4, shadow: 'M262 180 L340 180 L340 300 L262 300 Z',
+                inner: ['M206 226 C212 244 222 258 230 270', 'M240 238 C244 256 250 270 252 284', 'M272 238 C268 256 262 270 260 284', 'M306 226 C300 244 290 258 282 270'].map(l => line(l, 2.5, d)).join('') })
+    + part('M230 199 C238 191 249 191 256 196 C263 191 274 191 282 199 C276 204 266 204 256 200 C246 204 236 204 230 199 Z', o.hair, { w: 3 });   // brki nad usti
+}
 /* Kita: členi (izmenično nagnjeni) od (x0,y0) do (x1,y1), spodaj elastika in čopek. */
 function braid(o, x0, y0, x1, y1) {
   const n = 6, col = o.hair, dark = shade(o.hair);
@@ -346,10 +375,10 @@ function braid(o, x0, y0, x1, y1) {
 }
 const hairStyle = o => HAIR[o.style] || HAIR.kratki;
 const hairBack = o => { const h = hairStyle(o);
-  return part(h.back, o.hair, { shadow: 'M120 30 L400 30 L400 330 L120 330 Z' }) + h.extra.map(d => line(d, 3, shade(o.hair))).join('')
+  return (h.back ? part(h.back, o.hair, { shadow: 'M120 30 L400 30 L400 330 L120 330 Z' }) : '') + h.extra.map(d => line(d, 3, shade(o.hair))).join('')
     + (h.tie ? `<rect x="${h.tie[0] - 9}" y="${h.tie[1] - 7}" width="20" height="14" rx="5" transform="rotate(-30 ${h.tie[0]} ${h.tie[1]})" fill="#e0574f" stroke="${OL}" stroke-width="3"/>` : ''); };
 const hairMid = o => { const h = hairStyle(o); return h.mid ? h.mid(o) : ''; };
-const hairFront = o => part(FRINGE, o.hair, { shadow: 'M300 40 C350 70 360 120 352 160 L400 160 L400 40 Z', hi: 'M206 72 Q240 58 276 62 Q244 72 224 90 Z' })
+const hairFront = o => hairStyle(o).front ? hairStyle(o).front(o) : part(FRINGE, o.hair, { shadow: 'M300 40 C350 70 360 120 352 160 L400 160 L400 40 Z', hi: 'M206 72 Q240 58 276 62 Q244 72 224 90 Z' })
   + ['M256 54 Q250 80 240 100', 'M300 64 Q308 86 304 106', 'M210 64 Q200 88 196 112'].map(d => line(d, 3, shade(o.hair))).join('');
 
 /* ── oblike predmetov s parametri (ista oblika, druge barve) ── */
@@ -644,7 +673,9 @@ function hero(look, eq, viewBox = '0 0 512 512', noBg) {
   /* Zaprt šlem (hidesFace) pokrije vso glavo — glave ne rišemo, šlem je zato
      lahko manjši in sedi na ramenih. */
   /* Pod kapuco (oblačilo, ki skrije lase in gre čez glavo) ušes ne rišemo — kapuca je zato lahko tesno ob obrazu. */
-  if (!(hat && hat.hidesFace)) s += head(look, !hide, !!(out.over && out.hidesHair));
+  if (!(hat && hat.hidesFace)) s += head(look, !hide && !hairStyle(look).noFringe, !!(out.over && out.hidesHair));
+  /* Brada je del frizure, a ostane tudi pod odprto čelado; skrije jo le zaprt šlem. */
+  if (!(hat && hat.hidesFace) && hairStyle(look).beard) s += hairStyle(look).beard(look);
   if (!hide) s += hairFront(look);
   /* Oblačilo z delom čez glavo (kapuca): telo je narisano zgoraj, kapuca in
      ovratnik pa šele po glavi — in pred pokrivalom, da gre krona čez kapuco. */
