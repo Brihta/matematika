@@ -404,6 +404,24 @@ function greatHelm() {
   s += [[178, 78], [216, 66], [296, 66], [334, 78], [160, 200], [352, 200]].map(([x, y]) => rivet(x, y, 3.5)).join('');
   return s;
 }
+/* Kapuca z ovratnikom čez ramena (temno sukno). Lasje se skrijejo, obraz
+   ostane viden skozi odprtino; ob robu odprtine je senca, da je videti globoka. */
+function hood() {
+  const C = '#3b3d4a';
+  const HOLE = 'M256 104 C308 104 332 144 332 190 C332 240 302 264 256 264 C210 264 180 240 180 190 C180 144 204 104 256 104 Z';
+  let s = part('M198 236 Q256 222 314 236 Q372 262 376 322 Q304 348 256 346 Q208 348 136 322 Q140 262 198 236 Z', C, {
+    shadow: 'M256 220 L400 220 L400 360 L256 360 Z',
+    hi: 'M150 300 Q170 262 204 246 Q182 272 172 312 Z',
+    inner: line('M196 300 Q206 322 204 342', 3, '#2a2b35') + line('M316 300 Q306 322 308 342', 3, '#2a2b35') + line('M256 290 L256 344', 3, '#2a2b35')
+  });
+  s += part('M140 204 C134 106 190 44 256 36 C322 44 378 106 372 204 C372 256 340 282 256 286 C172 282 140 256 140 204 Z ' + HOLE, C, {
+    shadow: 'M300 30 C356 70 380 140 376 290 L420 290 L420 30 Z',
+    hi: 'M168 150 Q172 88 226 56 Q190 98 184 160 Z'
+  }).replace(/<path d="M140 204/g, '<path fill-rule="evenodd" clip-rule="evenodd" d="M140 204');
+  s += `<path d="${HOLE}" fill="none" stroke="#1d1e26" stroke-width="10" opacity=".55"/>`;   // globina ob obrazu
+  s += line('M256 40 Q262 70 256 102', 3, '#2a2b35');                                       // šiv na vrhu
+  return s;
+}
 function wizHat(col, band) {
   return part('M128 92 C128 74 384 74 384 92 C384 110 128 110 128 92 Z', shade(col), { w: 5 })
     + part('M190 88 C204 54 226 22 262 8 C286 0 312 4 326 20 C300 18 286 30 292 50 C298 66 312 78 322 88 Z', col, { shadow: 'M270 0 C300 40 300 70 330 100 L400 100 L400 0 Z', hi: 'M210 70 Q226 40 246 24 Q232 50 222 80 Z' })
@@ -508,6 +526,7 @@ const ITEMS = {
   oklep:        { slot: 'obleka', char: 'vitez', season: 1, name: 'Viteški oklep', rarity: 'redek', price: 220, sleeve: '#b9c2cc', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#b9c2cc', '#c0392b', '#f1c40f') },
   'zlati-oklep':{ slot: 'obleka', char: 'vitez', season: 2, name: 'Zlati oklep', rarity: 'nagrada', reward: [2, 'bit'], sleeve: '#f4d36b', cuff: '#d9a441', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#f4d36b', '#6a4fc0', '#fff') },
   'veliki-slem': { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška bojna čelada', acc: 'Viteško bojno čelado', rarity: 'epski', price: 300, hidesHair: true, hidesFace: true, crop: '136 44 240 240', draw: greatHelm },
+  kapuca:        { slot: 'glava', char: null, season: 1, name: 'Kapuca', acc: 'Kapuco', rarity: 'redek', price: 120, hidesHair: true, crop: '106 24 300 300', draw: hood },
   'celada-modra': { slot: 'glava', char: 'vitez', season: 1, name: 'Čelada z modrim perjem', acc: 'Čelado z modrim perjem', rarity: 'redek', price: 160, hidesHair: true, draw: () => helmet('#3a7bd5') },
   celada:       { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška čelada', acc: 'Viteško čelado', rarity: 'nagrada', reward: [1, 'bit'], hidesHair: true, draw: () => helmet('#e74c3c') + sparkle(330, 60, 8) },
   krona:        { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška krona', acc: 'Viteško krono', rarity: 'nagrada', reward: [1, 'tek'], draw: () =>
