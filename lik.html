@@ -447,6 +447,28 @@ function greatHelm() {
   s += [[256, 100], [240, 121], [272, 121], [240, 233], [272, 233], [256, 247], [194, 165], [194, 178], [318, 165], [318, 178]].map(([x, y]) => rivet(x, y)).join('');
   return s;
 }
+/* Vikinška čelada: kovinska kupola z zakovičenimi trakovi, na vrhu konica
+   z obročem, ob straneh velika rogova. Obraz, lasje in brada ostanejo vidni. */
+function vikingHelm() {
+  const M = '#aab3bd', D = '#7d8691', H = '#d6dce2';            // kovina, temna, odsev
+  const rivet = (x, y, r = 3.2) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${H}" stroke="${OL}" stroke-width="2"/>`;
+  const horn = k => { const X = x => +(256 + (x - 256) * k).toFixed(1);
+    return part(`M${X(178)} 144 C${X(118)} 148 ${X(84)} 112 ${X(86)} 70 C${X(88)} 40 ${X(102)} 18 ${X(122)} 4 C${X(114)} 30 ${X(112)} 58 ${X(124)} 80 C${X(136)} 98 ${X(158)} 102 ${X(182)} 100 Z`, '#c8ced5',
+      { shadow: `M${X(150)} 0 L${X(200)} 0 L${X(200)} 150 L${X(150)} 150 Z`, hi: `M${X(98)} 92 C${X(96)} 62 ${X(104)} 40 ${X(116)} 22 C${X(108)} 50 ${X(106)} 74 ${X(112)} 100 Z`,
+        inner: line(`M${X(126)} 118 Q${X(110)} 104 ${X(108)} 80`, 2, D) }); };
+  let s = horn(1) + horn(-1);
+  s += part('M246 48 L256 4 L266 48 Z', M, { w: 3.5, shadow: 'M256 0 L272 0 L272 50 L256 50 Z' });                       // konica
+  s += part('M168 142 C164 84 204 46 256 46 C308 46 348 84 344 142 Z', M, {                                         // kupola
+    shadow: 'M290 40 C340 70 356 110 352 150 L400 150 L400 40 Z', hi: 'M196 104 C204 78 224 62 244 58 C226 72 214 88 208 112 Z',
+    inner: [70, 82, 94, 106, 118].map(y => `<circle cx="${y < 80 ? 236 : 234}" cy="${y}" r="2.4" fill="${D}"/><circle cx="${y < 80 ? 276 : 278}" cy="${y}" r="2.4" fill="${D}"/>`).join('') });
+  s += part('M244 48 L268 48 L270 132 L242 132 Z', M, { w: 3.5, shadow: 'M258 44 L274 44 L274 136 L258 136 Z' });  // srednji trak
+  s += `<ellipse cx="256" cy="48" rx="15" ry="6" fill="${M}" stroke="${OL}" stroke-width="3.5"/>`;                  // obroč pod konico
+  s += part('M162 126 Q256 110 350 126 L352 156 Q256 140 160 156 Z', M, { w: 4, shadow: 'M290 100 L360 100 L360 160 L290 160 Z',  // obroba
+    inner: line('M164 134 Q256 118 348 134', 2, D) });
+  s += rivet(256, 84, 7) + rivet(256, 140, 7) + rivet(172, 142, 5) + rivet(340, 142, 5)
+     + [196, 216, 236, 276, 296, 316].map(x => rivet(x, 128 + Math.abs(x - 256) * .06 - 6, 2.6)).join('');
+  return s;
+}
 /* Kapuca z ovratnikom čez ramena (temno sukno), narisana kot EN kos blaga:
    kapuca se brez reže nadaljuje v ovratnik. Lasje se skrijejo, obraz je
    viden skozi odprtino; ob njej je ozek pas temnejše podloge. */
@@ -615,6 +637,7 @@ const ITEMS = {
   'veliki-slem': { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška bojna čelada', acc: 'Viteško bojno čelado', rarity: 'epski', price: 300, hidesHair: true, hidesFace: true, crop: '146 60 220 220', draw: greatHelm },
   kapuca:        { slot: 'obleka', char: null, season: 1, name: 'Kapuca', acc: 'Kapuco', rarity: 'redek', price: 120, hidesHair: true, crop: '86 30 340 340',
                    sleeve: '#3b3d4a', cuff: '#2a2b35', pants: '#4a4e69', boots: '#6b4226', draw: () => tunic('#3b3d4a', '#2a2b35'), over: hood },
+  'viking-celada': { slot: 'glava', char: 'vitez', season: 1, name: 'Vikinška čelada', acc: 'Vikinško čelado', rarity: 'epski', price: 250, crop: '76 -14 360 360', draw: vikingHelm },
   'celada-modra': { slot: 'glava', char: 'vitez', season: 1, name: 'Čelada z modrim perjem', acc: 'Čelado z modrim perjem', rarity: 'redek', price: 160, hidesHair: true, draw: () => helmet('#3a7bd5') },
   celada:       { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška čelada', acc: 'Viteško čelado', rarity: 'nagrada', reward: [1, 'bit'], hidesHair: true, draw: () => helmet('#e74c3c') + sparkle(330, 60, 8) },
   krona:        { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška krona', acc: 'Viteško krono', rarity: 'nagrada', reward: [1, 'tek'], draw: () =>
