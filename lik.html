@@ -404,22 +404,26 @@ function greatHelm() {
   s += [[178, 78], [216, 66], [296, 66], [334, 78], [160, 200], [352, 200]].map(([x, y]) => rivet(x, y, 3.5)).join('');
   return s;
 }
-/* Kapuca z ovratnikom čez ramena (temno sukno). Lasje se skrijejo, obraz
-   ostane viden skozi odprtino; ob robu odprtine je senca, da je videti globoka. */
+/* Kapuca z ovratnikom čez ramena (temno sukno), narisana kot EN kos blaga:
+   kapuca se brez reže nadaljuje v ovratnik. Lasje se skrijejo, obraz je
+   viden skozi odprtino; ob njej je ozek pas temnejše podloge. */
 function hood() {
-  const C = '#3b3d4a';
-  const HOLE = 'M256 104 C308 104 332 144 332 190 C332 240 302 264 256 264 C210 264 180 240 180 190 C180 144 204 104 256 104 Z';
-  let s = part('M198 236 Q256 222 314 236 Q372 262 376 322 Q304 348 256 346 Q208 348 136 322 Q140 262 198 236 Z', C, {
-    shadow: 'M256 220 L400 220 L400 360 L256 360 Z',
-    hi: 'M150 300 Q170 262 204 246 Q182 272 172 312 Z',
-    inner: line('M196 300 Q206 322 204 342', 3, '#2a2b35') + line('M316 300 Q306 322 308 342', 3, '#2a2b35') + line('M256 290 L256 344', 3, '#2a2b35')
-  });
-  s += part('M140 204 C134 106 190 44 256 36 C322 44 378 106 372 204 C372 256 340 282 256 286 C172 282 140 256 140 204 Z ' + HOLE, C, {
-    shadow: 'M300 30 C356 70 380 140 376 290 L420 290 L420 30 Z',
-    hi: 'M168 150 Q172 88 226 56 Q190 98 184 160 Z'
-  }).replace(/<path d="M140 204/g, '<path fill-rule="evenodd" clip-rule="evenodd" d="M140 204');
-  s += `<path d="${HOLE}" fill="none" stroke="#1d1e26" stroke-width="10" opacity=".55"/>`;   // globina ob obrazu
-  s += line('M256 40 Q262 70 256 102', 3, '#2a2b35');                                       // šiv na vrhu
+  const C = '#3b3d4a', LINING = '#23242d', FOLD = '#2a2b35';
+  const OUT = 'M256 32 C322 38 374 100 372 190 C370 226 358 244 354 252 C386 268 400 298 402 334 Q330 362 256 360 Q182 362 110 334 C112 298 126 268 158 252 C154 244 142 226 140 190 C138 100 190 38 256 32 Z';
+  // odprtina sledi obrazu (FACE) in je spodaj vedno znotraj njega — skozi njo se ne vidi ozadje
+  const HOLE = 'M256 102 C308 102 332 144 332 184 C330 212 304 228 256 230 C208 228 182 212 180 184 C180 144 204 102 256 102 Z';
+  const RIM = 'M256 90 C318 90 346 138 346 184 C346 226 314 248 256 250 C198 248 166 226 166 184 C166 138 194 90 256 90 Z';
+  const eo = d => `fill-rule="evenodd" clip-rule="evenodd" d="${d}`;
+  let s = part(OUT + ' ' + HOLE, C, {
+    shadow: 'M306 30 C364 70 390 150 380 250 C400 280 410 310 410 370 L460 370 L460 30 Z',
+    hi: 'M170 176 C168 110 200 64 240 48 C206 76 190 116 186 178 Z',
+    inner: line('M158 252 Q196 266 222 270', 3, FOLD) + line('M354 252 Q316 266 290 270', 3, FOLD)
+         + line('M184 292 Q196 318 190 350', 3, FOLD) + line('M328 292 Q316 318 322 350', 3, FOLD)
+         + line('M256 252 L256 352', 3, FOLD) + line('M256 36 Q262 66 256 90', 3, FOLD)
+  }).replace(/<path d="M256 32/g, '<path fill-rule="evenodd" clip-rule="evenodd" d="M256 32');   // odprtina za obraz
+  // podloga ob obrazu: obroč med RIM in HOLE
+  s += `<path ${eo(RIM + ' ' + HOLE)}" fill="${LINING}"/>`;
+  s += `<path d="${HOLE}" fill="none" stroke="${OL}" stroke-width="3"/>`;
   return s;
 }
 function wizHat(col, band) {
