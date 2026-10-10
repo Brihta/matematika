@@ -983,7 +983,7 @@ function renderShop() {
 }
 
 function renderLook() {
-  const O = { skin: ['#f7d2b4', '#efc29e', '#d9a47c', '#c98d62', '#8d5a3b'], hair: ['#5a3a24', '#2b1d2e', '#d9a441', '#c0392b', '#8a8f9a', '#e9e4ef'], eye: ['#4a8a3c', '#2a7fcf', '#6a4fc0', '#7a4a2a', '#3a3a3a'] };
+  const O = { skin: ['#f7d2b4', '#efc29e', '#d9a47c', '#c98d62', '#8d5a3b'], hair: ['#5a3a24', '#2b1d2e', '#d9a441', '#c0392b', '#8a8f9a', '#e9e4ef', '#f08cb8', '#8e5bd1', '#7cc6ee'], eye: ['#4a8a3c', '#2a7fcf', '#6a4fc0', '#7a4a2a', '#3a3a3a'] };
   const sw = k => O[k].map(v => `<button class="sw ${S.look[k] === v ? 'on' : ''}" data-look="${k}" data-val="${v}" style="background:${v}"></button>`).join('');
   const nm = CHARS[S.active].names;
   $('view').innerHTML = `<div class="panel looks"><h3>Moj lik je</h3><div class="sw-row">${['m', 'f'].map((v, i) => `<button class="chip ${S.look.form === v ? 'on' : ''}" data-look="form" data-val="${v}">${nm[i]}</button>`).join('')}</div><h3>Koža</h3><div class="sw-row">${sw('skin')}</div><h3>Barva las</h3><div class="sw-row">${sw('hair')}</div>
