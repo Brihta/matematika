@@ -10,8 +10,8 @@
 -- in nakupe. Ključ v script.js je javen, zato do tabel ni neposrednega
 -- dostopa (RLS brez pravil) — vse gre prek funkcij spodaj, kot povsod drugje.
 --
--- V TEM DELU: sezone, strani Poštevanke, Zvestoba, Tekmovanje in Bitka,
--- cekini, trgovina, videz lika, vojaška služba. Pogum in razredni cilj pridejo kasneje.
+-- V TEM DELU: sezone, strani Poštevanke, Zvestoba, Tekmovanje, Bitka,
+-- Pogum, cekini, trgovina, videz lika, vojaška služba. Razredni cilj pride kasneje.
 -- Tekmovanje ima svoj zapis po učencu (comp_rounds): javna lestvica
 -- "scores" ni vezana na učenca, zato sličice ne gradijo na njej.
 --
@@ -74,7 +74,8 @@ create table if not exists album_stickers (
 alter table album_stickers drop constraint if exists album_stickers_kind_check;
 alter table album_stickers add constraint album_stickers_kind_check check (kind in
   ('welcome', 'table', 'days', 'streak', 'comp_first', 'comp_score', 'comp_records', 'comp_board',
-   'battle_first', 'battle_count', 'battle_podium', 'battle_mates', 'battle_win', 'battle_host'));
+   'battle_first', 'battle_count', 'battle_podium', 'battle_mates', 'battle_win', 'battle_host',
+   'pogum_step', 'pogum_weeks', 'pogum_gain', 'pogum_beat'));
 
 -- Predmeti. Cena null = ni naprodaj (nagrada). Cena 0 = dobi ga vsak.
 -- char_id null = skupno vsem likom (spremljevalci, svetovi).
@@ -191,6 +192,20 @@ alter table student_avatar drop constraint if exists student_avatar_style_check;
 alter table student_avatar add constraint student_avatar_style_check
   check (style in ('kratki', 'dolgi', 'kitke', 'cop', 'irokeza', 'viking'));
 
+-- Pogum: najtežja poštevanka, izbrana enkrat na sezono (album_sync). Ostane
+-- ista vso sezono, da se trud sešteva. base_* = odgovori v sezoni ob izbiri;
+-- napredek šteje samo odgovore po izbiri.
+create table if not exists student_pogum (
+  student_id uuid     not null references students(id) on delete cascade,
+  season     smallint not null,
+  t          smallint not null,
+  op         text     not null check (op in ('x', 'd')),
+  base_n     int      not null,
+  base_c     int      not null,
+  chosen_on  date     not null,
+  primary key (student_id, season)
+);
+
 -- Vojaška služba (razdelek 7): cekini za igre in rezultat v bitki.
 alter table coin_ledger drop constraint if exists coin_ledger_reason_check;
 alter table coin_ledger add constraint coin_ledger_reason_check
@@ -225,6 +240,7 @@ alter table album_testers       enable row level security;
 alter table comp_rounds         enable row level security;
 alter table battle_log          enable row level security;
 alter table vojska_rounds       enable row level security;
+alter table student_pogum       enable row level security;
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- 3. VSEBINA 1. SEZONE (jesen: vitez / vitezinja)
@@ -253,6 +269,14 @@ insert into album_stickers (season, id, page, kind, n) values
   (1, 'z3', 'zve', 'streak', 10),
   (1, 'z4', 'zve', 'streak', 20),
   (1, 'z5', 'zve', 'days', 50)
+on conflict (season, id) do update set page = excluded.page, kind = excluded.kind, n = excluded.n;
+
+-- Pogum: trud pri najtežji poštevanki (gl. _album_pogum).
+insert into album_stickers (season, id, page, kind, n) values
+  (1, 'p0', 'pog', 'pogum_step',  20),   -- 20 odgovorov po izbiri
+  (1, 'p1', 'pog', 'pogum_weeks', 3),    -- 3 različni tedni z vsaj 20 odgovori
+  (1, 'p2', 'pog', 'pogum_gain',  10),   -- točnost +10 odstotnih točk (največ do 95 %)
+  (1, 'p3', 'pog', 'pogum_beat',  null)  -- poštevanka postane obvladana
 on conflict (season, id) do update set page = excluded.page, kind = excluded.kind, n = excluded.n;
 
 -- Tekmovanje. Meje iz 1.066 iger (sept.–okt. 2026): četrtina iger ≥ 12 točk,
@@ -432,6 +456,51 @@ language sql stable security definer set search_path = public as $$
                                  where b.score <= (select max(r2.score) from r r2 where r2.day = d.day)));
 $$;
 
+-- Pogum: izbere najtežjo poštevanko, če je še ni. Najtežja = najnižja
+-- točnost med poštevankami, ki jih je učenec v sezoni že vadil in jih še
+-- nima v albumu (najprej tiste z vsaj 10 odgovori; pri enaki točnosti
+-- počasnejša). Če vadi samo že obvladane, izbire še ni.
+create or replace function public._album_pogum_choose(p_student uuid, p_season smallint, p_from date, p_to date)
+returns void language sql security definer set search_path = public as $$
+  insert into student_pogum (student_id, season, t, op, base_n, base_c, chosen_on)
+  select p_student, p_season, f.table_n, f.op, sum(f.correct + f.wrong), sum(f.correct), _album_today()
+    from fact_stats f
+   where f.student_id = p_student and f.day between p_from and p_to
+     and not exists (select 1 from student_stickers ss
+                      where ss.student_id = p_student and ss.season = p_season and ss.sticker_id = f.op || f.table_n)
+   group by f.table_n, f.op
+  having sum(f.correct + f.wrong) > 0 and not _album_mastered(p_student, f.table_n, f.op, p_from, p_to)
+   order by (sum(f.correct + f.wrong) >= 10) desc,
+            sum(f.correct)::numeric / sum(f.correct + f.wrong),
+            coalesce(sum(f.fast)::numeric / nullif(sum(f.timed), 0), 0),
+            f.table_n desc
+   limit 1
+  on conflict do nothing;
+$$;
+
+-- Pogum: napredek pri izbrani poštevanki. new_* = odgovori po izbiri (sezona
+-- zdaj minus ob izbiri), weeks = tedni (pon–ned) z vsaj 20 odgovori od izbire.
+create or replace function public._album_pogum(p_student uuid, p_season smallint, p_from date, p_to date)
+returns table(t smallint, op text, base_n int, base_acc numeric, new_n int, new_acc numeric, weeks int, mastered boolean)
+language sql stable security definer set search_path = public as $$
+  select g.t, g.op, g.base_n,
+         g.base_c * 100.0 / nullif(g.base_n, 0),
+         (x.n - g.base_n)::int,
+         (x.c - g.base_c) * 100.0 / nullif(x.n - g.base_n, 0),
+         (select count(*)::int from (
+            select date_trunc('week', f.day) from fact_stats f
+             where f.student_id = p_student and f.table_n = g.t and f.op = g.op
+               and f.day between g.chosen_on and p_to
+             group by 1 having sum(f.correct + f.wrong) >= 20) w),
+         _album_mastered(p_student, g.t, g.op, p_from, p_to)
+    from student_pogum g,
+         lateral (select coalesce(sum(f.correct + f.wrong), 0) as n, coalesce(sum(f.correct), 0) as c
+                    from fact_stats f
+                   where f.student_id = p_student and f.table_n = g.t and f.op = g.op
+                     and f.day between p_from and p_to) x
+   where g.student_id = p_student and g.season = p_season;
+$$;
+
 -- Bitke v obdobju (iz battle_log).
 create or replace function public._album_battle(p_student uuid, p_from date, p_to date)
 returns table(battles int, wins int, podiums int, hosted int, mates int)
@@ -537,6 +606,10 @@ begin
     'battle', case when s.id is null then null else
                 (select json_build_object('battles', battles, 'wins', wins, 'podiums', podiums, 'hosted', hosted, 'mates', mates)
                    from _album_battle(p_student, s.starts, v_to)) end,
+    'pogum', case when s.id is null then null else
+                (select json_build_object('t', t, 'op', op, 'base_n', base_n, 'base_acc', base_acc, 'new_n', new_n,
+                                          'new_acc', new_acc, 'weeks', weeks, 'mastered', mastered)
+                   from _album_pogum(p_student, s.id, s.starts, v_to)) end,
     'vojska', case when s.id is null then null else _vojska_state(p_student) end
   );
 end; $$;
@@ -588,7 +661,7 @@ $$;
 -- podeli zlate. Vrne stanje. Varno je klicati poljubnokrat.
 create or replace function public.album_sync(p_student uuid)
 returns json language plpgsql security definer set search_path = public as $$
-declare s seasons; v_to date; v_char text; r record; ok boolean; st record; c record; bt record;
+declare s seasons; v_to date; v_char text; r record; ok boolean; st record; c record; bt record; pg record;
 begin
   if not exists (select 1 from students where id = p_student) then return null; end if;
   s := _album_season_for(p_student);
@@ -618,6 +691,8 @@ begin
 
   select * into c from _album_comp(p_student, s.starts, v_to);
   select * into bt from _album_battle(p_student, s.starts, v_to);
+  perform _album_pogum_choose(p_student, s.id, s.starts, v_to);
+  select * into pg from _album_pogum(p_student, s.id, s.starts, v_to);
 
   -- nove sličice → ovojnica
   for r in select * from album_stickers a
@@ -640,6 +715,10 @@ begin
       when 'battle_mates'  then bt.mates >= r.n
       when 'battle_win'    then bt.wins >= 1
       when 'battle_host'   then bt.hosted >= 1
+      when 'pogum_step'  then pg.new_n >= r.n
+      when 'pogum_weeks' then pg.weeks >= r.n
+      when 'pogum_gain'  then pg.new_n >= 20 and pg.new_acc >= least(pg.base_acc + r.n, 95)
+      when 'pogum_beat'  then pg.mastered
       else false end;
     if ok then
       insert into student_stickers (student_id, season, sticker_id) values (p_student, s.id, r.id)
@@ -895,6 +974,7 @@ $$;
 -- med preizkusom, da vsi začnejo enako:
 --   delete from coin_ledger         where student_id in (select student_id from album_testers);
 --   delete from vojska_rounds       where student_id in (select student_id from album_testers);
+--   delete from student_pogum       where student_id in (select student_id from album_testers);
 --   delete from student_stickers    where student_id in (select student_id from album_testers);
 --   delete from student_items       where student_id in (select student_id from album_testers);
 --   delete from student_season_char where student_id in (select student_id from album_testers);

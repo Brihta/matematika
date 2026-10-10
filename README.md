@@ -158,6 +158,12 @@ Aplikacija pošilja samo odgovore.
   vstopu potrdi, da je on ta igralec (`battle_claim`, s skrivnim žetonom
   igralca); izid ob koncu bitke zapiše baza sama (`battle_log`, sprožilec na
   `battles`). Šteje bitka z vsaj 5 odgovori.
+- **Pogum** (4 sličice): trud pri najtežji poštevanki = najnižja točnost med
+  poštevankami, ki jih je učenec v sezoni vadil in jih še nima v albumu.
+  Izbere se enkrat na sezono (`student_pogum`) in ostane ista. Sličice:
+  20 odgovorov po izbiri · 3 različni tedni z vsaj 20 odgovori · točnost
+  +10 odstotnih točk (do 95 %, vsaj 20 novih odgovorov) · poštevanka
+  obvladana. Štejejo tudi napačni odgovori. Polna stran: svet Sončni zahod.
 - Sličica +20 cekinov, zlata +20. Polna stran albuma odklene predmet, ki ni
   naprodaj.
 - **Vojaška služba** (zavihek Služba): odpre se, ko učenec s sličicami

@@ -100,7 +100,8 @@
     return { z0: 'Dobrodošlica', z1: '3 dni zapored', z2: 'Cel teden', z3: '10 dni zapored', z4: '20 dni zapored', z5: '50 dni vadbe',
              t0: 'Prvo tekmovanje', t1: 'Lesena medalja', t2: 'Železna medalja', t3: 'Bronasta medalja',
              t4: 'Srebrna medalja', t5: 'Zlata medalja', t6: 'Rekorder', t7: 'Na lestvici',
-             b0: 'Prva bitka', b1: '10 bitk', b2: 'Stopničke', b3: 'Ekipa', b4: 'Zmagovalec', b5: 'Gostitelj' }[id] || 'Nova sličica';
+             b0: 'Prva bitka', b1: '10 bitk', b2: 'Stopničke', b3: 'Ekipa', b4: 'Zmagovalec', b5: 'Gostitelj',
+             p0: 'Korak naprej', p1: 'Trije tedni', p2: 'Napredek', p3: 'Premagana' }[id] || 'Nova sličica';
   };
 
   /* Most za lik.html: profile je v script.js "let", zato ni window.profile. */
