@@ -372,37 +372,36 @@ function helmet(plume) {
     + `<circle cx="176" cy="206" r="4" fill="${OL}"/><circle cx="336" cy="206" r="4" fill="${OL}"/>`;
 }
 /* Veliki šlem (zaprt, ploščat vrh) s pozlačenim križem — pokrije ves obraz,
-   skozi reže se vidita le očesi. Glava pod njim se ne riše (hidesFace), zato
-   je pomanjšan na 80 % z vrhom ramen kot sidriščem. */
+   skozi reže se vidita le očesi. Glava pod njim se ne riše (hidesFace).
+   Višina kot pri glavi, širina 78 %: X() vse vodoravne mere stisne proti
+   sredini, kovice ostanejo okrogle in črte enako debele. */
 function greatHelm() {
-  return `<g transform="translate(256 258) scale(.8) translate(-256 -258)">${greatHelmShape()}</g>`;
-}
-function greatHelmShape() {
-  const B = '#e2b544', BD = '#b8862a';                       // medenina
-  const HELM = 'M150 104 Q150 60 198 56 L314 56 Q362 60 362 104 L366 214 Q350 256 256 274 Q162 256 146 214 Z';
-  const rivet = (x, y, r = 4) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#eef1f4" stroke="${OL}" stroke-width="2"/>`;
+  const K = .78, X = x => +(256 + (x - 256) * K).toFixed(1);
+  const sx = d => d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (m, x, y) => `${X(+x)} ${y}`);
+  const B = '#e2b544';                                        // medenina
+  const HELM = sx('M150 104 Q150 60 198 56 L314 56 Q362 60 362 104 L366 214 Q350 256 256 274 Q162 256 146 214 Z');
+  const rivet = (x, y, r = 4) => `<circle cx="${X(x)}" cy="${y}" r="${r}" fill="#eef1f4" stroke="${OL}" stroke-width="2"/>`;
+  const slot = (x, h) => `<rect x="${X(x)}" y="192" width="5" height="${h}" rx="2.5" fill="${OL}"/>`;
   let s = part(HELM, '#c3cad3', {
-    shadow: 'M300 50 C352 80 372 160 368 280 L400 280 L400 50 Z',
-    hi: 'M170 92 Q176 70 198 64 Q184 84 182 140 L174 140 Z',
-    inner:
-      // reže za dihanje
-      [184, 196, 208, 220].map(x => `<rect x="${x}" y="192" width="6" height="${x === 220 ? 30 : 42}" rx="3" fill="${OL}"/>`).join('')
-      + [286, 298, 310, 322].map(x => `<rect x="${x}" y="192" width="6" height="${x === 286 ? 30 : 42}" rx="3" fill="${OL}"/>`).join('')
+    shadow: sx('M300 50 C352 80 372 160 368 280 L420 280 L420 50 Z'),
+    hi: sx('M170 92 Q176 70 198 64 Q184 84 182 140 L174 140 Z'),
+    inner: [184, 197, 210, 223].map(x => slot(x, x === 223 ? 30 : 42)).join('')
+         + [284, 297, 310, 323].map(x => slot(x, x === 284 ? 30 : 42)).join('')
   });
   // vodoravni pas z režama za oči
-  s += part('M152 144 L360 144 L360 176 L152 176 Z', B, { w: 4, shadow: 'M152 166 L360 166 L360 176 L152 176 Z' });
-  s += `<rect x="178" y="152" width="56" height="15" rx="3" fill="#1d1620"/><rect x="278" y="152" width="56" height="15" rx="3" fill="#1d1620"/>`;
-  s += `<circle cx="212" cy="159" r="3.5" fill="#fff"/><circle cx="300" cy="159" r="3.5" fill="#fff"/>`;   // očesi v temi
+  s += part(sx('M152 144 L360 144 L360 176 L152 176 Z'), B, { w: 4, shadow: sx('M152 166 L360 166 L360 176 L152 176 Z') });
+  s += `<rect x="${X(180)}" y="152" width="${X(234) - X(180)}" height="15" rx="3" fill="#1d1620"/><rect x="${X(278)}" y="152" width="${X(332) - X(278)}" height="15" rx="3" fill="#1d1620"/>`;
+  s += `<circle cx="${X(212)}" cy="159" r="3.5" fill="#fff"/><circle cx="${X(300)}" cy="159" r="3.5" fill="#fff"/>`;   // očesi v temi
   // okrasna loka nad očmi
-  s += line('M176 140 C176 118 200 112 214 122 C222 128 230 124 236 118', 9) + line('M176 140 C176 118 200 112 214 122 C222 128 230 124 236 118', 5, B);
-  s += line('M336 140 C336 118 312 112 298 122 C290 128 282 124 276 118', 9) + line('M336 140 C336 118 312 112 298 122 C290 128 282 124 276 118', 5, B);
-  // navpični pas križa s cvetnim zaključkom spodaj
-  s += part('M244 56 L268 56 L268 236 Q284 238 286 252 Q272 256 268 262 L256 276 L244 262 Q240 256 226 252 Q228 238 244 236 Z', B,
-            { w: 4, shadow: 'M258 50 L290 50 L290 280 L258 280 Z', hi: 'M248 62 L254 62 L254 140 L248 140 Z' });
+  const arcL = sx('M176 140 C176 118 200 112 214 122 C222 128 230 124 236 118'), arcR = sx('M336 140 C336 118 312 112 298 122 C290 128 282 124 276 118');
+  s += line(arcL, 9) + line(arcL, 5, B) + line(arcR, 9) + line(arcR, 5, B);
+  // navpični pas križa s cvetnim zaključkom spodaj (ostane enako širok)
+  s += part('M245 56 L267 56 L267 236 Q281 238 283 252 Q270 256 266 262 L256 276 L246 262 Q242 256 229 252 Q231 238 245 236 Z', B,
+            { w: 4, shadow: 'M258 50 L290 50 L290 280 L258 280 Z', hi: 'M249 62 L254 62 L254 140 L249 140 Z' });
   // kovice
   s += [[256, 72], [256, 100], [256, 128], [256, 196], [256, 222], [256, 248]].map(([x, y]) => rivet(x, y)).join('');
-  s += [168, 200, 312, 344].map(x => rivet(x, 160, 3.5)).join('');
-  s += [[176, 78], [214, 66], [298, 66], [336, 78], [158, 200], [354, 200]].map(([x, y]) => rivet(x, y, 3.5)).join('');
+  s += [166, 198, 314, 346].map(x => rivet(x, 160, 3.5)).join('');
+  s += [[178, 78], [216, 66], [296, 66], [334, 78], [160, 200], [352, 200]].map(([x, y]) => rivet(x, y, 3.5)).join('');
   return s;
 }
 function wizHat(col, band) {
