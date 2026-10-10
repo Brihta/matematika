@@ -258,7 +258,7 @@ insert into items (id, season, char_id, slot, price, reward_season, reward_page)
   ('verizna',      1, 'vitez', 'obleka',        80,   null, null),
   ('oklep',        1, 'vitez', 'obleka',        220,  null, null),
   ('celada-modra', 1, 'vitez', 'glava',         160,  null, null),
-  ('veliki-slem',  1, 'vitez', 'glava',         300,  null, null),   -- veliki šlem z zlatim križem (dodan 10. 10. 2026)
+  ('veliki-slem',  1, 'vitez', 'glava',         300,  null, null),   -- viteška bojna čelada (dodana 10. 10. 2026)
   ('celada',       1, 'vitez', 'glava',         null, 1, 'bit'),
   ('krona',        1, 'vitez', 'glava',         null, 1, 'tek'),
   ('lesen-mec',    1, 'vitez', 'v-roki',        0,    null, null),
