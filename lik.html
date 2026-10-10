@@ -371,6 +371,36 @@ function helmet(plume) {
     + part('M180 126 Q256 102 332 126 L332 144 Q256 120 180 144 Z', '#8f98a3', { w: 4 }) + line('M256 48 L256 110', 3)
     + `<circle cx="176" cy="206" r="4" fill="${OL}"/><circle cx="336" cy="206" r="4" fill="${OL}"/>`;
 }
+/* Veliki šlem (zaprt, ploščat vrh) s pozlačenim križem — pokrije ves obraz,
+   skozi reže se vidita le očesi. */
+function greatHelm() {
+  const B = '#e2b544', BD = '#b8862a';                       // medenina
+  const HELM = 'M150 104 Q150 60 198 56 L314 56 Q362 60 362 104 L366 214 Q350 256 256 274 Q162 256 146 214 Z';
+  const rivet = (x, y, r = 4) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#eef1f4" stroke="${OL}" stroke-width="2"/>`;
+  let s = part(HELM, '#c3cad3', {
+    shadow: 'M300 50 C352 80 372 160 368 280 L400 280 L400 50 Z',
+    hi: 'M170 92 Q176 70 198 64 Q184 84 182 140 L174 140 Z',
+    inner:
+      // reže za dihanje
+      [184, 196, 208, 220].map(x => `<rect x="${x}" y="192" width="6" height="${x === 220 ? 30 : 42}" rx="3" fill="${OL}"/>`).join('')
+      + [286, 298, 310, 322].map(x => `<rect x="${x}" y="192" width="6" height="${x === 286 ? 30 : 42}" rx="3" fill="${OL}"/>`).join('')
+  });
+  // vodoravni pas z režama za oči
+  s += part('M152 144 L360 144 L360 176 L152 176 Z', B, { w: 4, shadow: 'M152 166 L360 166 L360 176 L152 176 Z' });
+  s += `<rect x="178" y="152" width="56" height="15" rx="3" fill="#1d1620"/><rect x="278" y="152" width="56" height="15" rx="3" fill="#1d1620"/>`;
+  s += `<circle cx="212" cy="159" r="3.5" fill="#fff"/><circle cx="300" cy="159" r="3.5" fill="#fff"/>`;   // očesi v temi
+  // okrasna loka nad očmi
+  s += line('M176 140 C176 118 200 112 214 122 C222 128 230 124 236 118', 9) + line('M176 140 C176 118 200 112 214 122 C222 128 230 124 236 118', 5, B);
+  s += line('M336 140 C336 118 312 112 298 122 C290 128 282 124 276 118', 9) + line('M336 140 C336 118 312 112 298 122 C290 128 282 124 276 118', 5, B);
+  // navpični pas križa s cvetnim zaključkom spodaj
+  s += part('M244 56 L268 56 L268 236 Q284 238 286 252 Q272 256 268 262 L256 276 L244 262 Q240 256 226 252 Q228 238 244 236 Z', B,
+            { w: 4, shadow: 'M258 50 L290 50 L290 280 L258 280 Z', hi: 'M248 62 L254 62 L254 140 L248 140 Z' });
+  // kovice
+  s += [[256, 72], [256, 100], [256, 128], [256, 196], [256, 222], [256, 248]].map(([x, y]) => rivet(x, y)).join('');
+  s += [168, 200, 312, 344].map(x => rivet(x, 160, 3.5)).join('');
+  s += [[176, 78], [214, 66], [298, 66], [336, 78], [158, 200], [354, 200]].map(([x, y]) => rivet(x, y, 3.5)).join('');
+  return s;
+}
 function wizHat(col, band) {
   return part('M128 92 C128 74 384 74 384 92 C384 110 128 110 128 92 Z', shade(col), { w: 5 })
     + part('M190 88 C204 54 226 22 262 8 C286 0 312 4 326 20 C300 18 286 30 292 50 C298 66 312 78 322 88 Z', col, { shadow: 'M270 0 C300 40 300 70 330 100 L400 100 L400 0 Z', hi: 'M210 70 Q226 40 246 24 Q232 50 222 80 Z' })
@@ -474,6 +504,7 @@ const ITEMS = {
   verizna:      { slot: 'obleka', char: 'vitez', season: 1, name: 'Verižna srajca', acc: 'Verižno srajco', rarity: 'navaden', price: 80, sleeve: '#a8b1bb', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: chainmail },
   oklep:        { slot: 'obleka', char: 'vitez', season: 1, name: 'Viteški oklep', rarity: 'redek', price: 220, sleeve: '#b9c2cc', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#b9c2cc', '#c0392b', '#f1c40f') },
   'zlati-oklep':{ slot: 'obleka', char: 'vitez', season: 2, name: 'Zlati oklep', rarity: 'nagrada', reward: [2, 'bit'], sleeve: '#f4d36b', cuff: '#d9a441', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#f4d36b', '#6a4fc0', '#fff') },
+  'veliki-slem': { slot: 'glava', char: 'vitez', season: 1, name: 'Veliki šlem z zlatim križem', acc: 'Veliki šlem z zlatim križem', rarity: 'epski', price: 300, hidesHair: true, draw: greatHelm },
   'celada-modra': { slot: 'glava', char: 'vitez', season: 1, name: 'Čelada z modrim perjem', acc: 'Čelado z modrim perjem', rarity: 'redek', price: 160, hidesHair: true, draw: () => helmet('#3a7bd5') },
   celada:       { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška čelada', acc: 'Viteško čelado', rarity: 'nagrada', reward: [1, 'bit'], hidesHair: true, draw: () => helmet('#e74c3c') + sparkle(330, 60, 8) },
   krona:        { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška krona', acc: 'Viteško krono', rarity: 'nagrada', reward: [1, 'tek'], draw: () =>
