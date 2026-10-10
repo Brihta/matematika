@@ -264,6 +264,7 @@ insert into items (id, season, char_id, slot, price, reward_season, reward_page)
   ('krona',        1, 'vitez', 'glava',         null, 1, 'tek'),
   ('lesen-mec',    1, 'vitez', 'v-roki',        0,    null, null),
   ('mec',          1, 'vitez', 'v-roki',        100,  null, null),
+  ('buzdovan',     1, 'vitez', 'v-roki',        200,  null, null),   -- buzdovan (bojni cepec), dodan 11. 10. 2026
   ('zlati-mec',    1, 'vitez', 'v-roki',        350,  null, null),
   ('scit-les',     1, 'vitez', 'scit',          60,   null, null),
   ('scit-zvezda',  1, 'vitez', 'scit',          150,  null, null),

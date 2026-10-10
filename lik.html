@@ -426,6 +426,43 @@ function hood() {
   s += `<path d="${HOLE}" fill="none" stroke="${OL}" stroke-width="3"/>`;
   return s;
 }
+/* Buzdovan (bojni cepec): lesen ročaj v desni roki, zgoraj kovinska kapa,
+   z nje na dveh verigah visita bodičasti krogli. */
+function flail() {
+  const STEEL = '#c3cad3';
+  // veriga: členi vzdolž krivulje (kvadratna Bézierjeva), vsak zasukan po smeri
+  const chain = (x1, y1, cx, cy, x2, y2, n) => {
+    let out = '';
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, u = 1 - t;
+      const x = u * u * x1 + 2 * u * t * cx + t * t * x2, y = u * u * y1 + 2 * u * t * cy + t * t * y2;
+      const dx = 2 * u * (cx - x1) + 2 * t * (x2 - cx), dy = 2 * u * (cy - y1) + 2 * t * (y2 - cy);
+      const a = Math.atan2(dy, dx) * 180 / Math.PI;
+      out += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="6.5" ry="${i % 2 ? 2.5 : 4}" transform="rotate(${a.toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})" fill="${i % 2 ? '#8f98a3' : 'none'}" stroke="${OL}" stroke-width="2"/>`;
+    }
+    return out;
+  };
+  // bodičasta krogla
+  const ball = (x, y, r) => {
+    let sp = '';
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2 + .3, c = Math.cos(a), sn = Math.sin(a), w = .32;
+      const tip = [x + c * (r + 14), y + sn * (r + 14)];
+      const b1 = [x + Math.cos(a - w) * (r - 1), y + Math.sin(a - w) * (r - 1)], b2 = [x + Math.cos(a + w) * (r - 1), y + Math.sin(a + w) * (r - 1)];
+      sp += `<path d="M${b1.map(v => v.toFixed(1)).join(' ')} L${tip.map(v => v.toFixed(1)).join(' ')} L${b2.map(v => v.toFixed(1)).join(' ')} Z" fill="#e3e8ee" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    }
+    return sp + part(`M${x - r} ${y} a${r} ${r} 0 1 0 ${2 * r} 0 a${r} ${r} 0 1 0 ${-2 * r} 0 Z`, STEEL,
+      { w: 3.5, shadow: `M${x} ${y - r - 2} L${x + r + 4} ${y - r - 2} L${x + r + 4} ${y + r + 4} L${x - r} ${y + r + 4} Z`, hi: `M${x - r * .55} ${y - r * .25} a${r * .3} ${r * .3} 0 1 1 ${r * .5} -${r * .35} Z` });
+  };
+  return chain(366, 182, 420, 180, 436, 240, 10) + chain(366, 182, 376, 262, 404, 296, 11)
+    + ball(440, 262, 20) + ball(408, 318, 17)
+    // ročaj (skozi roko 326,374) s prstani in kapama
+    + line('M318 418 L366 192', 20) + line('M318 418 L366 192', 12, '#9a5b30') + line('M320 404 L363 206', 3, '#c07a45')
+    + line('M345 268 L357 270', 3) + line('M337 306 L349 308', 3) + line('M330 340 L342 342', 3)
+    + part('M355 176 L378 181 L373 203 L350 198 Z', STEEL, { w: 3.5 })
+    + `<circle cx="366" cy="179" r="6" fill="none" stroke="${OL}" stroke-width="3.5"/>`
+    + part('M309 414 L328 418 L325 434 L306 430 Z', STEEL, { w: 3.5 });
+}
 function wizHat(col, band) {
   return part('M128 92 C128 74 384 74 384 92 C384 110 128 110 128 92 Z', shade(col), { w: 5 })
     + part('M190 88 C204 54 226 22 262 8 C286 0 312 4 326 20 C300 18 286 30 292 50 C298 66 312 78 322 88 Z', col, { shadow: 'M270 0 C300 40 300 70 330 100 L400 100 L400 0 Z', hi: 'M210 70 Q226 40 246 24 Q232 50 222 80 Z' })
@@ -539,6 +576,7 @@ const ITEMS = {
       + `<circle cx="256" cy="60" r="8" fill="#e74c3c" stroke="${OL}" stroke-width="3"/><circle cx="228" cy="64" r="5" fill="#3498db" stroke="${OL}" stroke-width="3"/><circle cx="284" cy="64" r="5" fill="#3498db" stroke="${OL}" stroke-width="3"/>` + sparkle(340, 40, 8) },
   'lesen-mec':  { slot: 'v-roki', char: 'vitez', season: 1, name: 'Lesen meč', rarity: 'navaden', price: 0, draw: () => sword('#c89a6a', '#8a5a3b') },
   mec:          { slot: 'v-roki', char: 'vitez', season: 1, name: 'Jeklen meč', rarity: 'navaden', price: 100, draw: () => sword('#e3e8ee', '#f1c40f') },
+  buzdovan:     { slot: 'v-roki', char: 'vitez', season: 1, name: 'Buzdovan', acc: 'Buzdovan', rarity: 'redek', price: 200, crop: '244 150 250 250', draw: flail },
   'zlati-mec':  { slot: 'v-roki', char: 'vitez', season: 1, name: 'Zlati meč', rarity: 'epski', price: 350, draw: () => sword('#f7dc7a', '#c0392b', '#ffe27a') },
   'ledeni-mec': { slot: 'v-roki', char: 'vitez', season: 2, name: 'Ledeni meč', rarity: 'nagrada', reward: [2, 'tek'], draw: () => sword('#cdeeff', '#7fb4e6', '#bfe9ff') },
   'scit-les':   { slot: 'scit', char: 'vitez', season: 1, name: 'Lesen ščit', rarity: 'navaden', price: 60, draw: () => shield('les') },
