@@ -3049,10 +3049,11 @@ function endCompetition() {
   recordStat('tekmovanje', cCorrect, cWrong, cScore, COMP_DURATION);
   /* Igra za album (supabase_album.sql): vezana na učenca, preveri jo baza.
      Javna lestvica (scores) ni vezana na učenca, zato sličice ne gradijo na
-     njej. Če funkcije v bazi še ni, klic tiho spodleti. */
+     njej. Če funkcije v bazi še ni, klic tiho spodleti. Vrne izid vojaške
+     službe (cekini za to igro), ki ga pokaže album.js. */
   if (profile) supabaseRPC('add_comp_round', {
     p_student: profile.id, p_score: cScore, p_correct: cCorrect, p_wrong: cWrong
-  });
+  }).then(r => { if (window.albumVojska) window.albumVojska(r); });
   flushStats();
   const div = document.createElement('div');
   div.className = 'timed-overlay';

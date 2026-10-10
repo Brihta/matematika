@@ -11,7 +11,7 @@
 -- dostopa (RLS brez pravil) — vse gre prek funkcij spodaj, kot povsod drugje.
 --
 -- V TEM DELU: sezone, strani Poštevanke, Zvestoba, Tekmovanje in Bitka,
--- cekini, trgovina, videz lika. Pogum in razredni cilj pridejo kasneje.
+-- cekini, trgovina, videz lika, vojaška služba. Pogum in razredni cilj pridejo kasneje.
 -- Tekmovanje ima svoj zapis po učencu (comp_rounds): javna lestvica
 -- "scores" ni vezana na učenca, zato sličice ne gradijo na njej.
 --
@@ -119,7 +119,7 @@ create table if not exists coin_ledger (
   id         bigserial primary key,
   student_id uuid not null references students(id) on delete cascade,
   amount     int  not null,
-  reason     text not null check (reason in ('sticker', 'gold', 'buy')),
+  reason     text not null check (reason in ('sticker', 'gold', 'buy', 'vojska')),
   ref        text not null,
   created_at timestamptz not null default now(),
   unique (student_id, reason, ref)
@@ -191,6 +191,26 @@ alter table student_avatar drop constraint if exists student_avatar_style_check;
 alter table student_avatar add constraint student_avatar_style_check
   check (style in ('kratki', 'dolgi', 'kitke', 'cop', 'irokeza', 'viking'));
 
+-- Vojaška služba (razdelek 7): cekini za igre in rezultat v bitki.
+alter table coin_ledger drop constraint if exists coin_ledger_reason_check;
+alter table coin_ledger add constraint coin_ledger_reason_check
+  check (reason in ('sticker', 'gold', 'buy', 'vojska'));
+alter table battle_log add column if not exists score int;   -- prazno pri bitkah pred vojaško službo
+
+-- Vsaka igra v vojaški službi: rezultat, mera ob igri (prazna = nabor) in plačilo.
+create table if not exists vojska_rounds (
+  student_id uuid    not null references students(id) on delete cascade,
+  kind       text    not null check (kind in ('tek', 'bit')),
+  ref        text    not null,          -- tek: comp_rounds.id · bit: battle_id:runda
+  day        date    not null,
+  score      int     not null,
+  measure    numeric,
+  coins      int     not null,
+  seq        bigserial,                -- vrstni red (več iger v isti milisekundi)
+  created_at timestamptz not null default now(),
+  primary key (student_id, kind, ref)
+);
+
 alter table seasons             enable row level security;
 alter table game_chars          enable row level security;
 alter table prosti_dnevi        enable row level security;
@@ -204,6 +224,7 @@ alter table student_avatar      enable row level security;
 alter table album_testers       enable row level security;
 alter table comp_rounds         enable row level security;
 alter table battle_log          enable row level security;
+alter table vojska_rounds       enable row level security;
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- 3. VSEBINA 1. SEZONE (jesen: vitez / vitezinja)
@@ -431,20 +452,29 @@ $$;
 -- supabase_bitka.sql, zato bitka deluje enako, tudi če tega dela ni.
 create or replace function public._battle_log_round()
 returns trigger language plpgsql security definer set search_path = public as $$
+declare r record;
 begin
   if new.status = 'finished' and old.status is distinct from 'finished' then
-    insert into battle_log (student_id, battle_id, round, day, place, players, host, mates, correct, wrong)
+    insert into battle_log (student_id, battle_id, round, day, place, players, host, mates, correct, wrong, score)
     select x.student_id, new.id, new.round, _album_today(), x.place, x.players,
            x.id = new.host_player,
            coalesce((select array_agg(distinct lower(s2.username))
                        from battle_players p2 join students s2 on s2.id = p2.student_id
                       where p2.battle_id = new.id and p2.id <> x.id and p2.student_id <> x.student_id), '{}'),
-           x.correct, x.wrong
+           x.correct, x.wrong, x.score
       from (select p.*, rank() over (order by p.score desc, p.correct desc)::int as place,
                    (count(*) over ())::int as players
               from battle_players p where p.battle_id = new.id) x
      where x.student_id is not null and x.correct + x.wrong >= 5
     on conflict do nothing;
+    -- vojaška služba: napaka tu ne sme ustaviti konca bitke
+    for r in select student_id, score from battle_log
+              where battle_id = new.id and round = new.round and score is not null loop
+      begin
+        perform _vojska_round(r.student_id, 'bit', new.id || ':' || new.round, r.score);
+      exception when others then null;
+      end;
+    end loop;
   end if;
   return new;
 end; $$;
@@ -506,7 +536,8 @@ begin
                    from _album_comp(p_student, s.starts, v_to)) end,
     'battle', case when s.id is null then null else
                 (select json_build_object('battles', battles, 'wins', wins, 'podiums', podiums, 'hosted', hosted, 'mates', mates)
-                   from _album_battle(p_student, s.starts, v_to)) end
+                   from _album_battle(p_student, s.starts, v_to)) end,
+    'vojska', case when s.id is null then null else _vojska_state(p_student) end
   );
 end; $$;
 
@@ -518,22 +549,28 @@ end; $$;
 -- učenca. Zavrne nemogoče: več kot 300 točk, več točk kot 3 × pravilni
 -- (največji množilnik), več kot 150 odgovorov v 60 s, igro izven 7–20 h
 -- po slovenskem času in več kot 40 iger na dan.
+-- Vrne izid vojaške službe za to igro (null, če služba še ni odprta).
+drop function if exists public.add_comp_round(uuid, int, int, int);
 create or replace function public.add_comp_round(
   p_student uuid, p_score int, p_correct int, p_wrong int)
-returns void language plpgsql security definer set search_path = public as $$
-declare v_hour int := extract(hour from now() at time zone 'Europe/Ljubljana');
+returns json language plpgsql security definer set search_path = public as $$
+declare v_hour int := extract(hour from now() at time zone 'Europe/Ljubljana'); v_id bigint;
 begin
-  if not exists (select 1 from students where id = p_student) then return; end if;
+  if not exists (select 1 from students where id = p_student) then return null; end if;
   if p_score is null or p_correct is null or p_wrong is null
      or p_score < 0 or p_score > 300 or p_correct < 0 or p_wrong < 0
-     or p_correct + p_wrong > 150 or p_score > 3 * p_correct then return; end if;
+     or p_correct + p_wrong > 150 or p_score > 3 * p_correct then return null; end if;
   -- odprto 7:00–19:00; igra, začeta ob 18:59, se konča po 19:00
   if (v_hour < 7 or v_hour >= 20)
-     and coalesce(current_setting('album.vsaka_ura', true), '') <> 'da' then return; end if;
+     and coalesce(current_setting('album.vsaka_ura', true), '') <> 'da' then return null; end if;
   if (select count(*) from comp_rounds
-       where student_id = p_student and day = _album_today()) >= 40 then return; end if;
+       where student_id = p_student and day = _album_today()) >= 40 then return null; end if;
   insert into comp_rounds (student_id, day, score, correct, wrong)
-  values (p_student, _album_today(), p_score, p_correct, p_wrong);
+  values (p_student, _album_today(), p_score, p_correct, p_wrong) returning id into v_id;
+  begin
+    return _vojska_round(p_student, 'tek', v_id::text, p_score);
+  exception when others then return null;   -- igra je zapisana tudi, če služba odpove
+  end;
 end; $$;
 
 -- Prijavljen učenec po vstopu v bitko (battle.js, btEnter): "ta igralec sem
@@ -741,7 +778,112 @@ begin
 end; $$;
 
 -- ══════════════════════════════════════════════════════════════════════════
--- 7. ZA UČITELJA (ročno v SQL Editorju)
+-- 7. VOJAŠKA SLUŽBA
+-- ══════════════════════════════════════════════════════════════════════════
+-- Ko učenec s sličicami zasluži 1000 cekinov (zlate štejejo, nakupi tega ne
+-- zmanjšajo), se mu odpre vojaška služba. Odtlej vsaka igra tekmovanja in
+-- bitke prinese cekine glede na to, kako blizu je SVOJI meri — počasnejši
+-- otrok zasluži enako kot hitrejši, če se trudi po svojih močeh.
+--   Nabor:   prve 3 igre (posebej tekmovanje, posebej bitka) → 5 cekinov.
+--   Mera:    povprečje 3 najboljših rezultatov v zadnjih 30 dneh (vsaj 10).
+--            Raste z otrokom; če en mesec igra slabše, se prilagodi.
+--   Plačilo: pod 70 % mere 0 · od 70 % 3 · od 85 % 6 · od 95 % 10 ·
+--            nad mero 15 + 1 za vsako točko čez (skupaj največ 25).
+--   Na dan se plača največ 10 iger (tekmovanje in bitka skupaj).
+-- Čine (rekrut … poveljnik) nariše lik.html iz vsote cekinov službe.
+-- Nabor in mera za bitko sta ločena: bitka ni primerljiva s tekmovanjem.
+
+create or replace function public._vojska_prag() returns int language sql immutable as $$ select 1000 $$;
+create or replace function public._vojska_cap()  returns int language sql immutable as $$ select 10 $$;
+
+create or replace function public._vojska_earned(p_student uuid) returns int
+language sql stable security definer set search_path = public as $$
+  select coalesce(sum(amount), 0)::int from coin_ledger
+   where student_id = p_student and reason in ('sticker', 'gold');
+$$;
+
+create or replace function public._vojska_open(p_student uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select (_album_season_for(p_student)).id is not null and _vojska_earned(p_student) >= _vojska_prag();
+$$;
+
+-- Mera: povprečje 3 najboljših v zadnjih 30 dneh, brez igre p_skip (ki se ravno ocenjuje).
+create or replace function public._vojska_measure(p_student uuid, p_kind text, p_skip text)
+returns numeric language sql stable security definer set search_path = public as $$
+  select greatest(10, round(avg(score), 2)) from (
+    select score from (
+      select score, id::text as ref, day from comp_rounds
+       where p_kind = 'tek' and student_id = p_student
+      union all
+      select score, battle_id || ':' || round, day from battle_log
+       where p_kind = 'bit' and student_id = p_student and score is not null
+    ) a
+    where day > _album_today() - 30 and ref is distinct from p_skip
+    order by score desc limit 3) t
+  having count(*) > 0;
+$$;
+
+create or replace function public._vojska_pay(p_score int, p_measure numeric) returns int
+language sql immutable as $$
+  select case
+    when p_score > p_measure          then 15 + least(10, floor(p_score - p_measure)::int)
+    when p_score >= 0.95 * p_measure then 10
+    when p_score >= 0.85 * p_measure then 6
+    when p_score >= 0.70 * p_measure then 3
+    else 0 end;
+$$;
+
+-- Oceni eno igro (kliče add_comp_round in sprožilec bitke). Vsaka igra samo enkrat.
+create or replace function public._vojska_round(p_student uuid, p_kind text, p_ref text, p_score int)
+returns json language plpgsql security definer set search_path = public as $$
+declare v_m numeric; v_coins int; v_capped boolean := false; v_total int; v_left int;
+begin
+  if p_student is null or not _vojska_open(p_student) then return null; end if;
+  perform pg_advisory_xact_lock(hashtext('album:' || p_student::text));
+  if exists (select 1 from vojska_rounds where student_id = p_student and kind = p_kind and ref = p_ref) then
+    return null;
+  end if;
+  -- nabor: prve 3 igre te vrste; tudi če v 30 dneh ni nobene igre (ponovni nabor)
+  if (select count(*) from vojska_rounds where student_id = p_student and kind = p_kind) >= 3 then
+    v_m := _vojska_measure(p_student, p_kind, p_ref);
+  end if;
+  v_coins := case when v_m is null then 5 else _vojska_pay(p_score, v_m) end;
+  if v_coins > 0 and (select count(*) from vojska_rounds
+                       where student_id = p_student and day = _album_today() and coins > 0) >= _vojska_cap() then
+    v_coins := 0; v_capped := true;
+  end if;
+  insert into vojska_rounds (student_id, kind, ref, day, score, measure, coins)
+  values (p_student, p_kind, p_ref, _album_today(), p_score, v_m, v_coins);
+  if v_coins > 0 then
+    insert into coin_ledger (student_id, amount, reason, ref)
+    values (p_student, v_coins, 'vojska', p_kind || ':' || p_ref) on conflict do nothing;
+  end if;
+  select coalesce(sum(coins), 0)::int, greatest(0, 3 - count(*) filter (where kind = p_kind))::int
+    into v_total, v_left from vojska_rounds where student_id = p_student;
+  return json_build_object('kind', p_kind, 'score', p_score, 'measure', v_m, 'coins', v_coins,
+                           'capped', v_capped, 'nabor', v_m is null, 'nabor_left', v_left, 'total', v_total);
+end; $$;
+
+-- Za album_state: vse o službi v enem kosu.
+create or replace function public._vojska_state(p_student uuid)
+returns json language sql stable security definer set search_path = public as $$
+  select json_build_object(
+    'open', _vojska_open(p_student), 'earned', _vojska_earned(p_student),
+    'prag', _vojska_prag(), 'cap', _vojska_cap(),
+    'total', (select coalesce(sum(coins), 0)::int from vojska_rounds where student_id = p_student),
+    'today', (select count(*)::int from vojska_rounds where student_id = p_student and day = _album_today() and coins > 0),
+    'tek', json_build_object('nabor_left', greatest(0, 3 - (select count(*) from vojska_rounds where student_id = p_student and kind = 'tek'))::int,
+                             'measure', _vojska_measure(p_student, 'tek', null)),
+    'bit', json_build_object('nabor_left', greatest(0, 3 - (select count(*) from vojska_rounds where student_id = p_student and kind = 'bit'))::int,
+                             'measure', _vojska_measure(p_student, 'bit', null)),
+    'recent', coalesce((select json_agg(json_build_object('kind', kind, 'ref', ref, 'day', day, 'score', score,
+                                                          'measure', measure, 'coins', coins) order by seq desc)
+                          from (select * from vojska_rounds where student_id = p_student
+                                 order by seq desc limit 8) r), '[]'::json));
+$$;
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- 8. ZA UČITELJA (ročno v SQL Editorju)
 -- ══════════════════════════════════════════════════════════════════════════
 
 -- Preizkusni način (sezono vidijo samo izbrani učenci):
@@ -752,6 +894,7 @@ end; $$;
 -- Začetek sezone za vse — najprej pobriši, kar so preizkuševalci nabrali
 -- med preizkusom, da vsi začnejo enako:
 --   delete from coin_ledger         where student_id in (select student_id from album_testers);
+--   delete from vojska_rounds       where student_id in (select student_id from album_testers);
 --   delete from student_stickers    where student_id in (select student_id from album_testers);
 --   delete from student_items       where student_id in (select student_id from album_testers);
 --   delete from student_season_char where student_id in (select student_id from album_testers);

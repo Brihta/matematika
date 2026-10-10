@@ -163,6 +163,24 @@
   .ch .btn { width: 100%; padding: 10px; font-size: .9rem; }
   .info { background: var(--purple-soft); color: var(--purple); border-radius: 14px; padding: 12px 14px; font-weight: 600; font-size: .92rem; margin-bottom: 14px; }
 
+  /* vojaška služba */
+  .vo-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .vo-head .chev { width: 54px; height: 54px; flex: 0 0 auto; }
+  .vo-head h2 { margin: 0; font-size: 1.3rem; }
+  .vo-head small { color: var(--muted); font-weight: 600; }
+  .vo-head .bar { margin-top: 6px; max-width: 320px; }
+  .vo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .vo-card { background: var(--bg); border-radius: 16px; padding: 14px; }
+  .vo-card h3 { margin: 0 0 4px; font-size: 1.05rem; }
+  .vo-card p { margin: 0 0 10px; color: var(--muted); font-size: .9rem; }
+  .vo-pay { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; font-size: .92rem; margin-bottom: 12px; }
+  .vo-pay span:nth-child(even) { font-weight: 800; text-align: right; }
+  .vo-pay .top { color: var(--accent); }
+  .vo-card .btn { width: 100%; padding: 10px; font-size: .92rem; }
+  .vo-log { display: grid; gap: 6px; }
+  .vo-log div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; background: var(--bg); border-radius: 10px; padding: 7px 10px; font-size: .9rem; }
+  .vo-log b.z { color: var(--muted); }
+
   .class-hero { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 22px; align-items: center; }
   .class-hero svg { width: 100%; height: auto; }
   .big-num { font-size: 2.2rem; font-weight: 900; line-height: 1.05; }
@@ -965,6 +983,18 @@ function rankInfo(ch = S.active) {
   return { n, i, name: r[i], next: r[i + 1], need: i < top ? RANK_AT[i + 1] - n : 0, frac: i < top ? (n - RANK_AT[i]) / (RANK_AT[i + 1] - RANK_AT[i]) : 1 };
 }
 
+/* Vojaška služba (supabase_album.sql, razdelek 7): čin po cekinih, zasluženih v službi.
+   Kliče ga tudi album.js (obvestilo o novem činu). */
+const VOJ_RANKS = [['Rekrut', 'Rekrutka'], ['Vojak', 'Vojakinja'], ['Desetnik', 'Desetnica'], ['Vodnik', 'Vodnica'],
+                   ['Zastavonoša', 'Zastavonoša'], ['Stotnik', 'Stotnica'], ['Poveljnik', 'Poveljnica']];
+const VOJ_AT = [0, 50, 150, 300, 500, 800, 1200];
+function vojRank(total) {
+  const top = VOJ_AT.length - 1, g = F() ? 1 : 0;
+  let i = 0; while (i < top && total >= VOJ_AT[i + 1]) i++;
+  return { i, name: VOJ_RANKS[i][g], next: i < top ? VOJ_RANKS[i + 1][g] : null, need: i < top ? VOJ_AT[i + 1] - total : 0,
+           frac: i < top ? (total - VOJ_AT[i]) / (VOJ_AT[i + 1] - VOJ_AT[i]) : 1 };
+}
+
 /* Odgovor baze → stanje strani. Kliče se po vsakem klicu v bazo. */
 function apply(st) {
   if (!st || st.unreachable) { S.error = 'Album se ni naložil. Preveri internetno povezavo in poskusi znova.'; return render(); }
@@ -1072,7 +1102,7 @@ function renderStage() {
 }
 
 function renderTabs() {
-  $('mainTabs').innerHTML = [['album', '📒 Album'], ['trgovina', '🛡️ Oprema'], ['videz', '🙂 Moj videz'], ['liki', '⭐ Moji liki']]
+  $('mainTabs').innerHTML = [['album', '📒 Album'], ['trgovina', '🛡️ Oprema'], ['sluzba', '⚔️ Služba'], ['videz', '🙂 Moj videz'], ['liki', '⭐ Moji liki']]
     .map(([k, n]) => `<button class="mt ${S.view === k ? 'on' : ''}" data-view="${k}">${n}</button>`).join('');
 }
 
@@ -1124,6 +1154,42 @@ function renderShop() {
     }).join('')}</div>`).join('') + `</div>`;
 }
 
+function renderVojska() {
+  const v = S.srv.vojska;
+  if (!v) { $('view').innerHTML = `<div class="panel"><p class="shop-note">Vojaška služba bo kmalu pripravljena.</p></div>`; return; }
+  if (!v.open) {
+    const left = Math.max(0, v.prag - v.earned);
+    $('view').innerHTML = `<div class="panel"><div class="vo-head">${chevrons(0)}<div><h2>Vojaška služba</h2><small>Še zaprta</small></div></div>
+      <p>Ko s sličicami zaslužiš <b>${v.prag} ${cek(v.prag)}</b>, te pokličejo v vojaško službo. Tam ti vsako tekmovanje in vsaka bitka prinese cekine — glede na <b>tvoj</b> najboljši rezultat, ne na rezultate drugih.</p>
+      <div class="page-prog"><span>${v.earned} / ${v.prag}</span><div class="bar"><i style="width:${Math.min(100, v.earned / v.prag * 100)}%"></i></div></div>
+      <p class="shop-note" style="margin-top:10px">Še ${left} ${cek(left)}. Štejejo sličice in zlate sličice; nakupi ne zmanjšajo napredka.</p></div>`;
+    return;
+  }
+  const r = vojRank(v.total), names = VOJ_RANKS.map(n => n[F() ? 1 : 0]);
+  const card = (kind, title, play, href) => {
+    const k = v[kind], m = k.measure == null ? null : Number(k.measure);
+    let body;
+    if (k.nabor_left > 0 || m == null) body = `<p>${k.nabor_left > 0 ? `<b>Nabor:</b> še ${k.nabor_left} ${k.nabor_left === 1 ? 'igra' : k.nabor_left === 2 ? 'igri' : 'igre'}.` : '<b>Ponovni nabor.</b>'} Vsaka prinese 5 ${cek(5)}. Pokaži, kaj znaš — iz nabora dobiš svojo mero.</p>`;
+    else {
+      const fl = Math.floor(m), t95 = Math.ceil(.95 * m), t85 = Math.ceil(.85 * m), t70 = Math.ceil(.7 * m);
+      const rng = (a, b) => a >= b ? `${a}` : `${a}–${b}`;
+      body = `<p>Tvoja mera: <b>${Math.round(m)} točk</b> (povprečje 3 najboljših v zadnjih 30 dneh).</p>
+        <div class="vo-pay"><span class="top">več kot ${fl} točk</span><span class="top">15+ ${cek(15)}</span>
+        <span>${rng(t95, fl)} točk</span><span>10</span><span>${rng(t85, t95 - 1)} točk</span><span>6</span>
+        <span>${rng(t70, t85 - 1)} točk</span><span>3</span><span>manj kot ${t70}</span><span>0</span></div>`;
+    }
+    return `<div class="vo-card"><h3>${title}</h3>${body}<a class="btn btn-main" href="${href}" target="_top">Igraj ${play}</a></div>`;
+  };
+  const log = (v.recent || []).map(x => `<div><span>${x.kind === 'bit' ? '⚔️ Bitka' : '⏱️ Tekmovanje'} · ${x.score} točk${x.measure == null ? ' · nabor' : ` · mera ${Math.round(Number(x.measure))}`}</span>${x.coins ? `<b>+${x.coins}</b>` : '<b class="z">0</b>'}</div>`).join('');
+  $('view').innerHTML = `<div class="panel">
+    <div class="vo-head">${chevrons(r.i)}<div><h2>${r.name}</h2><small>${r.next ? `še ${r.need} ${cek(r.need)} službe do čina ${r.next}` : 'Najvišji čin!'}</small><div class="bar"><i style="width:${r.frac * 100}%"></i></div></div></div>
+    <div class="info" style="margin-top:12px">Danes plačane igre: <b>${v.today} / ${v.cap}</b>. Nad mero dobiš 15 ${cek(15)} in še 1 za vsako točko čez (največ 25). Ko podreš mero, se ti mera dvigne.</div>
+    <div class="vo-grid">${card('tek', 'Tekmovanje', 'tekmovanje', './?mode=tekmovanje')}${card('bit', 'Bitka', 'bitko', './?mode=bitka')}</div>
+    ${log ? `<div class="section-title">Zadnje igre</div><div class="vo-log">${log}</div>` : ''}
+    <div class="section-title">Čini</div><div class="checks">${names.map((nm, i) => `<div class="check" style="${i === r.i ? 'outline:2px solid var(--accent)' : ''}"><span>${chevrons(i).replace('class="chev"', 'width="26" height="26"')}</span><div><b>${nm}</b>${i === r.i ? ' · <b style="color:var(--accent)">ti</b>' : ''}<br><small style="color:var(--muted)">${VOJ_AT[i]} ${cek(VOJ_AT[i])} službe</small></div></div>`).join('')}</div>
+    <p class="shop-note">Skupaj zasluženo v službi: <b>${v.total} ${cek(v.total)}</b>.</p></div>`;
+}
+
 function renderLook() {
   const O = { skin: ['#f7d2b4', '#efc29e', '#d9a47c', '#c98d62', '#8d5a3b'], hair: ['#5a3a24', '#2b1d2e', '#d9a441', '#c0392b', '#8a8f9a', '#e9e4ef', '#f08cb8', '#8e5bd1', '#7cc6ee'], eye: ['#4a8a3c', '#2a7fcf', '#6a4fc0', '#7a4a2a', '#3a3a3a'] };
   const sw = k => O[k].map(v => `<button class="sw ${S.look[k] === v ? 'on' : ''}" data-look="${k}" data-val="${v}" style="background:${v}"></button>`).join('');
@@ -1158,7 +1224,7 @@ function render() {
     return;
   }
   renderHeader(); renderStage(); renderTabs();
-  ({ album: renderAlbum, trgovina: renderShop, videz: renderLook, liki: renderChars })[S.view]();
+  ({ album: renderAlbum, trgovina: renderShop, sluzba: renderVojska, videz: renderLook, liki: renderChars })[S.view]();
 }
 
 /* ════════════════ OKNA IN DEJANJA ════════════════ */

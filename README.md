@@ -160,6 +160,12 @@ Aplikacija pošilja samo odgovore.
   `battles`). Šteje bitka z vsaj 5 odgovori.
 - Sličica +20 cekinov, zlata +20. Polna stran albuma odklene predmet, ki ni
   naprodaj.
+- **Vojaška služba** (zavihek Služba): odpre se, ko učenec s sličicami
+  zasluži 1000 cekinov (nakupi ne štejejo). Prve 3 igre so nabor (5 cekinov);
+  nato vsako tekmovanje in bitka plača glede na **lastno mero** = povprečje
+  3 najboljših rezultatov v zadnjih 30 dneh (bitka ima svojo mero): od 70 %
+  3, od 85 % 6, od 95 % 10, nad mero 15 + 1 na točko (največ 25). Na dan se
+  plača največ 10 iger. Čini od rekruta do poveljnika po cekinih službe.
 
 Sezona začne, ko jo učitelj odpre v Supabase:
 `update seasons set starts = current_date where id = 1;`

@@ -119,6 +119,33 @@
     const coin = W() && W().cek ? W().cek(20) : 'cekinov';
     if (fresh.length) toast(`<span style="font-size:1.6rem">✉</span><div>Nova sličica: <b>${label(fresh[0].id)}</b>!${fresh.length > 1 ? ` (in še ${fresh.length - 1})` : ''}<small>Tapni in jo prilepi v album · +20 ${coin}</small></div>`);
     else if (gold.length && !overlay.classList.contains('on')) toast(`<span style="font-size:1.6rem">⭐</span><div>Zlata sličica: <b>${label(gold[0].id)}</b>!<small>Znaš jo tudi po 14 dneh · +20 ${coin}</small></div>`);
+    else if (!overlay.classList.contains('on')) {
+      /* Bitko oceni baza ob koncu bitke — izid vidimo šele ob naslednjem stanju. */
+      const nv = st.vojska, top = nv && nv.recent && nv.recent[0];
+      if (top && top.kind === 'bit' && !((prev.vojska && prev.vojska.recent) || []).some(x => x.kind === 'bit' && x.ref === top.ref))
+        window.albumVojska({ ...top, nabor: top.measure == null, nabor_left: nv.bit.nabor_left, total: nv.total }, true);
+    }
+  };
+
+  /* Vojaška služba: izid ene igre (tekmovanje: add_comp_round v script.js). */
+  window.albumVojska = function (r, inState) {
+    if (!r || typeof r !== 'object' || !('coins' in r) || !active()) return;
+    const w = ready() ? W() : null, coin = n => (w && w.cek ? w.cek(n) : 'cekinov');
+    const what = r.kind === 'bit' ? 'bitko' : 'tekmovanje';
+    let head, sub = '';
+    if (r.capped) { head = 'danes je plačanih že 10 iger'; sub = 'Jutri spet! Igra se vseeno šteje v tvojo mero.'; }
+    else if (r.nabor) { head = `+${r.coins} ${coin(r.coins)} za ${what}`; sub = r.nabor_left ? `Nabor: še ${r.nabor_left} ${r.nabor_left === 1 ? 'igra' : 'igri'}, nato dobiš svojo mero.` : 'Nabor končan — zdaj imaš svojo mero!'; }
+    else {
+      const m = Number(r.measure), pct = Math.round(r.score / m * 100);
+      head = r.score > m ? `nad mero! +${r.coins} ${coin(r.coins)}` : r.coins ? `+${r.coins} ${coin(r.coins)}` : 'tokrat brez plačila';
+      sub = `${r.score} točk · ${pct} % tvoje mere (${Math.round(m)})`;
+    }
+    if (w && w.vojRank && r.coins) {
+      const before = w.vojRank(r.total - r.coins), after = w.vojRank(r.total);
+      if (after.i > before.i) sub = `Nov čin: ${after.name}!`;
+    }
+    toast(`<span style="font-size:1.6rem">⚔️</span><div>Vojaška služba: <b>${head}</b>${sub ? `<small>${sub}</small>` : ''}</div>`, 6000);
+    if (!inState && state && r.coins) { state.coins += r.coins; render(); }
   };
 
   function render() {
