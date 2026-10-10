@@ -507,7 +507,7 @@ const ITEMS = {
   verizna:      { slot: 'obleka', char: 'vitez', season: 1, name: 'Verižna srajca', acc: 'Verižno srajco', rarity: 'navaden', price: 80, sleeve: '#a8b1bb', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: chainmail },
   oklep:        { slot: 'obleka', char: 'vitez', season: 1, name: 'Viteški oklep', rarity: 'redek', price: 220, sleeve: '#b9c2cc', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#b9c2cc', '#c0392b', '#f1c40f') },
   'zlati-oklep':{ slot: 'obleka', char: 'vitez', season: 2, name: 'Zlati oklep', rarity: 'nagrada', reward: [2, 'bit'], sleeve: '#f4d36b', cuff: '#d9a441', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#f4d36b', '#6a4fc0', '#fff') },
-  'veliki-slem': { slot: 'glava', char: 'vitez', season: 1, name: 'Veliki šlem z zlatim križem', acc: 'Veliki šlem z zlatim križem', rarity: 'epski', price: 300, hidesHair: true, hidesFace: true, draw: greatHelm },
+  'veliki-slem': { slot: 'glava', char: 'vitez', season: 1, name: 'Veliki šlem z zlatim križem', acc: 'Veliki šlem z zlatim križem', rarity: 'epski', price: 300, hidesHair: true, hidesFace: true, crop: '136 44 240 240', draw: greatHelm },
   'celada-modra': { slot: 'glava', char: 'vitez', season: 1, name: 'Čelada z modrim perjem', acc: 'Čelado z modrim perjem', rarity: 'redek', price: 160, hidesHair: true, draw: () => helmet('#3a7bd5') },
   celada:       { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška čelada', acc: 'Viteško čelado', rarity: 'nagrada', reward: [1, 'bit'], hidesHair: true, draw: () => helmet('#e74c3c') + sparkle(330, 60, 8) },
   krona:        { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška krona', acc: 'Viteško krono', rarity: 'nagrada', reward: [1, 'tek'], draw: () =>
@@ -572,7 +572,9 @@ function hero(look, eq, viewBox = '0 0 512 512', noBg) {
   if (it('spremljevalec')) s += it('spremljevalec').draw();
   return `<svg viewBox="${viewBox}" aria-hidden="true">${s}</svg>`;
 }
-const itemPic = (id, eq) => { const it = ITEMS[id]; return hero(S.look, { ...eq, [it.slot]: id, ...(it.slot === 'ozadje' ? {} : { ozadje: null }) }, SLOTS[it.slot].crop); };
+/* Slika predmeta na kartici: lik s tem predmetom, izrez reže. Predmet, ki je
+   večji od reže (zaprt šlem), ima svoj izrez (crop). */
+const itemPic = (id, eq) => { const it = ITEMS[id]; return hero(S.look, { ...eq, [it.slot]: id, ...(it.slot === 'ozadje' ? {} : { ozadje: null }) }, it.crop || SLOTS[it.slot].crop); };
 
 /* ════════════════ SLIČICE ════════════════ */
 const TABLE_COLORS = ['#7cc35d', '#3fb8c9', '#5a8fe0', '#8a6fe0', '#e06fb4', '#f08c2e', '#e0574f', '#d9a441', '#3f9a8a', '#b05ad9'];
@@ -848,7 +850,9 @@ function renderAlbum() {
 function renderShop() {
   const ids = Object.keys(ITEMS).filter(id => { const it = ITEMS[id]; return it.season <= seasonId() && (!it.char || it.char === S.active); });
   const order = ['obleka', 'glava', 'v-roki', 'scit', 'hrbet', 'spremljevalec', 'ozadje'];
-  const groups = order.map(sl => [sl, ids.filter(id => ITEMS[id].slot === sl)]).filter(([, l]) => l.length);
+  /* V skupini po ceni: brezplačni, nato od najcenejšega; nagrade (niso naprodaj) na koncu. */
+  const cost = id => ITEMS[id].reward ? Infinity : ITEMS[id].price || 0;
+  const groups = order.map(sl => [sl, ids.filter(id => ITEMS[id].slot === sl).sort((a, b) => cost(a) - cost(b))]).filter(([, l]) => l.length);
   $('view').innerHTML = `<div class="panel"><p class="shop-note">Oprema za: <b>${cname(S.active)}</b>. Predmeti z oznako <span class="rar nagrada">nagrada</span> niso naprodaj — odklene jih polna stran albuma.</p>`
     + groups.map(([sl, l]) => `<div class="section-title">${SLOTS[sl].name}</div><div class="igrid">${l.map(id => {
       const it = ITEMS[id], own = S.owned.has(id), on = EQ()[it.slot] === id, lock = it.reward && !own;
