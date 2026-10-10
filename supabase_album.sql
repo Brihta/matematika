@@ -859,7 +859,7 @@ end; $$;
 -- ══════════════════════════════════════════════════════════════════════════
 -- 7. VOJAŠKA SLUŽBA
 -- ══════════════════════════════════════════════════════════════════════════
--- Ko učenec s sličicami zasluži 1000 cekinov (zlate štejejo, nakupi tega ne
+-- Ko učenec s sličicami zasluži 500 cekinov (zlate štejejo, nakupi tega ne
 -- zmanjšajo), se mu odpre vojaška služba. Odtlej vsaka igra tekmovanja in
 -- bitke prinese cekine glede na to, kako blizu je SVOJI meri — počasnejši
 -- otrok zasluži enako kot hitrejši, če se trudi po svojih močeh.
@@ -872,7 +872,7 @@ end; $$;
 -- Čine (rekrut … poveljnik) nariše lik.html iz vsote cekinov službe.
 -- Nabor in mera za bitko sta ločena: bitka ni primerljiva s tekmovanjem.
 
-create or replace function public._vojska_prag() returns int language sql immutable as $$ select 1000 $$;
+create or replace function public._vojska_prag() returns int language sql immutable as $$ select 500 $$;   -- 1000 → 500 (10. 10. 2026)
 create or replace function public._vojska_cap()  returns int language sql immutable as $$ select 10 $$;
 
 create or replace function public._vojska_earned(p_student uuid) returns int
