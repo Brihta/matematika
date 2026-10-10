@@ -530,7 +530,8 @@ const ITEMS = {
   oklep:        { slot: 'obleka', char: 'vitez', season: 1, name: 'Viteški oklep', rarity: 'redek', price: 220, sleeve: '#b9c2cc', cuff: '#8f98a3', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#b9c2cc', '#c0392b', '#f1c40f') },
   'zlati-oklep':{ slot: 'obleka', char: 'vitez', season: 2, name: 'Zlati oklep', rarity: 'nagrada', reward: [2, 'bit'], sleeve: '#f4d36b', cuff: '#d9a441', pants: '#4a4e69', boots: '#5b5f6e', draw: () => armor('#f4d36b', '#6a4fc0', '#fff') },
   'veliki-slem': { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška bojna čelada', acc: 'Viteško bojno čelado', rarity: 'epski', price: 300, hidesHair: true, hidesFace: true, crop: '136 44 240 240', draw: greatHelm },
-  kapuca:        { slot: 'glava', char: null, season: 1, name: 'Kapuca', acc: 'Kapuco', rarity: 'redek', price: 120, hidesHair: true, crop: '106 24 300 300', draw: hood },
+  kapuca:        { slot: 'obleka', char: null, season: 1, name: 'Kapuca', acc: 'Kapuco', rarity: 'redek', price: 120, hidesHair: true, crop: '86 30 340 340',
+                   sleeve: '#3b3d4a', cuff: '#2a2b35', pants: '#4a4e69', boots: '#6b4226', draw: () => tunic('#3b3d4a', '#2a2b35'), over: hood },
   'celada-modra': { slot: 'glava', char: 'vitez', season: 1, name: 'Čelada z modrim perjem', acc: 'Čelado z modrim perjem', rarity: 'redek', price: 160, hidesHair: true, draw: () => helmet('#3a7bd5') },
   celada:       { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška čelada', acc: 'Viteško čelado', rarity: 'nagrada', reward: [1, 'bit'], hidesHair: true, draw: () => helmet('#e74c3c') + sparkle(330, 60, 8) },
   krona:        { slot: 'glava', char: 'vitez', season: 1, name: 'Viteška krona', acc: 'Viteško krono', rarity: 'nagrada', reward: [1, 'tek'], draw: () =>
@@ -576,7 +577,7 @@ const cname = ch => CHARS[ch].names[F() ? 1 : 0];
 
 function hero(look, eq, viewBox = '0 0 512 512', noBg) {
   const it = s => eq[s] ? ITEMS[eq[s]] : null;
-  const out = it('obleka') || ITEMS.oproda, hat = it('glava'), hide = hat && hat.hidesHair;
+  const out = it('obleka') || ITEMS.oproda, hat = it('glava'), hide = (hat && hat.hidesHair) || out.hidesHair;
   let s = !noBg && it('ozadje') ? it('ozadje').draw() : '';
   s += `<ellipse cx="256" cy="480" rx="112" ry="14" fill="rgba(60,30,40,.18)"/>`;
   if (it('hrbet')) s += it('hrbet').draw();
@@ -588,6 +589,9 @@ function hero(look, eq, viewBox = '0 0 512 512', noBg) {
      lahko manjši in sedi na ramenih. */
   if (!(hat && hat.hidesFace)) s += head(look, !hide);
   if (!hide) s += hairFront(look);
+  /* Oblačilo z delom čez glavo (kapuca): telo je narisano zgoraj, kapuca in
+     ovratnik pa šele po glavi — in pred pokrivalom, da gre krona čez kapuco. */
+  if (out.over) s += out.over();
   if (hat) s += hat.draw();
   if (it('v-roki')) s += it('v-roki').draw();
   s += hand(186, 374, look.skin, true) + hand(326, 374, look.skin, false);
@@ -738,6 +742,8 @@ function apply(st) {
   const a = st.avatar || {};
   S.look = { skin: a.skin || S.look.skin, hair: a.hair || S.look.hair, eye: a.eye || S.look.eye, style: a.style || S.look.style, form: a.form || S.look.form };
   S.equip = a.equip || {};
+  /* Predmet, ki je zamenjal režo (kapuca: glava → oblačila), se sleče iz stare reže. */
+  Object.values(S.equip).forEach(eq => Object.keys(eq || {}).forEach(sl => { const it = ITEMS[eq[sl]]; if (!it || it.slot !== sl) delete eq[sl]; }));
   S.active = a.active_char || S.seasonChar;
   const got = {}; (st.stickers || []).forEach(x => { got[x.id] = x.gold ? 'gold' : x.state; });
   const tbl = {}; (st.tables || []).forEach(x => { tbl[x.op + x.t] = x; });

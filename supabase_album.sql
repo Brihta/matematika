@@ -259,7 +259,7 @@ insert into items (id, season, char_id, slot, price, reward_season, reward_page)
   ('oklep',        1, 'vitez', 'obleka',        220,  null, null),
   ('celada-modra', 1, 'vitez', 'glava',         160,  null, null),
   ('veliki-slem',  1, 'vitez', 'glava',         300,  null, null),   -- viteška bojna čelada (dodana 10. 10. 2026)
-  ('kapuca',       1, null,    'glava',         120,  null, null),   -- temna kapuca z ovratnikom, za vse like (dodana 10. 10. 2026)
+  ('kapuca',       1, null,    'obleka',        120,  null, null),   -- temna kapuca z ovratnikom in tuniko, za vse like (oblačilo od 11. 10. 2026)
   ('celada',       1, 'vitez', 'glava',         null, 1, 'bit'),
   ('krona',        1, 'vitez', 'glava',         null, 1, 'tek'),
   ('lesen-mec',    1, 'vitez', 'v-roki',        0,    null, null),
