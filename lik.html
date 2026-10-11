@@ -1057,6 +1057,7 @@ function apply(st) {
   });
   try { parent.albumChanged && parent.albumChanged(st); } catch (e) {}
   render();
+  vojskaIntroOnce();
 }
 
 /* Klic v bazo prek aplikacije (album.js: albumApi — supabaseRPC in prijavljen učenec). */
@@ -1361,7 +1362,9 @@ document.addEventListener('click', e => {
     case 'wear': EQ()[it.slot] = S.trying; toast(`Oblečeno: ${it.name}`); saveAvatar(); break;
     case 'off': delete EQ()[it.slot]; S.trying = null; saveAvatar(); break;
     case 'wearNow': { const r = ITEMS[b.dataset.id]; EQ()[r.slot] = b.dataset.id; S.trying = null; closeModal(); toast(`Oblečeno: ${r.name}`); saveAvatar(); break; }
-    case 'form': S.look.form = b.dataset.val; closeModal(); markFormChosen(); saveAvatar(); break;
+    case 'form': S.look.form = b.dataset.val; closeModal(); markFormChosen(); saveAvatar(); vojskaIntroOnce(); break;
+    case 'voGo': voSeen(); closeModal(); S.view = 'sluzba'; S.trying = null; break;
+    case 'voLater': voSeen(); return closeModal();
     default: return;
   }
   render();
@@ -1379,6 +1382,28 @@ function askFormOnce() {
   openModal(`<h3>Kdo boš to ${(S.srv.season.name || '').toLowerCase() === 'jesen' ? 'jesen' : 'sezono'}?</h3><p>Izberi ime svojega lika. Spremeniš ga lahko kadarkoli v "Moj videz".</p>
     <div class="choose">${['m', 'f'].map((v, i) => `<div class="opt"><div class="pic">${hero(S.look, EQ())}</div><b>${CHARS[ch].names[i]}</b><button class="btn ${i ? 'btn-purple' : 'btn-main'}" data-do="form" data-val="${v}">Sem ${CHARS[ch].names[i].toLowerCase()}</button></div>`).join('')}</div>`, true);
 }
+
+/* Vojaška služba se odpre sama (500 zasluženih cekinov) — otroku enkrat razložimo,
+   kaj se je zgodilo. Okno počaka, dokler ni odprto kakšno drugo (ovojnica, izbira lika). */
+const voKey = () => 'brihta_vojska_uvod_' + ((api() && api().profile() && api().profile().id) || '');
+function vojskaIntroOnce() {
+  const v = S.srv && S.srv.vojska;
+  if (!v || !v.open || $('modal').classList.contains('on')) return;
+  try { if (localStorage.getItem(voKey())) return; } catch (e) { return; }
+  const pay = [['Bliže svoji meri', '3–10'], ['nad svojo mero', '15–25']];
+  openModal(`<div class="art bgd" style="display:grid;place-items:center">${chevrons(0).replace('class="chev"', 'width="120" height="120"')}</div>
+    <h3>${g('Poklican', 'Poklicana')} si v vojaško službo!</h3>
+    <p>S sličicami si ${g('zaslužil', 'zaslužila')} ${v.prag} cekinov, zato te kličejo v službo. Tvoj čin: <b>${vojRank(v.total).name}</b>.</p>
+    <div class="checks">
+      <div class="check"><span>⚔️</span><div>Odslej ti <b>vsako tekmovanje in vsaka bitka</b> prinese cekine.</div></div>
+      <div class="check"><span>📏</span><div>Koliko, je odvisno od <b>tvoje mere</b> — povprečja tvojih 3 najboljših iger v zadnjih 30 dneh. Tekmuješ s seboj, ne z drugimi.</div></div>
+      <div class="check"><span>🪙</span><div>${pay.map(([t, n]) => `${t}: <b>${n}</b>`).join(' · ')} cekinov. Ko podreš mero, se ti dvigne.</div></div>
+      <div class="check"><span>📅</span><div>Na dan se plača <b>${v.cap} iger</b>.</div></div>
+      <div class="check"><span>🎖️</span><div>S cekini službe napreduješ: od rekruta do poveljnika.</div></div>
+    </div>
+    <div class="btns"><button class="btn btn-main" data-do="voGo">Pojdi v službo</button><button class="btn btn-soft" data-do="voLater">Kasneje</button></div>`);
+}
+const voSeen = () => { try { localStorage.setItem(voKey(), '1'); } catch (e) {} };
 
 /* Ob odprtju: baza preveri pogoje (nove sličice v ovojnico, zlate) in vrne stanje. */
 async function load() {

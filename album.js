@@ -37,11 +37,18 @@
   .al-buddy svg { width: 100%; height: 100%; display: block; }
   .al-buddy.hop { animation: alHop .45s ease-out; }
   @keyframes alHop { 40% { transform: translateY(-18px) rotate(-4deg); } }
-  .al-toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 160px); z-index: 950; background: #fff8ec; color: #2b2233;
+  .al-toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 160px); z-index: 5100;   /* nad oknom konca igre (5000) */ background: #fff8ec; color: #2b2233;
     border: 2px solid #f08c2e; border-radius: 16px; padding: 10px 14px; font-weight: 700; display: flex; gap: 10px; align-items: center;
     box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .3s; max-width: calc(100% - 32px); cursor: pointer; }
   .al-toast.on { transform: translate(-50%, 0); }
   .al-toast small { display: block; font-weight: 600; color: #7a7184; }
+  /* Vojaška služba v oknu "Konec!" po tekmovanju */
+  .al-voj { display: flex; gap: 10px; align-items: center; text-align: left; width: 100%; background: rgba(240,165,0,.12);
+    border: 1px solid rgba(240,165,0,.5); border-radius: 14px; padding: 10px 12px; color: #ffd27a; animation: alVoj .5s cubic-bezier(.34,1.56,.64,1); }
+  .al-voj b { display: block; font-size: 1.05rem; color: #fff; }
+  .al-voj small { display: block; color: rgba(255,255,255,.65); font-weight: 600; }
+  .al-voj .ico { font-size: 1.7rem; }
+  @keyframes alVoj { from { transform: scale(.6); opacity: 0; } }
   /* Široka vrstica se ne lomi (style.css, min-width 900px): beseda "cekinov"
      bi do ~1180 px potisnila Prijavo čez rob. */
   @media (max-width: 1180px) { .al-chip .al-txt { display: none; } }
@@ -120,6 +127,8 @@
     const coin = W() && W().cek ? W().cek(20) : 'cekinov';
     if (fresh.length) toast(`<span style="font-size:1.6rem">✉</span><div>Nova sličica: <b>${label(fresh[0].id)}</b>!${fresh.length > 1 ? ` (in še ${fresh.length - 1})` : ''}<small>Tapni in jo prilepi v album · +20 ${coin}</small></div>`);
     else if (gold.length && !overlay.classList.contains('on')) toast(`<span style="font-size:1.6rem">⭐</span><div>Zlata sličica: <b>${label(gold[0].id)}</b>!<small>Znaš jo tudi po 14 dneh · +20 ${coin}</small></div>`);
+    else if (prev.vojska && !prev.vojska.open && st.vojska && st.vojska.open && !overlay.classList.contains('on'))
+      toast(`<span style="font-size:1.6rem">🎖️</span><div>Poklican${st.avatar && st.avatar.form === 'f' ? 'a' : ''} si v <b>vojaško službo</b>!<small>Tapni in poglej, kaj to pomeni.</small></div>`, 8000);
     else if (!overlay.classList.contains('on')) {
       /* Bitko oceni baza ob koncu bitke — izid vidimo šele ob naslednjem stanju. */
       const nv = st.vojska, top = nv && nv.recent && nv.recent[0];
@@ -145,7 +154,15 @@
       const before = w.vojRank(r.total - r.coins), after = w.vojRank(r.total);
       if (after.i > before.i) sub = `Nov čin: ${after.name}!`;
     }
-    toast(`<span style="font-size:1.6rem">⚔️</span><div>Vojaška služba: <b>${head}</b>${sub ? `<small>${sub}</small>` : ''}</div>`, 6000);
+    /* Po tekmovanju: v okno "Konec!" pod rezultat (tam otrok gleda). Sicer obvestilo spodaj. */
+    const box = r.kind === 'tek' && document.querySelector('.comp-end-box');
+    if (box) {
+      const card = document.createElement('div');
+      card.className = 'al-voj';
+      card.innerHTML = `<span class="ico">⚔️</span><div><small>Vojaška služba</small><b>${head.charAt(0).toUpperCase() + head.slice(1)}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+      const at = box.querySelector('.comp-name-prompt') || box.querySelector('#compSaveBtn');
+      box.insertBefore(card, at);
+    } else toast(`<span style="font-size:1.6rem">⚔️</span><div>Vojaška služba: <b>${head}</b>${sub ? `<small>${sub}</small>` : ''}</div>`, 6000);
     if (!inState && state && r.coins) { state.coins += r.coins; render(); }
   };
 
