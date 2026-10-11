@@ -1297,7 +1297,10 @@ function stickerDetail(s) {
 const envSvg = open => `<svg viewBox="0 0 220 160">${open ? part('M20 60 L110 6 L200 60 Z', '#e9b37a', { w: 4 }) : ''}${part('M20 60 L200 60 L200 150 L20 150 Z', '#f6cf9f', { w: 4, shadow: 'M110 60 L210 60 L210 160 L110 160 Z' })}${line('M20 150 L110 96 L200 150', 4)}${open ? '' : part('M20 60 L110 116 L200 60 Z', '#e9b37a', { w: 4 })}<circle cx="110" cy="${open ? 30 : 104}" r="16" fill="#e0574f" stroke="${OL}" stroke-width="3"/>${star(110, open ? 30 : 104, 8, '#f4c542', 1.5)}</svg>`;
 function openEnvelope() {
   if (!ALL().some(s => s.state === 'pending')) return;
-  openModal(`<div class="env-art shake" id="envArt">${envSvg(false)}</div><h3>Nova sličica!</h3><p>Zaslužena z veliko vaje. Čestitam!</p><div class="btns"><button class="btn btn-main" data-do="reveal">Odpri</button></div>`);
+  /* Dobrodošlico otrok dobi ob prihodu, ne za vajo. */
+  const first = ALL().find(s => s.state === 'pending'), adj = { 1: 'jesenski', 2: 'zimski' }[seasonId()];
+  const msg = first && first.id === 'z0' && adj ? `${g('Dobrodošel', 'Dobrodošla')} v ${adj} sezoni!` : 'Zaslužena z veliko vaje. Čestitam!';
+  openModal(`<div class="env-art shake" id="envArt">${envSvg(false)}</div><h3>Nova sličica!</h3><p>${msg}</p><div class="btns"><button class="btn btn-main" data-do="reveal">Odpri</button></div>`);
 }
 function reveal() {
   const s = ALL().find(x => x.state === 'pending'), p = S.album.find(x => x.id === s.page);
