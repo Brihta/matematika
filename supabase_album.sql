@@ -37,12 +37,34 @@ create table if not exists game_chars (
 );
 
 -- Šolski dnevi brez pouka (počitnice, prazniki), da niz "dni zapored" ne
--- poči. Sobote in nedelje se izpustijo same. Vpiši ročno, npr.:
---   insert into prosti_dnevi values ('2026-12-25', 'božič');
+-- poči. Sobote in nedelje se izpustijo same. Vadba na prost dan se v niz
+-- vseeno šteje (gl. _album_streak). Vpiše se spodaj (šolski koledar).
 create table if not exists prosti_dnevi (
   dan  date primary key,
   opis text
 );
+
+-- Šolski koledar 2026/27 (delavniki brez pouka; vikendi se izpustijo sami).
+-- Informativna dneva 12.–13. 2. sta dneva s poukom.
+insert into prosti_dnevi (dan, opis)
+select d::date, r.opis
+  from (values
+    ('2026-10-26', '2026-10-30', 'jesenske počitnice'),
+    ('2026-12-24', '2026-12-24', 'pouka prost dan'),
+    ('2026-12-25', '2027-01-02', 'božič, novoletne počitnice'),
+    ('2027-02-08', '2027-02-08', 'Prešernov dan'),
+    ('2027-02-15', '2027-02-19', 'zimske počitnice'),
+    ('2027-03-29', '2027-03-29', 'velikonočni ponedeljek'),
+    ('2027-04-26', '2027-05-02', 'pouka prost dan, prvomajske počitnice'),
+    ('2027-06-25', '2027-08-31', 'dan državnosti, poletne počitnice')
+  ) r(od, do_, opis),
+  generate_series(r.od::date, r.do_::date, interval '1 day') d
+ where extract(isodow from d) < 6
+on conflict do nothing;
+
+-- Hitrost: album ob vsakem odprtju bere vadbo (stats) in lestvico dneva (scores).
+create index if not exists stats_student_day on stats (student_id, day);
+create index if not exists scores_day on scores (day);
 
 -- Sličice. kind določa pravilo:
 --   welcome — dobi jo vsak ob prvem obisku sezone
@@ -410,19 +432,23 @@ returns table(day date) language sql stable security definer set search_path = p
    group by s.day having sum(coalesce(s.correct, 0)) >= 10;
 $$;
 
--- Niz: najdaljši in trenutni niz šolskih dni z vadbo. Sobote, nedelje in
--- prosti_dnevi se preskočijo, zato vikend ali počitnice niza ne prekinejo.
+-- Niz: najdaljši in trenutni niz dni z vadbo. Šolski dan brez vadbe niz
+-- prekine; sobota, nedelja ali prost dan brez vadbe ga ne prekine, prost
+-- dan Z vadbo pa se šteje (otroci igrajo tudi med počitnicami).
 create or replace function public._album_streak(p_student uuid, p_from date, p_to date)
 returns table(best int, now_len int)
 language sql stable security definer set search_path = public as $$
-  with school as (
+  with pd as (
+    select day from _album_practice_days(p_student, p_from, p_to)
+  ), school as (
     select d::date as day, row_number() over (order by d) as rn
       from generate_series(p_from, p_to, interval '1 day') d
-     where extract(isodow from d) < 6
-       and not exists (select 1 from prosti_dnevi p where p.dan = d::date)
+     where (extract(isodow from d) < 6
+            and not exists (select 1 from prosti_dnevi p where p.dan = d::date))
+        or d::date in (select day from pd)
   ), hit as (
     select s.day, s.rn, s.rn - row_number() over (order by s.rn) as grp
-      from school s join _album_practice_days(p_student, p_from, p_to) pd on pd.day = s.day
+      from school s join pd on pd.day = s.day
   ), runs as (
     select grp, count(*)::int as len, max(rn) as last_rn from hit group by grp
   )
