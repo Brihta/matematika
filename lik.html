@@ -1309,7 +1309,9 @@ function reveal() {
 async function stick(id) {
   const s = ALL().find(x => x.id === id), p = S.album.find(x => x.id === s.page), before = rankInfo(S.seasonChar).i, coins = S.coins;
   closeModal();
+  S.calmUntil = Date.now() + 60000;   // album.js: naslednja ovojnica šele, ko se lepljenje odvije
   const st = await rpc('album_stick', { p_sticker: id });
+  S.calmUntil = Date.now() + 2500;
   if (!st || st.unreachable) return toast('Sličice ni bilo mogoče prilepiti. Poskusi znova.');
   S.view = 'album'; S.page = p.id; apply(st);
   const el = $('slot-' + id);

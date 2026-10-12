@@ -125,6 +125,8 @@
     const prevGold = new Set((prev.stickers || []).filter(s => s.gold).map(s => s.id));
     const gold = (st.stickers || []).filter(s => s.gold && !prevGold.has(s.id));
     const coin = W() && W().cek ? W().cek(20) : 'cekinov';
+    /* Ko otrok ni sredi igre, se ovojnica odpre sama (autoEnvelope); obvestilo samo med igro. */
+    if (fresh.length && !busy()) return;
     if (fresh.length) toast(`<span style="font-size:1.6rem">✉</span><div>Nova sličica: <b>${label(fresh[0].id)}</b>!${fresh.length > 1 ? ` (in še ${fresh.length - 1})` : ''}<small>Tapni in jo prilepi v album · +20 ${coin}</small></div>`);
     else if (gold.length && !overlay.classList.contains('on')) toast(`<span style="font-size:1.6rem">⭐</span><div>Zlata sličica: <b>${label(gold[0].id)}</b>!<small>Znaš jo tudi po 14 dneh · +20 ${coin}</small></div>`);
     else if (prev.vojska && !prev.vojska.open && st.vojska && st.vojska.open && !overlay.classList.contains('on'))
@@ -194,7 +196,32 @@
     overlay.classList.add('on');
     if (ready() && W().albumReload) W().albumReload();
   }
-  function close() { overlay.classList.remove('on'); render(); }
+  function close() {
+    /* Zaprl je, ne da bi prilepil: teh sličic ne odpiramo več sami, ostanejo v ovojnici (značka). */
+    (state && state.stickers || []).forEach(s => { if (s.state === 'pending') shown.add(s.id); });
+    overlay.classList.remove('on'); render();
+  }
+
+  /* Nova sličica: okno z ovojnico se odpre samo — ne med tekmovanjem ali bitko
+     in ne, dokler je odprto okno konca igre (najprej rezultat, potem sličica).
+     Vsaka sličica se sama odpre le enkrat. Velja tudi za stare iz ovojnice ob prijavi. */
+  const shown = new Set();
+  const busy = () => !!cTimer || ['lobby', 'countdown', 'game', 'waiting'].includes(btView)
+    || !!document.querySelector('.timed-overlay');
+  function autoEnvelope() {
+    if (!active() || !ready() || busy()) return;
+    const w = W(), next = (state.stickers || []).find(s => s.state === 'pending' && !shown.has(s.id));
+    if (!next || Date.now() < (w.S.calmUntil || 0)) return;
+    if (!overlay.classList.contains('on')) {
+      if (document.activeElement) document.activeElement.blur();   // tipke naj ne tečejo v vajo za oknom
+      overlay.classList.add('on');
+      frame.focus();
+    }
+    /* Novinca okno najprej vpraša, kdo bo (vitez/vitezinja) — ovojnica pride za tem. */
+    if (w.document.getElementById('modal').classList.contains('on')) return;
+    shown.add(next.id);
+    w.openEnvelope();
+  }
   chip.addEventListener('click', open);
   $('alClose').addEventListener('click', close);
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
@@ -241,6 +268,7 @@
   const panels = ['quizPanel', 'keypadPanel', 'tekmovanjePanel', 'bitkaPanel'].map(id => $(id));
   setInterval(() => {
     buddy.classList.toggle('on', !!active() && !overlay.classList.contains('on') && panels.some(p => p && p.style.display !== 'none'));
+    autoEnvelope();
   }, 500);
 
   if (isPupil()) ensureFrame();
