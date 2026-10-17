@@ -1420,7 +1420,9 @@ async function load() {
 /* Za album.js: ponovno preverjanje ob odprtju in po vadbi; stanje za glavo na gumbu in lika med vadbo. */
 window.albumReload = load;
 window.S = S;
-load();
+/* Dvorana slavnih (script.js) naloži stran samo zato, da nariše like drugih
+   učencev (hero): brez baze, brez albuma prijavljenega učenca. */
+if (!/[?&]samo-risanje\b/.test(location.search)) load();
 </script>
 </body>
 </html>

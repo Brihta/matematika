@@ -2848,6 +2848,8 @@ function showTekmovanjePanel() {
         <p class="comp-sub">Reši čim več računov in pridi na dnevno lestvico!</p>
         <button class="comp-btn comp-btn-start" id="compStartBtn">▶ Začni tekmovanje</button>
         <button class="comp-btn comp-btn-ghost" id="compBoardBtn">🏆 Dnevna lestvica</button>
+        <button class="comp-btn comp-btn-ghost" id="compHallBtn">🏛️ Dvorana slavnih</button>
+        <p class="comp-best" id="compBest"></p>
       </div>`;
     area.querySelector('#compStartBtn').addEventListener('click', startCompetition);
     area.querySelector('#compBoardBtn').addEventListener('click', () => openLeaderboard());
@@ -2859,9 +2861,13 @@ function showTekmovanjePanel() {
         <p>Odprto je vsak dan med <strong>7:00</strong> in <strong>19:00</strong>.</p>
         <p class="comp-now">Trenutno je <strong>${getSloveniaClock()}</strong> po slovenskem času.</p>
         <button class="comp-btn comp-btn-ghost" id="compBoardBtn">🏆 Poglej dnevno lestvico</button>
+        <button class="comp-btn comp-btn-ghost" id="compHallBtn">🏛️ Dvorana slavnih</button>
+        <p class="comp-best" id="compBest"></p>
       </div>`;
     area.querySelector('#compBoardBtn').addEventListener('click', () => openLeaderboard());
   }
+  area.querySelector('#compHallBtn').addEventListener('click', openHallOfFame);
+  showPersonalBest();
 }
 
 /* ── Countdown 3-2-1 ── */
@@ -2903,6 +2909,7 @@ function startCompetition() {
   cInput = ''; cAnswered = false; cActive = false;
   if (cTimer) { clearInterval(cTimer); cTimer = null; }
   if (cAdvanceTimer) { clearTimeout(cAdvanceTimer); cAdvanceTimer = null; }
+  loadRecordsBeforeRound();
   runCountdown(() => {
     cActive = true;
     cTimer = setInterval(compTick, 1000);
@@ -3063,6 +3070,7 @@ function endCompetition() {
       <div class="overlay-divider"></div>
       <div class="overlay-score-big" style="color:#c79bff">${cScore}</div>
       <div class="overlay-score-label">točk</div>
+      ${recordNoteHTML()}
       ${profile
         ? `<div class="comp-name-prompt">Rezultat se shrani kot</div>
            <div class="comp-name-auto">${esc(profile.emoji || '🦉')} ${esc(profile.username)}</div>`
@@ -3119,10 +3127,12 @@ async function openLeaderboard(highlightName, highlightScore) {
       ${isCompetitionOpen()
         ? '<button class="overlay-btn overlay-btn-next" id="compReplayBtn">▶ Igraj znova</button>'
         : ''}
+      <button class="overlay-btn overlay-btn-ghost" id="compHallBtn">🏛️ Dvorana slavnih</button>
       <button class="overlay-btn overlay-btn-ghost" id="compCloseBtn">Zapri</button>
     </div>`;
   document.body.appendChild(div);
   activeOverlay = div;
+  div.querySelector('#compHallBtn').addEventListener('click', openHallOfFame);
 
   const replayBtn = div.querySelector('#compReplayBtn');
   if (replayBtn) replayBtn.addEventListener('click', () => { removeOverlay(); startCompetition(); });
@@ -3156,6 +3166,161 @@ async function openLeaderboard(highlightName, highlightScore) {
     list.insertAdjacentHTML('beforeend', `<div class="comp-board-note">`
       + `Tokrat ${esc(highlightScore)} · tvoj najboljši danes ostaja ${esc(myBest)} 💪</div>`);
   }
+}
+
+/* ══════════════════════════════════════════
+   DVORANA SLAVNIH (supabase_dvorana.sql)
+   Dnevna lestvica se vsak dan izprazni; izjemen rezultat ostane tu za
+   vedno, tudi čez sezone. Klubi namesto prvih 10: kdor doseže prag, je
+   v klubu za vedno, zato je "klub 100" cilj, ne zamrznjena lestvica.
+   Šteje samo igra prijavljenega učenca (comp_rounds), ki jo preveri baza.
+══════════════════════════════════════════ */
+const HALL_CLUBS = [
+  { min: 120, name: 'Klub 120+', medal: '🥇' },
+  { min: 100, name: 'Klub 100+', medal: '🥈' },
+  { min: 80,  name: 'Klub 80+',  medal: '🥉' },
+];
+const hallClub = score => HALL_CLUBS.find(c => score >= c.min) || null;
+/* Pred igro: osebni rekord in rekord šole (null = ni znano, ne slavimo). */
+let cPrevBest = null, cSchoolBest = null;
+
+async function fetchCompBest() {
+  if (!profile) return null;
+  const rows = await supabaseRPC('get_comp_best', { p_student: profile.id });
+  if (!Array.isArray(rows)) return null;
+  return rows.length ? rows[0] : { score: 0, day: null };
+}
+async function fetchHall() {
+  const rows = await supabaseRPC('get_hall_of_fame', {});
+  return Array.isArray(rows) ? rows : null;
+}
+function loadRecordsBeforeRound() {
+  cPrevBest = null; cSchoolBest = null;
+  if (!profile) return;
+  fetchCompBest().then(b => { if (b) cPrevBest = b.score; });
+  fetchHall().then(h => { if (h) cSchoolBest = h.length ? h[0].score : 0; });
+}
+const pointsWord = n => { const m = n % 100; return m === 1 ? 'točka' : m === 2 ? 'točki' : m === 3 || m === 4 ? 'točke' : 'točk'; };
+const fmtDay = d => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(d || ''); return m ? `${+m[3]}. ${+m[2]}. ${m[1]}` : ''; };
+/* "Še 7 točk do Kluba 100+" — naslednji cilj za ta rekord. */
+function nextClubText(best) {
+  const next = HALL_CLUBS.slice().reverse().find(c => best < c.min);
+  return next ? `še ${next.min - best} ${pointsWord(next.min - best)} do ${next.name.replace('Klub', 'Kluba')}` : '';
+}
+
+/* Okno "Konec!": rekord šole › nov klub › osebni rekord. Brez podatkov nič. */
+function recordNoteHTML() {
+  if (!profile || cPrevBest == null) return '';
+  const club = hallClub(cScore);
+  let ico, head, sub = '';
+  if (cSchoolBest != null && cScore > cSchoolBest && cSchoolBest > 0) {
+    ico = '👑'; head = 'Nov rekord šole!'; sub = `Prejšnji je bil ${cSchoolBest}. Tvoj lik je na vrhu dvorane slavnih.`;
+  } else if (club && cPrevBest < club.min) {
+    ico = club.medal; head = `Zdaj si v ${club.name.replace('Klub', 'Klubu')}!`; sub = 'Tvoj lik je v dvorani slavnih — za vedno.';
+  } else if (cPrevBest > 0 && cScore > cPrevBest) {
+    ico = '⭐'; head = 'Nov osebni rekord!'; sub = `Prej ${cPrevBest}` + (nextClubText(cScore) ? ` · ${nextClubText(cScore)}` : '');
+  } else if (cPrevBest > 0) {
+    return `<div class="comp-record-note">Tvoj rekord: <b>${esc(cPrevBest)}</b>${nextClubText(cPrevBest) ? ` · ${esc(nextClubText(cPrevBest))}` : ''}</div>`;
+  } else return '';
+  return `<div class="comp-record"><span class="ico">${ico}</span><div><b>${esc(head)}</b><small>${esc(sub)}</small></div></div>`;
+}
+
+/* Začetni zaslon tekmovanja: prijavljen učenec vidi svoj rekord in cilj. */
+async function showPersonalBest() {
+  if (!profile) return;
+  const b = await fetchCompBest();
+  const el = document.getElementById('compBest');
+  if (!el || !b || !b.score) return;
+  const club = hallClub(b.score), next = nextClubText(b.score);
+  el.innerHTML = `⭐ Tvoj rekord: <b>${esc(b.score)}</b>`
+    + (club ? ` · ${club.medal} ${esc(club.name)}` : '')
+    + (next ? `<br><span>${esc(next.charAt(0).toUpperCase() + next.slice(1))}</span>` : '');
+}
+
+/* Like riše lik.html (hero) — ista risba kot v albumu, z ozadjem in opremo,
+   kot jo je učenec sam izbral. Stran se naloži enkrat, skrita, brez baze. */
+let hallArtist = null;
+function hallDrawer() {
+  if (!hallArtist) hallArtist = new Promise(resolve => {
+    const f = document.createElement('iframe');
+    f.src = 'lik.html?samo-risanje';
+    f.title = 'Risanje likov'; f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1;
+    f.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
+    f.onload = () => { try { resolve(f.contentWindow.hero ? f.contentWindow : null); } catch (e) { resolve(null); } };
+    f.onerror = () => resolve(null);
+    document.body.appendChild(f);
+  });
+  return hallArtist;
+}
+function hallFigure(w, r) {
+  const a = r.avatar;
+  if (w && a) {
+    try {
+      const look = { ...w.S.look };
+      ['form', 'skin', 'hair', 'eye', 'style'].forEach(k => { if (a[k]) look[k] = a[k]; });
+      return w.hero(look, a.equip || {}, '0 0 512 512', false);
+    } catch (e) {}
+  }
+  return `<span class="hall-emoji">${esc(r.emoji || '🦉')}</span>`;   // še nima lika
+}
+
+async function openHallOfFame() {
+  removeOverlay();
+  const div = document.createElement('div');
+  div.className = 'timed-overlay';
+  div.innerHTML = `
+    <div class="timed-overlay-box comp-board-box hall-box">
+      <div class="overlay-title" style="color:#ffd27a">🏛️ Dvorana slavnih</div>
+      <div class="comp-board-date">Najboljši rezultati vseh časov · šteje igra prijavljenih učencev</div>
+      <div class="hall-body" id="hallBody"><div class="comp-board-empty">Nalagam …</div></div>
+      <button class="overlay-btn overlay-btn-ghost" id="hallCloseBtn">Zapri</button>
+    </div>`;
+  document.body.appendChild(div);
+  activeOverlay = div;
+  div.querySelector('#hallCloseBtn').addEventListener('click', () => { removeOverlay(); showTekmovanjePanel(); });
+
+  const [rows, w, mine] = await Promise.all([fetchHall(), hallDrawer(), fetchCompBest()]);
+  const body = div.querySelector('#hallBody');
+  if (!body) return;
+  if (!rows) {
+    body.innerHTML = `<div class="comp-board-empty">Dvorane ni bilo mogoče naložiti. Preveri internetno povezavo.</div>`;
+    return;
+  }
+  const me = profile ? profile.username.toLowerCase() : null;
+  const isMe = r => me && String(r.username).toLowerCase() === me;
+  let html = '';
+  if (rows.length) {
+    const top = rows[0];
+    html += `<div class="hall-record${isMe(top) ? ' me' : ''}">
+      <div class="hall-pic big">${hallFigure(w, top)}</div>
+      <div class="hall-record-txt">
+        <small>👑 Rekord šole</small>
+        <b class="hall-record-score">${esc(top.score)}</b>
+        <span class="hall-name">${esc(top.username)}</span>
+        <small>${esc(fmtDay(top.day))}</small>
+      </div>
+    </div>`;
+  }
+  if (mine && mine.score) {
+    const next = nextClubText(mine.score);
+    html += `<div class="comp-record-note">Tvoj rekord: <b>${esc(mine.score)}</b>${next ? ` · ${esc(next)}` : ' · najvišji klub! 🎉'}</div>`;
+  }
+  HALL_CLUBS.forEach((c, i) => {
+    const upper = i ? HALL_CLUBS[i - 1].min : Infinity;
+    const members = rows.filter(r => r.score >= c.min && r.score < upper);
+    html += `<div class="hall-club">
+      <div class="hall-club-head">${c.medal} ${esc(c.name)}</div>
+      ${members.length ? `<div class="hall-grid">${members.map(r => `
+        <div class="hall-card${isMe(r) ? ' me' : ''}">
+          <div class="hall-pic">${hallFigure(w, r)}</div>
+          <span class="hall-name">${esc(r.username)}</span>
+          <b class="hall-score">${esc(r.score)}</b>
+          <small>${esc(fmtDay(r.day))}</small>
+        </div>`).join('')}</div>`
+        : `<div class="hall-empty">Še prazno — kdo bo prvi?</div>`}
+    </div>`;
+  });
+  body.innerHTML = html;
 }
 
 /* physical keyboard for competition mode */
