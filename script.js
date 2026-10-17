@@ -1394,6 +1394,7 @@ function updateProfileButton() {
   }
   // battle.js se naloži za tem skriptom, ob prvem klicu ga še ni
   if (typeof battleAccessChanged === 'function') battleAccessChanged();
+  showPersonalBest();   // drug učenec na isti napravi: njegov rekord, ne prejšnjega
 }
 function handleProfileButton() {
   if (teacherSession) openTeacherDashboard();
@@ -3227,10 +3228,14 @@ function recordNoteHTML() {
 
 /* Začetni zaslon tekmovanja: prijavljen učenec vidi svoj rekord in cilj. */
 async function showPersonalBest() {
+  const el0 = document.getElementById('compBest');
+  if (el0) el0.innerHTML = '';
   if (!profile) return;
+  const who = profile.id;
   const b = await fetchCompBest();
   const el = document.getElementById('compBest');
-  if (!el || !b || !b.score) return;
+  /* Med čakanjem se je lahko prijavil kdo drug — odgovor velja le za tistega, ki je vprašal. */
+  if (!el || !profile || profile.id !== who || !b || !b.score) return;
   const club = hallClub(b.score), next = nextClubText(b.score);
   el.innerHTML = `⭐ Tvoj rekord: <b>${esc(b.score)}</b>`
     + (club ? ` · ${club.medal} ${esc(club.name)}` : '')
