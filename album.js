@@ -202,7 +202,7 @@
     overlay.classList.remove('on'); render();
   }
 
-  /* Nova sličica: okno z ovojnico se odpre samo — ne med tekmovanjem ali bitko
+  /* Nova sličica (ali grad za cilj razreda): okno se odpre samo — ne med tekmovanjem ali bitko
      in ne, dokler je odprto okno konca igre (najprej rezultat, potem sličica).
      Vsaka sličica se sama odpre le enkrat. Velja tudi za stare iz ovojnice ob prijavi. */
   const shown = new Set();
@@ -211,7 +211,7 @@
   function autoEnvelope() {
     if (!active() || !ready() || busy()) return;
     const w = W(), next = (state.stickers || []).find(s => s.state === 'pending' && !shown.has(s.id));
-    if (!next || Date.now() < (w.S.calmUntil || 0)) return;
+    if ((!next && !w.S.classWin) || Date.now() < (w.S.calmUntil || 0)) return;
     if (!overlay.classList.contains('on')) {
       if (document.activeElement) document.activeElement.blur();   // tipke naj ne tečejo v vajo za oknom
       overlay.classList.add('on');
@@ -219,6 +219,7 @@
     }
     /* Novinca okno najprej vpraša, kdo bo (vitez/vitezinja) — ovojnica pride za tem. */
     if (w.document.getElementById('modal').classList.contains('on')) return;
+    if (w.S.classWin) return w.classReward();   // razred je dosegel cilj: grad
     shown.add(next.id);
     w.openEnvelope();
   }

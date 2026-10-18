@@ -1021,6 +1021,8 @@ function apply(st) {
   S.srv = st; S.error = null;
   S.coins = st.coins || 0;
   S.owned = new Set(st.items || []);
+  { const g = rewardFor('razred'); let seen = true; try { seen = !!localStorage.getItem(gradKey()); } catch (e) {}
+    if (g && S.owned.has(g) && !seen) S.classWin = true; }   // album.js pokaže slavje (classReward)
   S.seasonChar = st.char || 'vitez';
   const a = st.avatar || {};
   S.look = { skin: a.skin || S.look.skin, hair: a.hair || S.look.hair, eye: a.eye || S.look.eye, style: a.style || S.look.style, form: a.form || S.look.form };
@@ -1121,9 +1123,9 @@ function renderStage() {
     const pg = !later && live ? S.album.find(p => p.id === rp) : null;
     body = `<div class="act-note">${pg ? `Ni naprodaj — nagrada za polno stran <b>${pg.name}</b> (${pg.stickers.filter(owned).length}/${pg.stickers.length}).`
       : later ? `Pride v sezoni ${rs} (${(SEASONS[rs] || {}).name || ''}) — nagrada za polno stran <b>${PAGE_NAMES[rp]}</b>.`
-      : rp === 'razred' ? 'Nagrada za ves razred, ko dosežete skupni cilj — kmalu.'
+      : rp === 'razred' ? (S.srv.razred ? `Nagrada za ves razred ${S.srv.razred.name}, ko dosežete skupni cilj (${Math.min(S.srv.razred.done, S.srv.razred.goal)}/${S.srv.razred.goal}).` : 'Nagrada za ves razred, ko dosežete skupni cilj. Izberi svoj razred v aplikaciji.')
       : `Ni naprodaj — nagrada za polno stran <b>${PAGE_NAMES[rp]}</b>. Ta stran pride kmalu.`}</div>
-      <div class="btns">${pg ? `<button class="btn btn-purple" data-go="${pg.id}">Pojdi na stran</button>` : ''}<button class="btn btn-soft" data-do="cancel">Zapri</button></div>`;
+      <div class="btns">${pg ? `<button class="btn btn-purple" data-go="${pg.id}">Pojdi na stran</button>` : rp === 'razred' ? `<button class="btn btn-purple" data-go="razred">Naš razred</button>` : ''}<button class="btn btn-soft" data-do="cancel">Zapri</button></div>`;
   } else if (!own) {
     const short = t.price - S.coins;
     body = `<div class="btns">${short > 0 ? `<button class="btn btn-main" disabled>Manjka še ${short} ${cek(short)}</button>` : `<button class="btn btn-main" data-do="buy">Kupi za ${t.price} ${cek(t.price)}</button>`}<button class="btn btn-soft" data-do="cancel">Prekliči</button></div>`;
@@ -1160,7 +1162,10 @@ function rewardBox(p) {
 }
 
 function renderAlbum() {
-  const tabs = S.album.map(p => `<button class="tab ${S.page === p.id ? 'on' : ''} ${pageDone(p) ? 'full' : ''}" data-page="${p.id}">${p.name} <small>${p.stickers.filter(owned).length}/${p.stickers.length}</small></button>`).join('');
+  const rz = S.srv.razred;
+  const tabs = S.album.map(p => `<button class="tab ${S.page === p.id ? 'on' : ''} ${pageDone(p) ? 'full' : ''}" data-page="${p.id}">${p.name} <small>${p.stickers.filter(owned).length}/${p.stickers.length}</small></button>`).join('')
+    + `<button class="tab ${S.page === 'razred' ? 'on' : ''} ${rz && rz.reached ? 'full' : ''}" data-page="razred">Naš razred${rz ? ` <small>${Math.min(rz.done, rz.goal)}/${rz.goal}</small>` : ''}</button>`;
+  if (S.page === 'razred') { $('view').innerHTML = `<nav class="tabs">${tabs}</nav><section class="page">${classPage(rz)}</section>`; return; }
   const p = S.album.find(x => x.id === S.page) || S.album[0], h = p.stickers.filter(owned).length, n = p.stickers.length;
   const cols = n === 6 ? 'six' : n === 8 || n === 4 ? 'four' : '';
   const body = `<div class="page-head"><div><h1>${p.name}</h1><p class="desc">${p.desc}</p><div class="page-prog"><span>${h} / ${n}</span><div class="bar"><i style="width:${h / n * 100}%"></i></div></div></div>${rewardBox(p)}</div>`
@@ -1168,6 +1173,31 @@ function renderAlbum() {
                   : `<div class="sgrid ${cols}">${p.stickers.map(slotHTML).join('')}</div>`)
     + (p.id === 'pog' && POG() && !owned(p.stickers[3]) ? `<p style="margin-top:18px"><a class="btn btn-main" href="${practiceHref(POG().t, POG().op)}" target="_top">Vadi ${pogL()} zdaj</a></p>` : '');
   $('view').innerHTML = `<nav class="tabs">${tabs}</nav><section class="page">${body}</section>`;
+}
+
+/* Cilj razreda (supabase_album.sql, _album_razred): imen ni, šteje skupni seštevek. */
+function classPage(rz) {
+  const id = rewardFor('razred');
+  if (!rz) return `<div class="page-head"><div><h1>Naš razred</h1><p class="desc">Skupni cilj razreda. Ko v aplikaciji izbereš svoj razred, tu vidiš, koliko poštevank ste obvladali skupaj.</p></div></div>`;
+  const mine = ALL().filter(s => s.t && s.state !== 'none').length, left = Math.max(0, rz.goal - rz.done);
+  const box = id ? `<button class="reward ${rz.reached ? 'open' : 'locked'}" data-try="${id}"><div class="pic">${itemPic(id, EQ())}</div><div><small>${rz.reached ? 'Odklenjeno za ves razred!' : 'Ko razred doseže cilj'}</small><b>${ITEMS[id].name}</b><small>${rz.reached ? 'Tvoje — v opremi.' : 'za vsakega v razredu'}</small></div></button>` : '';
+  return `<div class="page-head"><div><h1>Naš razred · ${rz.name}</h1>
+    <p class="desc">Skupni cilj do konca sezone. Vsaka poštevanka, ki jo obvlada kdorkoli iz razreda, šteje — tudi tvoja. Imen tu ni: šteje, kaj zmoremo skupaj.</p>
+    <div class="page-prog"><span>${Math.min(rz.done, rz.goal)} / ${rz.goal}</span><div class="bar"><i style="width:${Math.min(100, rz.done / rz.goal * 100)}%"></i></div></div></div>${box}</div>
+    <div class="panel"><div class="big-num">${rz.reached ? 'Cilj dosežen!' : `Še ${left} do cilja!`}</div>
+    <p class="desc">${rz.members} ${rz.members === 1 ? 'učenec' : rz.members === 2 ? 'učenca' : rz.members < 5 ? 'učenci' : 'učencev'} z albumom · cilj je 8 poštevank na učenca, zato raste z vsakim novim.<br>Tvoj prispevek: <b>${mine}</b> ${mine === 1 ? 'poštevanka' : mine === 2 ? 'poštevanki' : mine < 5 && mine ? 'poštevanke' : 'poštevank'}.</p></div>`;
+}
+
+/* Grad: ko ga razred odklene, vsak učenec enkrat vidi slavje (album.js odpre okno). */
+const gradKey = () => 'brihta_grad_' + ((api() && api().profile() && api().profile().id) || '');
+function classReward() {
+  const id = rewardFor('razred'), rz = S.srv.razred;
+  try { localStorage.setItem(gradKey(), '1'); } catch (e) {}
+  S.classWin = false;
+  S.view = 'album'; S.page = 'razred'; render();
+  confetti();
+  openModal(`<div class="art bgd reveal" style="width:200px;height:200px">${itemPic(id, EQ())}</div><h3>Vaš razred je dosegel cilj!</h3><p>${rz ? `${rz.name} je skupaj obvladal ${rz.done} poštevank. ` : ''}Odklenjeno za vse: <b>${ITEMS[id].name}</b>.</p>
+    <div class="btns"><button class="btn btn-ok" data-do="wearNow" data-id="${id}">Obleci zdaj</button><button class="btn btn-soft" data-do="close">Kasneje</button></div>`);
 }
 
 function renderShop() {

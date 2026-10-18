@@ -11,7 +11,7 @@
 -- dostopa (RLS brez pravil) — vse gre prek funkcij spodaj, kot povsod drugje.
 --
 -- V TEM DELU: sezone, strani Poštevanke, Zvestoba, Tekmovanje, Bitka,
--- Pogum, cekini, trgovina, videz lika, vojaška služba. Razredni cilj pride kasneje.
+-- Pogum, cekini, trgovina, videz lika, vojaška služba, cilj razreda.
 -- Tekmovanje ima svoj zapis po učencu (comp_rounds): javna lestvica
 -- "scores" ni vezana na učenca, zato sličice ne gradijo na njej.
 --
@@ -248,6 +248,17 @@ create table if not exists vojska_rounds (
   primary key (student_id, kind, ref)
 );
 
+-- Cilj razreda: ko ga razred doseže, se zapiše tu in ostane dosežen, tudi
+-- če se kasneje pridruži nov učenec (cilj raste s številom učencev).
+-- Razred = letnik vpisa + oddelek (supabase_generacije.sql), zato velja vse leto.
+create table if not exists class_goals (
+  season     smallint not null references seasons(id),
+  letnik     int      not null,
+  oddelek    text     not null,
+  reached_at timestamptz not null default now(),
+  primary key (season, letnik, oddelek)
+);
+
 alter table seasons             enable row level security;
 alter table game_chars          enable row level security;
 alter table prosti_dnevi        enable row level security;
@@ -263,6 +274,7 @@ alter table comp_rounds         enable row level security;
 alter table battle_log          enable row level security;
 alter table vojska_rounds       enable row level security;
 alter table student_pogum       enable row level security;
+alter table class_goals         enable row level security;
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- 3. VSEBINA 1. SEZONE (jesen: vitez / vitezinja)
@@ -374,6 +386,29 @@ returns seasons language sql stable security definer set search_path = public as
    where starts is not null and starts <= _album_today() and ends >= _album_today()
    order by starts desc limit 1;
 $$;
+
+-- Cilj razreda: vsak obvladan predal (sličica Poštevanke, zaslužena v sezoni)
+-- kateregakoli učenca razreda šteje. Cilj = 8 predalov na učenca, ki je v
+-- sezoni odprl album. Do konca sezone. Brez razreda (letnik/oddelek) → null.
+create or replace function public._album_razred(p_student uuid, p_season smallint)
+returns json language plpgsql stable security definer set search_path = public as $$
+declare v_l int; v_o text; v_y int; v_members int; v_done int; v_reached boolean;
+begin
+  select letnik, oddelek into v_l, v_o from students where id = p_student;
+  if v_l is null or v_o is null then return null; end if;
+  v_y := extract(year from _album_today())::int - case when extract(month from _album_today()) >= 9 then 0 else 1 end;
+  select count(*) into v_members
+    from students st join student_season_char sc on sc.student_id = st.id and sc.season = p_season
+   where st.letnik = v_l and st.oddelek = v_o;
+  select count(*) into v_done
+    from students st
+    join student_stickers ss on ss.student_id = st.id and ss.season = p_season
+    join album_stickers a on a.season = ss.season and a.id = ss.sticker_id and a.kind = 'table'
+   where st.letnik = v_l and st.oddelek = v_o;
+  v_reached := exists (select 1 from class_goals where season = p_season and letnik = v_l and oddelek = v_o);
+  return json_build_object('name', (v_y - v_l + 1)::text || v_o, 'members', v_members,
+                           'done', v_done, 'goal', 8 * greatest(v_members, 1), 'reached', v_reached);
+end; $$;
 
 -- Sezona za tega učenca: prava, če teče; sicer za preizkuševalca prva
 -- sezona, ki še ni odprta, z začetkom na dan, ko je postal preizkuševalec.
@@ -636,7 +671,8 @@ begin
                 (select json_build_object('t', t, 'op', op, 'base_n', base_n, 'base_acc', base_acc, 'new_n', new_n,
                                           'new_acc', new_acc, 'weeks', weeks, 'mastered', mastered)
                    from _album_pogum(p_student, s.id, s.starts, v_to)) end,
-    'vojska', case when s.id is null then null else _vojska_state(p_student) end
+    'vojska', case when s.id is null then null else _vojska_state(p_student) end,
+    'razred', case when s.id is null then null else _album_razred(p_student, s.id) end
   );
 end; $$;
 
@@ -647,7 +683,8 @@ end; $$;
 -- Konec tekmovanja (script.js, endCompetition): zapiše igro prijavljenega
 -- učenca. Zavrne nemogoče: več kot 300 točk, več točk kot 3 × pravilni
 -- (največji množilnik), več kot 150 odgovorov v 60 s, igro izven 7–20 h
--- po slovenskem času in več kot 40 iger na dan.
+-- po slovenskem času in več kot 300 iger na dan (zaščita pred skripto, ne
+-- pred vnemo: pridni naredijo 100 iger na dan; cekine omeji služba sama).
 -- Vrne izid vojaške službe za to igro (null, če služba še ni odprta).
 drop function if exists public.add_comp_round(uuid, int, int, int);
 create or replace function public.add_comp_round(
@@ -663,7 +700,7 @@ begin
   if (v_hour < 7 or v_hour >= 20)
      and coalesce(current_setting('album.vsaka_ura', true), '') <> 'da' then return null; end if;
   if (select count(*) from comp_rounds
-       where student_id = p_student and day = _album_today()) >= 40 then return null; end if;
+       where student_id = p_student and day = _album_today()) >= 300 then return null; end if;
   insert into comp_rounds (student_id, day, score, correct, wrong)
   values (p_student, _album_today(), p_score, p_correct, p_wrong) returning id into v_id;
   begin
@@ -687,7 +724,7 @@ $$;
 -- podeli zlate. Vrne stanje. Varno je klicati poljubnokrat.
 create or replace function public.album_sync(p_student uuid)
 returns json language plpgsql security definer set search_path = public as $$
-declare s seasons; v_to date; v_char text; r record; ok boolean; st record; c record; bt record; pg record; v_all boolean;
+declare s seasons; v_to date; v_char text; r record; ok boolean; st record; c record; bt record; pg record; v_all boolean; v_raz jsonb;
 begin
   if not exists (select 1 from students where id = p_student) then return null; end if;
   s := _album_season_for(p_student);
@@ -772,6 +809,20 @@ begin
       values (p_student, 20, 'gold', s.id || ':' || st.sticker_id) on conflict do nothing;
     end if;
   end loop;
+
+  -- cilj razreda: dosežen se zapiše; nagrado dobi vsak učenec razreda ob svojem obisku
+  v_raz := _album_razred(p_student, s.id);
+  if v_raz is not null and (v_raz->>'done')::int >= (v_raz->>'goal')::int then
+    insert into class_goals (season, letnik, oddelek)
+    select s.id, letnik, oddelek from students where id = p_student
+    on conflict do nothing;
+  end if;
+  if v_raz is not null and exists (select 1 from class_goals g join students u on u.letnik = g.letnik and u.oddelek = g.oddelek
+                                    where g.season = s.id and u.id = p_student) then
+    insert into student_items (student_id, item_id, source)
+    select p_student, i.id, 'reward' from items i where i.reward_season = s.id and i.reward_page = 'razred'
+    on conflict do nothing;
+  end if;
 
   return album_state(p_student);
 end; $$;
