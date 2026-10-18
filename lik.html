@@ -317,10 +317,15 @@ function legs(pants, boots) {
        + part('M299 436 L261 436 L259 462 Q258 476 272 476 L299 476 Q309 476 307 464 Z', boots, { shadow: 'M252 462 L312 462 L312 480 L252 480 Z', hi: 'M288 442 L296 442 L297 460 L290 460 Z' })
        + part('M211 434 L253 434 L253 446 L211 446 Z', light(boots), { w: 4 }) + part('M259 434 L301 434 L301 446 L259 446 Z', light(boots), { w: 4 });
 }
-function arms(col, cuff) {
+/* pose: desna roka drži predmet drugače kot ob pasu (gl. POSES). Tu je le
+   nadlaket; podlaket gre čez telo, zato jo hero nariše šele po obleki. */
+function arms(col, cuff, pose) {
   return part('M212 256 C188 262 182 292 178 320 L172 358 Q188 368 202 360 L207 322 C209 302 215 284 224 272 Z', col, { shadow: 'M150 330 L230 300 L230 380 L150 380 Z' })
-       + part('M300 256 C324 262 330 292 334 320 L340 358 Q324 368 310 360 L305 322 C303 302 297 284 288 272 Z', col, { shadow: 'M300 240 L350 240 L350 380 L318 380 Q318 300 300 240 Z' })
-       + part('M172 350 L203 354 L202 364 Q187 372 171 362 Z', cuff, { w: 4 }) + part('M340 350 L309 354 L310 364 Q325 372 341 362 Z', cuff, { w: 4 });
+       + (pose
+         ? part(pose.arm, col, { shadow: 'M300 240 L350 240 L350 380 L318 380 Q318 300 300 240 Z' })
+         : part('M300 256 C324 262 330 292 334 320 L340 358 Q324 368 310 360 L305 322 C303 302 297 284 288 272 Z', col, { shadow: 'M300 240 L350 240 L350 380 L318 380 Q318 300 300 240 Z' })
+           + part('M340 350 L309 354 L310 364 Q325 372 341 362 Z', cuff, { w: 4 }))
+       + part('M172 350 L203 354 L202 364 Q187 372 171 362 Z', cuff, { w: 4 });
 }
 const FACE = 'M168 150 C168 92 206 62 256 62 C306 62 344 92 344 150 C344 198 314 232 256 234 C198 232 168 198 168 150 Z';
 function head(o, fringe, noEars) {
@@ -564,6 +569,37 @@ function sword(blade, guard, glow) {
     + part('M320 358 L332 358 L332 394 L320 394 Z', '#6b4226', { w: 4 }) + `<circle cx="326" cy="402" r="8" fill="${guard}" stroke="${OL}" stroke-width="4"/>`
     + (glow ? sparkle(352, 150, 8) + sparkle(304, 210, 6) : '') + `</g>`;
 }
+/* Drže desne roke za velike predmete: nadlaket za telesom (arm), podlaket čez
+   telo (fore, shadow, cuff), kje je dlan (hand), kam kaže rezilo (rot: 0 =
+   navzdol, 180 = navzgor) in kako dolgo je (len).
+   obraz: dlan pred prsmi, rezilo navpično pred obrazom (pozdrav). */
+const POSES = {
+  obraz: { hand: [258, 312], rot: 180, len: 250,
+    arm: 'M300 256 C322 260 338 282 342 306 C346 326 342 342 330 346 C318 340 312 326 310 310 C306 294 298 282 288 272 Z',
+    fore: 'M338 310 C350 320 348 342 330 347 L280 333 L278 303 L314 308 C322 304 332 304 338 310 Z',
+    shadow: 'M270 326 L352 326 L352 360 L270 360 Z',
+    cuff: 'M270 300 L284 302 L284 332 L270 330 Z' }
+};
+/* Meč kralja Matjaža: širok pri križu in se oži v konico, po sredini zlat
+   vložek; zlat križ z navzdol zavitimi konci, krona v sredini, rdeč kamen
+   na glavici. Narisan okoli dlani (0 0), rezilo kaže v smer +y. */
+function matjazSword(pose) {
+  const G = '#f4c542', L = pose.len, T = 44 + L;
+  const blade = `M-26 44 L26 44 C24 ${44 + L * .35} 17 ${T - 60} 12 ${T - 26} L0 ${T} L-12 ${T - 26} C-17 ${T - 60} -24 ${44 + L * .35} -26 44 Z`;
+  return `<g transform="translate(${pose.hand[0]} ${pose.hand[1]}) rotate(${pose.rot})">`
+    + `<path d="M0 -60 L56 0 L34 ${T - 50} L0 ${T + 16} L-34 ${T - 50} L-56 0 Z" fill="#ffe27a" opacity=".22"/>`
+    + part(blade, '#e3e8ee', { shadow: `M0 30 L30 30 L30 ${T + 8} L0 ${T + 8} Z`, hi: `M-19 54 L-12 54 C-12 ${44 + L * .4} -9 ${T - 60} -6 ${T - 30} L-9 ${T - 32} C-13 ${T - 60} -17 ${44 + L * .4} -19 54 Z` })
+    + line(`M0 54 L0 ${T - 30}`, 3, '#9aa4b0')
+    + part(`M-11 50 L11 50 L3 ${44 + L * .42} L0 ${44 + L * .46} L-3 ${44 + L * .42} Z`, G, { w: 3 })
+    + `<circle cx="0" cy="66" r="4" fill="#c0392b" stroke="${OL}" stroke-width="2"/>`
+    + part('M-66 20 C-78 22 -82 40 -72 54 L-62 46 C-62 42 -60 40 -54 40 L54 40 C60 40 62 42 62 46 L72 54 C82 40 78 22 66 20 Z', G, { w: 4, shadow: 'M-90 32 L90 32 L90 58 L-90 58 Z' })
+    + `<circle cx="-72" cy="52" r="5" fill="#c0392b" stroke="${OL}" stroke-width="2"/><circle cx="72" cy="52" r="5" fill="#c0392b" stroke="${OL}" stroke-width="2"/>`
+    + part('M-16 22 L-10 8 L-5 16 L0 2 L5 16 L10 8 L16 22 L16 48 Q0 58 -16 48 Z', G, { w: 3.5 })
+    + `<circle cx="0" cy="33" r="5" fill="#c0392b" stroke="${OL}" stroke-width="2"/>`
+    + part('M-7 -26 L7 -26 L7 20 L-7 20 Z', '#7a2a2a', { w: 4, inner: [-16, -4, 8, 20].map(y => line(`M-7 ${y} L7 ${y - 6}`, 2.5, G)).join('') })
+    + `<circle cx="0" cy="-38" r="14" fill="${G}" stroke="${OL}" stroke-width="4"/><circle cx="0" cy="-38" r="6.5" fill="#c0392b" stroke="${OL}" stroke-width="2"/>`
+    + sparkle(34, T - 20, 9) + sparkle(-34, T * .6, 7) + sparkle(22, 80, 5) + `</g>`;
+}
 function shield(kind) {
   const S = 'M178 286 C214 286 230 312 230 342 C230 376 206 400 178 404 C150 400 126 376 126 342 C126 312 142 286 178 286 Z';
   const k = { les: ['#b07a50', '#6b4226'], zvezda: ['#2a6fb0', '#f1c40f'], brihta: ['#f08c2e', '#f4c542'] }[kind];
@@ -781,6 +817,7 @@ const ITEMS = {
   mec:          { slot: 'v-roki', char: 'vitez', season: 1, name: 'Jeklen meč', rarity: 'navaden', price: 100, draw: () => sword('#e3e8ee', '#f1c40f') },
   buzdovan:     { slot: 'v-roki', char: 'vitez', season: 1, name: 'Buzdovan', acc: 'Buzdovan', rarity: 'redek', price: 200, crop: '244 150 250 250', draw: flail },
   'zlati-mec':  { slot: 'v-roki', char: 'vitez', season: 1, name: 'Zlati meč', rarity: 'epski', price: 350, draw: () => sword('#f7dc7a', '#c0392b', '#ffe27a') },
+  'mec-matjaz': { slot: 'v-roki', char: 'vitez', season: 1, name: 'Meč kralja Matjaža', rarity: 'epski', price: 400, pose: 'obraz', crop: '96 6 320 320', draw: () => matjazSword(POSES.obraz) },
   'ledeni-mec': { slot: 'v-roki', char: 'vitez', season: 2, name: 'Ledeni meč', rarity: 'nagrada', reward: [2, 'tek'], draw: () => sword('#cdeeff', '#7fb4e6', '#bfe9ff') },
   'scit-les':   { slot: 'scit', char: 'vitez', season: 1, name: 'Lesen ščit', rarity: 'navaden', price: 60, draw: () => shield('les') },
   'scit-zvezda':{ slot: 'scit', char: 'vitez', season: 1, name: 'Ščit z zvezdo', rarity: 'redek', price: 150, draw: () => shield('zvezda') },
@@ -827,7 +864,8 @@ function hero(look, eq, viewBox = '0 0 512 512', noBg) {
   if (it('hrbet')) s += it('hrbet').draw();
   if (!hide) s += hairBack(look);
   s += legs(out.pants, out.boots);
-  if (!out.robe) s += arms(out.sleeve, out.cuff);
+  const pose = it('v-roki') && POSES[it('v-roki').pose];
+  if (!out.robe) s += arms(out.sleeve, out.cuff, pose);
   s += out.draw();
   if (!hide) s += hairMid(look);   // kitke čez rame: po obleki, pred glavo
   /* Zaprt šlem (hidesFace) pokrije vso glavo — glave ne rišemo, šlem je zato
@@ -844,8 +882,9 @@ function hero(look, eq, viewBox = '0 0 512 512', noBg) {
     s += out.over();
   }
   if (hat) s += hat.draw();
+  if (pose && !out.robe) s += part(pose.fore, out.sleeve, { shadow: pose.shadow }) + part(pose.cuff, out.cuff, { w: 4 });
   if (it('v-roki')) s += it('v-roki').draw();
-  s += hand(186, 374, look.skin, true) + hand(326, 374, look.skin, false);
+  s += hand(186, 374, look.skin, true) + hand(pose ? pose.hand[0] : 326, pose ? pose.hand[1] : 374, look.skin, false);
   if (it('scit')) s += it('scit').draw();
   if (it('spremljevalec')) s += it('spremljevalec').draw();
   return `<svg viewBox="${viewBox}" aria-hidden="true">${s}</svg>`;
