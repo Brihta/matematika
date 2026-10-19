@@ -72,6 +72,7 @@
     profile: () => profile,
     /* "Vadi" pri mejniku: Do 20, samo ta skupina in operacija, na tipkovnici. */
     practice(g, op) {
+      screen = 'play';
       subject = 'do20';
       groups = new Set([g]);
       opType = op === 'p' ? 'multiply' : 'divide';
@@ -109,9 +110,9 @@
   }
 
   function render() {
-    const on = !!active() && inDo20();
+    const on = !!active() && (inDo20() || screen === 'home');
     chip.classList.toggle('on', on);
-    if (!active()) { buddy.classList.remove('on'); return; }
+    if (!active()) { buddy.classList.remove('on'); const hp = $('homePet'); if (hp) hp.innerHTML = ''; return; }
     const pet = state.pet || { species: 'zmaj' };
     const stage = state.pet ? state.stage : 'jajce';
     $('ptFace').innerHTML = PetArt.draw(pet, stage, { viewBox: stage === 'jajce' ? '40 40 120 150' : '50 20 100 100' });
@@ -120,6 +121,9 @@
     b.textContent = state.pet ? '' : '!';      // še nima jajca: povabi ga
     b.classList.toggle('on', !state.pet);
     buddy.innerHTML = state.pet ? PetArt.draw(state.pet, state.stage) : '';
+    // ljubljenček pokuka iz ploščice Do 20 na začetnem zaslonu
+    const hp = $('homePet');
+    if (hp) hp.innerHTML = state.pet ? PetArt.draw(state.pet, state.stage) : '';
   }
 
   async function fetchState(announce) {
@@ -198,7 +202,7 @@
   /* Gumb in ljubljenček med vajo sledita stikalu Poštevanka | Do 20. */
   const panels = ['quizPanel', 'keypadPanel'].map(id => $(id));
   setInterval(() => {
-    chip.classList.toggle('on', !!active() && inDo20());
+    chip.classList.toggle('on', !!active() && (inDo20() || screen === 'home'));
     buddy.classList.toggle('on', !!active() && inDo20() && !!state.pet && !overlay.classList.contains('on')
       && panels.some(p => p && p.style.display !== 'none'));
   }, 500);

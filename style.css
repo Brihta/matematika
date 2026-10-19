@@ -1998,3 +1998,129 @@ body.do20 .keyboard-hint { color: var(--g-muted); }
 /* barvo naslednje medalje nastavi JS (svetla siva, srebrna …) — na peščeni
    podlagi je ne bi bilo videti */
 body.do20 .hud-medal-next { color: var(--g-muted) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   POSPRAVLJEN ZASLON (19. 10. 2026)
+   Kot pri Duolingu in Times Tables Rock Stars: najprej izbereš, kaj
+   utrjuješ (začetni zaslon s ploščicami), med vajo pa ni nastavitev —
+   ena vrstica zgoraj, gumb "kaj utrjujem" odpre okno z izbiro.
+══════════════════════════════════════════════════════════ */
+/* zgornja vrstica: logotip · nazaj · kaj utrjujem · … · lik/ljubljenček · profil */
+#topbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+#topbar > .brand { order: 1; }
+#topbar > .back-btn { order: 2; }
+#topbar > .summary-chip { order: 3; }
+#topbar > .topbar-sp { order: 4; flex: 1; }
+#topbar > .al-chip, #topbar > .pt-chip { order: 5; }
+#topbar > .profile-btn { order: 6; margin-left: 0; }
+.back-btn {
+  width: 36px; height: 36px; flex-shrink: 0; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05);
+  color: #ddd; font: 700 1.3rem/1 inherit; cursor: pointer; padding-bottom: 3px;
+}
+.back-btn:hover { background: rgba(255,255,255,0.1); }
+#topbar > .summary-chip {
+  display: flex; flex: 0 1 auto; min-width: 0; padding: 8px 14px;
+  font-size: .85rem; font-weight: 800; color: #eee;
+}
+#summaryLabel { overflow: hidden; text-overflow: ellipsis; }
+body.home .back-btn, body.home #topbar > .summary-chip,
+body.competition #topbar > .summary-chip { display: none; }
+@media (max-width: 420px) { body:not(.home) .brand > span { display: none; } }
+
+/* okno "Kaj utrjujem?" — spodaj na telefonu, na sredini na računalniku */
+.pick-sheet { position: fixed; inset: 0; z-index: 800; background: rgba(10,10,25,.5); display: none; align-items: flex-end; justify-content: center; }
+.pick-sheet.on { display: flex; }
+.pick-box {
+  width: 100%; max-width: 720px; background: #16213e; color: #eee;
+  border-radius: 24px 24px 0 0; padding: 18px 18px 22px;
+  display: flex; flex-direction: column; gap: 14px;
+  animation: pickIn .25s cubic-bezier(.2,.9,.3,1);
+  max-height: 92vh; overflow-y: auto;
+}
+@keyframes pickIn { from { transform: translateY(40px); opacity: 0; } }
+@media (min-width: 900px) {
+  .pick-sheet { align-items: center; }
+  .pick-box { border-radius: 24px; padding: 22px 26px 26px; }
+}
+.pick-head { display: flex; align-items: center; }
+.pick-head h3 { flex: 1; font-size: 1.15rem; font-weight: 900; }
+.pick-x { width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(255,255,255,.1); color: inherit; font-size: 1rem; cursor: pointer; }
+.pick-box .filter-row { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.pick-box .table-btn { padding: 11px 0; font-size: 1.05rem; }
+.pick-box .group-row { grid-template-columns: 1fr 1fr; }
+.pick-box .group-btn { padding: 10px 8px; font-size: .95rem; align-items: flex-start; }
+@media (min-width: 600px) { .pick-box .filter-row { grid-template-columns: repeat(10, 1fr); } .pick-box .group-row { grid-template-columns: repeat(5, 1fr); } .pick-box .group-btn { align-items: center; } }
+.pick-box #opBtnGroup .seg-btn { padding: 10px; font-size: 1.05rem; }
+.pick-start {
+  border: 0; border-radius: 16px; padding: 14px; margin-top: 2px;
+  background: #f0a500; color: #1a1a2e; font: 900 1rem system-ui, sans-serif; cursor: pointer;
+}
+
+/* začetni zaslon */
+body.home .toolbar { box-shadow: none; }
+.home-screen { padding: 20px 2px 30px; }
+.home-hi h1 { font-size: 1.7rem; font-weight: 900; letter-spacing: -.01em; }
+.home-hi p { font-weight: 600; font-size: .95rem; margin-top: 2px; opacity: .75; }
+.home-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+@media (min-width: 900px) { .home-tiles { grid-template-columns: repeat(4, 1fr); gap: 16px; } .home-tile { min-height: 200px; } }
+.home-tile {
+  position: relative; overflow: hidden; min-height: 156px; border: 0; border-radius: 22px;
+  padding: 15px; text-align: left; font-family: inherit; cursor: pointer;
+  display: flex; flex-direction: column; justify-content: space-between;
+  transition: transform .12s, box-shadow .12s;
+}
+.home-tile:hover { transform: translateY(-3px); }
+.home-tile small { display: block; font-weight: 700; font-size: .78rem; opacity: .85; }
+.home-tile b { display: block; font-size: 1.2rem; font-weight: 900; }
+.home-tile .big { font-size: 2.4rem; font-weight: 900; line-height: 1; }
+.t-do20 { background: linear-gradient(135deg, #a9cf45, #8ab52c); color: #05270b; box-shadow: 0 6px 20px rgba(122,160,40,.3); }
+.t-post { background: linear-gradient(145deg, #1f2b52, #16213e); color: #fff; box-shadow: 0 6px 20px rgba(22,33,62,.3); }
+.t-post .big { color: #f0a500; }
+.t-tek { background: linear-gradient(145deg, #4a2a7a, #2d1b4e); color: #fff; box-shadow: 0 6px 20px rgba(45,27,78,.3); }
+.t-bit { background: linear-gradient(135deg, #ffb23f, #ff7a1a); color: #2b1406; box-shadow: 0 6px 20px rgba(255,122,26,.3); }
+.home-pet { position: absolute; right: -6px; bottom: -8px; width: 96px; height: 96px; pointer-events: none; }
+.home-pet svg { width: 100%; height: 100%; display: block; }
+.home-cont {
+  width: 100%; margin-top: 16px; display: flex; align-items: center; gap: 12px; text-align: left;
+  background: #fffef8; border: 1px solid #ecd9bc; border-radius: 18px; padding: 12px 14px;
+  font-family: inherit; color: #05270b; cursor: pointer;
+}
+.home-cont .ic { width: 42px; height: 42px; flex-shrink: 0; border-radius: 14px; display: grid; place-items: center;
+  background: linear-gradient(135deg, #a9cf45, #8ab52c); font-size: 1.3rem; font-weight: 900; }
+.home-cont b { display: block; font-weight: 900; }
+.home-cont small { color: #5d6b52; font-weight: 700; font-size: .78rem; }
+.home-cont .go { margin-left: auto; font-size: 1.4rem; font-weight: 900; }
+body.home.do20 .al-chip.on { display: flex !important; }   /* na začetku sta vidna oba: lik in ljubljenček */
+
+/* tanka vrstica rezultata (namesto velikega okvirja) */
+.score-hud { padding: 6px 14px; gap: 14px; margin-top: 10px; }
+.score-item { flex-direction: row; align-items: center; gap: 5px; }
+.score-val { font-size: 1.1rem; font-weight: 900; }
+.score-lbl, .score-sep, .hud-medal-name { display: none; }
+.score-correct .score-val::before { content: '✔ '; }
+.score-wrong .score-val::before { content: '✘ '; }
+.score-pct .score-val::before { content: '🎯 '; font-size: .9rem; }
+#hudMedalSVG svg { width: 26px; height: 26px; display: block; }
+.score-medal { padding: 2px 4px; }
+.hud-medal-next { font-size: .72rem !important; margin: 0; }
+@media (min-width: 900px) { #scoreHUD { margin-top: 0; } .stage { gap: 10px; } }
+
+/* kviz ↔ tipkovnica */
+.mode-switch { text-align: center; margin-top: 6px; }
+.mode-switch button {
+  background: none; border: 1px dashed rgba(255,255,255,.25); border-radius: 999px;
+  padding: 7px 14px; color: rgba(255,255,255,.7); font: 700 .8rem system-ui, sans-serif; cursor: pointer;
+}
+.mode-switch button:hover { border-style: solid; }
+.keyboard-hint { display: none; }
+
+/* svetla tema (Do 20 in začetni zaslon) za nove dele */
+body.do20 .back-btn { background: #fdfcf3; border-color: #ecd9bc; color: #05270b; }
+body.do20 #topbar > .summary-chip { background: #f6e5cd; border-color: transparent; color: #05270b; }
+body.do20 .pick-sheet { background: rgba(5,39,11,.35); }
+body.do20 .pick-box { background: #fffef8; color: #05270b; }
+body.do20 .pick-x { background: #f6e5cd; }
+body.do20 .pick-start { background: #05270b; color: #fdfcf3; }
+body.do20 .mode-switch button { border-color: #ecd9bc; color: #5d6b52; }
+body.home .home-hi p { color: #5d6b52; opacity: 1; }

@@ -172,6 +172,9 @@ let cards    = [];
    'multiply' je tam +, 'divide' je −. Tako vse, kar že dela z opType
    (kviz, tipkovnica, prednastavitve), dela tudi za Do 20. */
 let subject  = 'post';
+/* Začetni zaslon ('home') s ploščicami ali vaja ('play'). Povezava
+   učiteljice (prednastavitev v URL) gre naravnost v vajo. */
+let screen   = 'home';
 /* Računi do 20 so razdeljeni po korakih, kot jih uvaja pouk v 1. in 2.
    razredu, ne po številih: učiteljica vklopi samo tisto, kar so že jemali.
    Vsak račun je v natanko eni skupini (do20Group), sicer statistika ne bi
@@ -500,18 +503,14 @@ function showLoadError() {
   });
 }
 
-/* ── BRAND = reload ──
-   Tapping the logo to get back to a clean start is what everyone expects it
-   to do. Pending answers are flushed first so a mid-session reload does not
-   lose the last few questions. */
+/* ── BRAND = na začetek ──
+   Logotip vodi na začetni zaslon (prej je osvežil stran — "čist začetek",
+   ki ga zdaj da začetni zaslon brez nalaganja). */
 /* Guarded: a browser holding a cached index.html from before this button
    existed would otherwise throw here and take the whole init block with it,
    leaving the child staring at a dead page. */
 const brandBtn = document.getElementById('brandBtn');
-if (brandBtn) brandBtn.addEventListener('click', () => {
-  flushStats(true);
-  location.reload();
-});
+if (brandBtn) brandBtn.addEventListener('click', () => showHome());
 
 /* ── BRAND FALLBACK ── */
 document.getElementById('brandImg').onerror = function() {
@@ -521,27 +520,36 @@ document.getElementById('brandImg').onerror = function() {
 };
 
 /* ══════════════════════════
-   TOOLBAR — chip toggles only (no auto-collapse)
+   KAJ UTRJUJEM — okno z izbiro računov
+   Gumb v zgornji vrstici pove, kaj se vadi ("Do 10 · + −"), in odpre okno.
+   Imeni collapse/expandToolbar sta ostali, ker ju kličejo tekmovanje in
+   bitka (battle.js): "pospravi nastavitve z poti".
 ══════════════════════════ */
 const toolbar = document.getElementById('toolbar');
 const summaryArrow = document.getElementById('summaryArrow');
 const summaryLabel = document.getElementById('summaryLabel');
 const summaryChip = document.getElementById('summaryChip');
+const pickSheet = document.getElementById('pickSheet');
 function collapseToolbar() {
-  toolbar.classList.add('collapsed');
-  if (summaryArrow) summaryArrow.textContent = '▾';
-  if (summaryLabel) summaryLabel.textContent = 'Nastavitve';
-  summaryChip.classList.remove('is-open');
+  if (pickSheet) pickSheet.classList.remove('on');
+  if (summaryChip) summaryChip.classList.remove('is-open');
 }
 function expandToolbar() {
-  toolbar.classList.remove('collapsed');
-  if (summaryArrow) summaryArrow.textContent = '▴';
-  if (summaryLabel) summaryLabel.textContent = '✕  Zapri nastavitve';
-  summaryChip.classList.add('is-open');
+  if (!pickSheet) return;
+  if (document.activeElement) document.activeElement.blur();   // tipke naj ne tečejo v vajo za oknom
+  pickSheet.classList.add('on');
+  if (summaryChip) summaryChip.classList.add('is-open');
 }
-document.getElementById('summaryChip').addEventListener('click', () => {
-  toolbar.classList.contains('collapsed') ? expandToolbar() : collapseToolbar();
+if (summaryChip) summaryChip.addEventListener('click', () => {
+  pickSheet && pickSheet.classList.contains('on') ? collapseToolbar() : expandToolbar();
 });
+if (pickSheet) {
+  pickSheet.addEventListener('click', e => { if (e.target === pickSheet) collapseToolbar(); });
+  const close = document.getElementById('pickClose'), start = document.getElementById('pickStart');
+  if (close) close.addEventListener('click', collapseToolbar);
+  if (start) start.addEventListener('click', collapseToolbar);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && pickSheet.classList.contains('on')) collapseToolbar(); });
+}
 
 /* ── MODE BUTTONS ── */
 document.querySelectorAll('#modeBtnGroup .seg-btn').forEach(btn => {
@@ -598,7 +606,9 @@ function applySubjectUI() {
   document.querySelectorAll('.group-btn').forEach(b => {
     b.classList.toggle('active', groups.has(b.dataset.g));
   });
-  document.body.classList.toggle('do20', do20);
+  // začetni zaslon je vedno svetel (kot Do 20), ne glede na zadnjo snov
+  document.body.classList.toggle('do20', do20 || screen === 'home');
+  updateSummary();
 }
 
 document.querySelectorAll('#subjectBtnGroup .seg-btn').forEach(btn => {
@@ -622,6 +632,7 @@ document.querySelectorAll('.group-btn').forEach(btn => {
     const g = this.dataset.g;
     if (groups.has(g)) { groups.delete(g); this.classList.remove('active'); }
     else               { groups.add(g);    this.classList.add('active'); }
+    updateSummary();
     triggerRestartDebounced();
   });
 });
@@ -681,20 +692,106 @@ function applyUIFromState() {
 }
 
 function showPanel(m) {
-  document.getElementById('quizPanel').style.display       = m==='quiz'       ? '' : 'none';
-  document.getElementById('keypadPanel').style.display     = m==='keypad'     ? '' : 'none';
-  document.getElementById('tekmovanjePanel').style.display = m==='tekmovanje' ? '' : 'none';
-  document.getElementById('bitkaPanel').style.display      = m==='bitka'      ? '' : 'none';
+  const home = screen === 'home';
+  const show = (id, on, how) => { const el = document.getElementById(id); if (el) el.style.display = on ? (how || '') : 'none'; };
+  show('homeScreen',      home);
+  show('quizPanel',       !home && m==='quiz');
+  show('keypadPanel',     !home && m==='keypad');
+  show('tekmovanjePanel', !home && m==='tekmovanje');
+  show('bitkaPanel',      !home && m==='bitka');
   const race = m === 'tekmovanje' || m === 'bitka';
-  document.getElementById('scoreHUD').style.display = race ? 'none' : 'flex';
+  show('scoreHUD',   !home && !race, 'flex');
+  show('modeSwitch', !home && !race);
+  const msb = document.getElementById('modeSwitchBtn');
+  if (msb) msb.textContent = m === 'quiz' ? '⌨️ Vtipkaj odgovor' : '🎯 Pokaži izbirne odgovore';
   // bitka si deli postavitev tekmovanja, le barva je svoja
-  document.body.classList.toggle('competition', race);
-  document.body.classList.toggle('bitka', m==='bitka');
+  document.body.classList.toggle('competition', !home && race);
+  document.body.classList.toggle('bitka', !home && m==='bitka');
+  document.body.classList.toggle('home', home);
+  document.body.classList.toggle('do20', subject === 'do20' || home);
+  if (home) { collapseToolbar(); renderHomeCont(); }
 }
 
-/* The chip now shows a static "Nastavitve" / "Skrij nastavitve" label
-   (set by collapse/expandToolbar), so there is nothing to update here. */
-function updateSummary() {}
+/* Napis na gumbu "kaj utrjujem": kratko, kar je izbrano. */
+function updateSummary() {
+  if (!summaryLabel) return;
+  let what, op;
+  if (subject === 'do20') {
+    const sel = DO20_GROUPS.filter(g => groups.has(g.key));
+    what = !sel.length ? 'Nič izbrano' : sel.length === DO20_GROUPS.length ? 'Vsi računi'
+         : sel.length <= 2 ? sel.map(g => g.label).join(', ') : `${sel.length} skupine`;
+    op = { both: '+ −', multiply: '+', divide: '−' }[opType];
+  } else {
+    const t = [...tables].sort((a, b) => a - b);
+    what = !t.length ? 'Nič izbrano' : t.length === 10 ? 'Vse poštevanke'
+         : t.length <= 4 ? 'Poštevanka ' + t.join(', ') : `${t.length} poštevank`;
+    op = { both: '× ÷', multiply: '×', divide: '÷' }[opType];
+  }
+  summaryLabel.textContent = `${what} · ${op}`;
+}
+
+/* ══════════════════════════
+   ZAČETNI ZASLON
+══════════════════════════ */
+/* Zapomni se samo, KAJ je otrok nazadnje vadil (za "Nadaljuj"), ne katere
+   poštevanke — zakaj ne, piše pri loadSettings. */
+const LAST_KEY = 'brihta_last_v1';
+function rememberLast() {
+  try { localStorage.setItem(LAST_KEY, JSON.stringify({ subject })); } catch(e) {}
+}
+function renderHomeCont() {
+  const btn = document.getElementById('homeCont');
+  if (!btn) return;
+  let last = null;
+  try { last = JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch(e) {}
+  if (!last || !['post', 'do20'].includes(last.subject)) { btn.style.display = 'none'; return; }
+  btn.dataset.subject = last.subject;
+  document.getElementById('homeContIc').textContent = last.subject === 'do20' ? '+' : '×';
+  document.getElementById('homeContTxt').textContent =
+    'Nadaljuj: ' + (last.subject === 'do20' ? 'Računi do 20' : 'Poštevanka');
+  btn.style.display = '';
+}
+function showHome() {
+  if (screen === 'home') return;
+  screen = 'home';
+  removeOverlay();
+  applySubjectUI();
+  showPanel(mode);
+  doRestart();           // ustavi igro, zapiše odgovore, zapusti bitko
+  window.scrollTo(0, 0);
+}
+/* Vstop v vajo: snov in način; pri vaji se odpre še "kaj utrjujem". */
+function enterPlay(subj, m, openPick) {
+  screen = 'play';
+  subject = subj;
+  mode = m;
+  if (m === 'quiz' || m === 'keypad') rememberLast();   // tekmovanje ni "zadnja vaja"
+  saveSettings();
+  applyUIFromState();
+  updateControlLock();
+  showPanel(mode);
+  triggerRestart();
+  if (openPick) expandToolbar();
+  window.scrollTo(0, 0);
+}
+/* Vaja je na tipkovnici, razen če je otrok sam izbral kviz (zapomnjeno). */
+const practiceMode = () => (mode === 'quiz' ? 'quiz' : 'keypad');
+document.querySelectorAll('[data-home]').forEach(b => b.addEventListener('click', () => {
+  const h = b.dataset.home;
+  if (h === 'do20' || h === 'post') enterPlay(h, practiceMode(), true);
+  else enterPlay('post', h, false);     // tekmovanje in bitka sta za poštevanko
+}));
+(function () {
+  const cont = document.getElementById('homeCont');
+  if (cont) cont.addEventListener('click', () => enterPlay(cont.dataset.subject || 'post', practiceMode(), false));
+  const back = document.getElementById('backBtn');
+  if (back) back.addEventListener('click', () => showHome());
+  const ms = document.getElementById('modeSwitchBtn');
+  if (ms) ms.addEventListener('click', () => {
+    mode = mode === 'quiz' ? 'keypad' : 'quiz';
+    saveSettings(); applyUIFromState(); showPanel(mode); triggerRestart();
+  });
+})();
 
 /* ══════════════════════════
    RESTART
@@ -714,10 +811,11 @@ function doRestart() {
   if (cTimer) { clearInterval(cTimer); cTimer = null; }
   if (cAdvanceTimer) { clearTimeout(cAdvanceTimer); cAdvanceTimer = null; }
   cActive = false;
-  if (mode !== 'bitka') battleLeave();   // preklop drugam = odhod iz bitke
+  if (mode !== 'bitka' || screen === 'home') battleLeave();   // preklop drugam = odhod iz bitke
   flushStats();          // persist any answers from the mode we are leaving
   lastAnswerTs = 0;
   removeOverlay();
+  if (screen === 'home') return;     // na začetnem zaslonu ne teče nobena igra
   cards = shuffle(getFilteredCards());
   if      (mode === 'quiz')   startQuiz();
   else if (mode === 'keypad') startKeypad();
@@ -836,8 +934,8 @@ document.body.addEventListener('click', e => {
    QUIZ MODE
 ══════════════════════════ */
 function emptyPickMsg() {
-  return subject === 'do20' ? 'Izberi vsaj eno skupino računov v nastavitvah.'
-                            : 'Izberi vsaj eno poštevanko v nastavitvah.';
+  return subject === 'do20' ? 'Izberi vsaj eno skupino računov (gumb zgoraj).'
+                            : 'Izberi vsaj eno poštevanko (gumb zgoraj).';
 }
 function startQuiz() {
   qQueue = shuffle(cards); qIdx = 0; qOk = 0; qNo = 0; qStreak = 0;
@@ -1030,7 +1128,8 @@ function checkKeypadAnswer() {
 
 /* physical keyboard for keypad mode */
 document.addEventListener('keydown', e => {
-  if (mode !== 'keypad') return;
+  if (mode !== 'keypad' || screen === 'home') return;
+  if (pickSheet && pickSheet.classList.contains('on')) return;
   // ignore when modal is open or focus is in an input
   if (document.getElementById('medalModal').style.display === 'flex') return;
   const tag = (e.target && e.target.tagName) || '';
@@ -3676,7 +3775,8 @@ setInterval(() => {
    INIT
 ══════════════════════════ */
 loadSettings();
-applyPresetFromURL();   // a teacher's link overrides whatever is saved
+// a teacher's link overrides whatever is saved — and skips the start screen
+if (applyPresetFromURL()) { screen = 'play'; rememberLast(); }
 loadProfile();
 applyUIFromState();
 updateControlLock();
@@ -3687,6 +3787,7 @@ showPanel(mode);
 if (profile && leaderboardEnabled()) ensureRazred();   // also refreshes after the summer
 loadData(() => {
   cards = shuffle(getFilteredCards());
+  if (screen === 'home') return;
   if      (mode === 'quiz')   startQuiz();
   else if (mode === 'keypad') startKeypad();
   else if (mode === 'bitka')  showBattlePanel();

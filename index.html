@@ -9,90 +9,126 @@
 <body>
 <div class="container">
 
-  <!-- TOOLBAR -->
+  <!-- TOOLBAR
+       Med vajo samo ena vrstica: logotip (na začetek), nazaj, gumb "kaj
+       utrjujem" (odpre izbiro) ter lik/ljubljenček in profil. Izbira računov
+       je v oknu #pickSheet, izbira vaje na začetnem zaslonu #homeScreen. -->
   <div class="toolbar collapsed" id="toolbar">
-
-    <!-- Always-visible bar: identity + the two controls that get used most -->
     <div class="topbar" id="topbar">
-      <button class="brand" id="brandBtn" type="button" title="Osveži stran">
+      <button class="brand" id="brandBtn" type="button" title="Na začetek">
         <img class="brand-icon" id="brandImg" src="Brihta.png" width="256" height="256" alt="">
         <span>Brihta</span>
       </button>
-      <button class="summary-chip" id="summaryChip" title="Nastavitve">
-        <span id="summaryLabel">Nastavitve</span>
+      <button class="back-btn" id="backBtn" type="button" title="Nazaj na začetek" aria-label="Nazaj na začetek">‹</button>
+      <button class="summary-chip" id="summaryChip" type="button" title="Kaj utrjujem?">
+        <span id="summaryLabel">Vse</span>
         <span class="summary-arrow" id="summaryArrow">▾</span>
       </button>
+      <span class="topbar-sp"></span>
       <button class="profile-btn" id="profileBtn" title="Profil">
         <span class="profile-emoji">👤</span>
         <span class="profile-name">Prijava</span>
       </button>
 
-      <div class="topbar-ctrls" id="topbarCtrls">
+      <!-- Stari gumbi za snov in način: skriti, a ostanejo, ker jih script.js
+           še uporablja za stanje (izbira je zdaj na začetnem zaslonu). -->
+      <div class="topbar-ctrls" id="topbarCtrls" style="display:none">
         <div class="ctrl-block" id="subjectBlock">
-          <div class="ctrl-label">Vadim</div>
           <div class="btn-group" id="subjectBtnGroup">
             <button class="seg-btn active" data-subject="post">Poštevanka</button>
             <button class="seg-btn" data-subject="do20">Do 20</button>
           </div>
         </div>
         <div class="ctrl-block" id="modeBlock">
-          <div class="ctrl-label">Način</div>
           <div class="btn-group" id="modeBtnGroup">
-            <button class="seg-btn" data-mode="keypad" aria-label="Tipkovnica">⌨️<span class="seg-label"> Tipkovnica</span></button>
-            <button class="seg-btn active" data-mode="quiz" aria-label="Kviz">🎯<span class="seg-label"> Kviz</span></button>
-            <button class="seg-btn" data-mode="tekmovanje" aria-label="Tekmovanje">🏆<span class="seg-label"> Tekmovanje</span></button>
-            <button class="seg-btn" data-mode="bitka" aria-label="Bitka">⚔️<span class="seg-label"> Bitka</span></button>
-          </div>
-        </div>
-        <div class="ctrl-block" id="opBlock">
-          <div class="ctrl-label">Vrsta računa</div>
-          <div class="btn-group" id="opBtnGroup">
-            <button class="seg-btn active" data-op="both">× ÷</button>
-            <button class="seg-btn" data-op="multiply">×</button>
-            <button class="seg-btn" data-op="divide">÷</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Poštevanke: left rail on wide screens, collapsible row on phones -->
-    <div class="toolbar-controls-wrap" id="toolbarControlsWrap">
-      <div class="toolbar-controls">
-        <div class="ctrl-block tables-block">
-          <div class="ctrl-label-row">
-            <span class="ctrl-label" id="pickLabel">Poštevanke</span>
-            <div class="quick-group">
-              <button class="quick-btn" id="selAll">Vse</button>
-              <button class="quick-btn" id="selNone">Nič</button>
-            </div>
-          </div>
-          <div class="filter-row" id="filterRow">
-            <button class="table-btn active" data-n="1">1</button>
-            <button class="table-btn active" data-n="2">2</button>
-            <button class="table-btn active" data-n="3">3</button>
-            <button class="table-btn active" data-n="4">4</button>
-            <button class="table-btn active" data-n="5">5</button>
-            <button class="table-btn active" data-n="6">6</button>
-            <button class="table-btn active" data-n="7">7</button>
-            <button class="table-btn active" data-n="8">8</button>
-            <button class="table-btn active" data-n="9">9</button>
-            <button class="table-btn active" data-n="10">10</button>
-          </div>
-          <!-- Računi do 20: namesto poštevank koraki, kot jih uvaja pouk -->
-          <div class="filter-row group-row" id="groupRow" style="display:none">
-            <button class="group-btn active" data-g="d10">Do 10<small>4 + 3</small></button>
-            <button class="group-btn active" data-g="p10">Prijatelji 10<small>7 + 3</small></button>
-            <button class="group-btn active" data-g="dv">Dvojčki<small>6 + 6</small></button>
-            <button class="group-btn active" data-g="b20">Do 20<small>13 + 4</small></button>
-            <button class="group-btn active" data-g="pr">Čez 10<small>8 + 5</small></button>
+            <button class="seg-btn" data-mode="keypad">Tipkovnica</button>
+            <button class="seg-btn active" data-mode="quiz">Kviz</button>
+            <button class="seg-btn" data-mode="tekmovanje">Tekmovanje</button>
+            <button class="seg-btn" data-mode="bitka">Bitka</button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- KAJ UTRJUJEM — izbira računov (odpre se z gumbom v zgornji vrstici) -->
+  <div class="pick-sheet" id="pickSheet">
+    <div class="pick-box" role="dialog" aria-label="Kaj utrjujem?">
+      <div class="pick-head">
+        <h3>Kaj utrjujem?</h3>
+        <button class="pick-x" id="pickClose" type="button" aria-label="Zapri">✕</button>
+      </div>
+      <div class="ctrl-block tables-block">
+        <div class="ctrl-label-row">
+          <span class="ctrl-label" id="pickLabel">Poštevanke</span>
+          <div class="quick-group">
+            <button class="quick-btn" id="selAll">Vse</button>
+            <button class="quick-btn" id="selNone">Nič</button>
+          </div>
+        </div>
+        <div class="filter-row" id="filterRow">
+          <button class="table-btn active" data-n="1">1</button>
+          <button class="table-btn active" data-n="2">2</button>
+          <button class="table-btn active" data-n="3">3</button>
+          <button class="table-btn active" data-n="4">4</button>
+          <button class="table-btn active" data-n="5">5</button>
+          <button class="table-btn active" data-n="6">6</button>
+          <button class="table-btn active" data-n="7">7</button>
+          <button class="table-btn active" data-n="8">8</button>
+          <button class="table-btn active" data-n="9">9</button>
+          <button class="table-btn active" data-n="10">10</button>
+        </div>
+        <!-- Računi do 20: namesto poštevank koraki, kot jih uvaja pouk -->
+        <div class="filter-row group-row" id="groupRow" style="display:none">
+          <button class="group-btn active" data-g="d10">Do 10<small>4 + 3</small></button>
+          <button class="group-btn active" data-g="p10">Prijatelji 10<small>7 + 3</small></button>
+          <button class="group-btn active" data-g="dv">Dvojčki<small>6 + 6</small></button>
+          <button class="group-btn active" data-g="b20">Do 20<small>13 + 4</small></button>
+          <button class="group-btn active" data-g="pr">Čez 10<small>8 + 5</small></button>
+        </div>
+      </div>
+      <div class="ctrl-block" id="opBlock">
+        <div class="ctrl-label">Vrsta računa</div>
+        <div class="btn-group" id="opBtnGroup">
+          <button class="seg-btn active" data-op="both">× ÷</button>
+          <button class="seg-btn" data-op="multiply">×</button>
+          <button class="seg-btn" data-op="divide">÷</button>
+        </div>
+      </div>
+      <button class="pick-start" id="pickStart" type="button">Začni ›</button>
+    </div>
+  </div>
+
   <!-- Score + game move together, so they can be centred as one block -->
   <div class="stage">
+
+  <!-- ZAČETNI ZASLON: kaj utrjujem danes (ploščice namesto nastavitev) -->
+  <div id="homeScreen" class="home-screen" style="display:none">
+    <div class="home-hi">
+      <h1>Kaj utrjujem danes?</h1>
+      <p>Izberi in začni z vajo.</p>
+    </div>
+    <div class="home-tiles">
+      <button class="home-tile t-do20" data-home="do20" type="button">
+        <span><small>Računi</small><b>Do 20</b></span><span class="big">+ −</span>
+        <span class="home-pet" id="homePet"></span>
+      </button>
+      <button class="home-tile t-post" data-home="post" type="button">
+        <span><small>Vaja</small><b>Poštevanka</b></span><span class="big">× ÷</span>
+      </button>
+      <button class="home-tile t-tek" data-home="tekmovanje" type="button">
+        <span><small>60 sekund</small><b>Tekmovanje</b></span><span class="big">🏆</span>
+      </button>
+      <button class="home-tile t-bit" data-home="bitka" type="button">
+        <span><small>S prijatelji</small><b>Bitka</b></span><span class="big">⚔️</span>
+      </button>
+    </div>
+    <button class="home-cont" id="homeCont" type="button" style="display:none">
+      <span class="ic" id="homeContIc">+</span>
+      <span><b id="homeContTxt">Nadaljuj</b><small>Zadnja vaja na tej napravi</small></span>
+      <span class="go">›</span>
+    </button>
+  </div>
 
   <!-- SCORE HUD -->
   <div id="scoreHUD" class="score-hud" style="display:none">
@@ -134,6 +170,11 @@
     <div id="keypadArea" class="keypad-area">
       <div class="quiz-empty">Izberi nastavitve in začni! ⌨️</div>
     </div>
+  </div>
+
+  <!-- Kviz ↔ tipkovnica: tipkovnica je privzeta, izbirni odgovori so pomoč -->
+  <div class="mode-switch" id="modeSwitch" style="display:none">
+    <button id="modeSwitchBtn" type="button">🎯 Pokaži izbirne odgovore</button>
   </div>
 
   <!-- TEKMOVANJE PANEL -->

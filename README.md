@@ -132,10 +132,13 @@ bi prednastavitev preprosto prezrlo.
   čakalnici, po 20 s izpade; če odide gostitelj, vlogo prevzame naslednji.
   Bitke, starejše od 12 ur, se samodejno pobrišejo.
 
-Na širokih zaslonih (nad 900 px) sta **način** in **vrsta računa** stalno
-vidna v zgornji vrstici, **poštevanke** pa so v levem stolpcu, vsaka v svoji
-vrsti. Ničesar ni treba odpirati ali zapirati. Na tablicah in telefonih
-ostane zgornja zložljiva vrstica.
+**Začetni zaslon** (od 19. 10. 2026): "Kaj utrjujem danes?" s štirimi
+ploščicami — Do 20, Poštevanka, Tekmovanje, Bitka — in "Nadaljuj" za zadnjo
+vajo na napravi. Med vajo je zgoraj samo ena vrstica: logotip (na začetek),
+‹ nazaj, gumb s tem, kar se vadi ("Do 10 · + −"), ki odpre okno **Kaj
+utrjujem?** z izbiro računov, ter lik/ljubljenček in profil. Tipkovnica je
+privzeta; kviz je gumb "🎯 Pokaži izbirne odgovore" pod tipkovnico.
+Povezava učiteljice s parametri začetni zaslon preskoči.
 
 ## Učiteljski računi
 
