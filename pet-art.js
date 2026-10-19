@@ -121,7 +121,8 @@
        front — za glavo (ušesa, rogovi, puhasta lica)
        face  — na glavi (gobček, kljun, nos, brki)
        belly — na trebuščku (luske, perje)
-       arms  — ali ima prednje tačke (sova ima krila)
+       arms  — true: tačke ob trebuščku (zmaj); 'sit': sedi, sprednje noge
+               do tal kot prava mačka ali lisica; false: krila (sova)
        feet  — barva nog, če ni kot telo
      Telo, trebušček, glava in oči so skupni (creature). */
   const SP = {
@@ -170,7 +171,7 @@
             + line('M100 106 L100 110', 2.2) + line('M93 110 Q96.5 114 100 110 Q103.5 114 107 110', 2.4)
             // pramen na čelu
             + line('M96 34 Q100 42 104 34', 2.2, D),
-        arms: true
+        arms: 'sit'
       };
     },
     sova(c, b) {
@@ -212,7 +213,7 @@
             + ['M80 100 L60 96', 'M80 104 L60 106', 'M120 100 L140 96', 'M120 104 L140 106'].map(d => line(d, 1.8)).join('')
             // proge na čelu
             + line('M100 36 L100 46', 3, D) + line('M90 38 L92 46', 3, D) + line('M110 38 L108 46', 3, D),
-        arms: true
+        arms: 'sit'
       };
     }
   };
@@ -283,12 +284,23 @@
     const fc = sp.feet || D;
     const foot = x => shape(`M${x} 178 C${x} 167 ${x + 22} 167 ${x + 22} 178 C${x + 22} 187 ${x} 187 ${x} 178 Z`, fc, '', 3)
       + line(`M${x + 8} 181 L${x + 8} 185`, 1.8) + line(`M${x + 14} 181 L${x + 14} 185`, 1.8);
-    const feet = foot(69) + foot(109);
+    const sit = sp.arms === 'sit';
+    // sedeča žival: zadnje tačke pokukajo ob straneh, spredaj sta nogi do tal
+    const feet = sit ? foot(50) + foot(128) : foot(69) + foot(109);
     // prednje tačke ob trebuščku (sova ima namesto njih krila)
     const paw = (x, flip) => shape(`M${x} 134 C${x - 9 * flip} 140 ${x - 8 * flip} 154 ${x + 3 * flip} 154 C${x + 12 * flip} 154 ${x + 12 * flip} 142 ${x + 6 * flip} 134 Z`, c,
         `<path d="M${x - 14} 148 L${x + 14} 148 L${x + 14} 160 L${x - 14} 160 Z" fill="${D}" opacity=".5"/>`, 3)
       + line(`M${x + 1 * flip} 150 L${x + 1 * flip} 154`, 1.6) + line(`M${x + 5 * flip} 150 L${x + 5 * flip} 154`, 1.6);
-    const arms = sp.arms ? paw(76, 1) + paw(124, -1) : '';
+    /* Sprednja noga do tal: mehka, spodaj širša tačka v barvi trebuščka
+       ("nogavička") s prstki. Vrh noge pokrije puhast prsni ovratnik (bib),
+       kot pri pravi mački. x = levi rob noge. */
+    const leg = x => shape(`M${x + 2} 128 C${x} 150 ${x} 164 ${x - 1} 175 C${x - 3} 189 ${x + 23} 189 ${x + 21} 175 C${x + 20} 164 ${x + 20} 150 ${x + 18} 128 Z`, c,
+        `<path d="M${x + 14} 120 C${x + 18} 140 ${x + 18} 160 ${x + 24} 192 L${x + 30} 192 L${x + 30} 120 Z" fill="${D}" opacity=".4"/>`
+      + `<path d="M${x - 6} 171 C${x + 4} 166 ${x + 16} 166 ${x + 26} 171 L${x + 26} 192 L${x - 6} 192 Z" fill="${b}"/>`, 3)
+      + line(`M${x + 6} 181 L${x + 6} 185.5`, 1.7) + line(`M${x + 14} 181 L${x + 14} 185.5`, 1.7);
+    const bib = shape('M72 118 C72 102 128 102 128 118 L124 134 L116 129 L110 140 L100 133 L90 140 L84 129 L76 134 Z', b,
+        `<ellipse cx="90" cy="114" rx="9" ry="5" fill="#fff" opacity=".4"/>`, 3);
+    const arms = sit ? leg(78) + leg(101) + bib : sp.arms ? paw(76, 1) + paw(124, -1) : '';
     const headD = 'M58 76 C58 44 78 30 100 30 C122 30 142 44 142 76 C142 106 124 120 100 120 C76 120 58 106 58 76 Z';
     const headS = shape(headD, c,
         patternFill(pet.pattern, c, 100, 66, 30)
