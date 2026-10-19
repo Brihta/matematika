@@ -164,11 +164,11 @@ $$;
 -- Vrste po sezonah. Risbe so v pet-art.js — ime vrste mora biti tam enako.
 create or replace function public._pet_species(p_season smallint)
 returns text[] language sql immutable as $$
-  select case p_season when 1 then array['zmaj', 'lisica', 'sova', 'jez']
-                       else array['zmaj', 'lisica', 'sova', 'jez'] end;
+  select case p_season when 1 then array['zmaj', 'lisica', 'sova', 'macka']
+                       else array['zmaj', 'lisica', 'sova', 'macka'] end;
 $$;
 
--- Videz. Prosto: prve tri barve, vse barve trebuščka, tri barve oči, brez
+-- Videz. Prosto: prve štiri barve (oblak = siva, dodana z mucko), vse barve trebuščka, tri barve oči, brez
 -- vzorca. Vsak mejnik odklene eno možnost, v tem vrstnem redu (enak seznam
 -- je v pet-art.js, UNLOCKS):
 create or replace function public._pet_unlocks()
@@ -179,7 +179,7 @@ $$;
 create or replace function public._pet_allowed(p_kind text, p_val text, p_count int)
 returns boolean language sql immutable as $$
   select case p_kind
-    when 'body'    then p_val in ('gozd', 'med', 'nebo')
+    when 'body'    then p_val in ('gozd', 'med', 'nebo', 'oblak')
                      or (p_val in ('malina', 'sliva', 'koral', 'polnoc', 'zlata')
                          and array_position(_pet_unlocks(), p_val) <= p_count)
     when 'belly'   then p_val in ('krema', 'breskev', 'meta', 'sivka')
@@ -207,6 +207,8 @@ create table if not exists student_pets (
 alter table student_pets enable row level security;
 -- oprema iz trgovine (3b): {"glava": "kapa", "vrat": "sal", "obraz": "ocala"}
 alter table student_pets add column if not exists equip jsonb not null default '{}'::jsonb;
+-- 19. 10. 2026: ježka je zamenjala mucka (pet-art.js riše stare ježke kot mucke)
+update student_pets set species = 'macka' where species = 'jez';
 
 -- Stopnja rasti iz števila mejnikov.
 create or replace function public._pet_stage(p_count int)

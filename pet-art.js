@@ -16,12 +16,13 @@
     { id: 'zmaj',   name: 'Zmajček', acc: 'zmajčka' },
     { id: 'lisica', name: 'Lisička', acc: 'lisičko' },
     { id: 'sova',   name: 'Sovica',  acc: 'sovico'  },
-    { id: 'jez',    name: 'Ježek',   acc: 'ježka'   }
+    { id: 'macka',  name: 'Mucka',   acc: 'mucko'   }
   ];
   const BODY = {
     gozd:   { name: 'Gozdna',   c: '#6f9a4a' },
     med:    { name: 'Medena',   c: '#e0a84a' },
     nebo:   { name: 'Nebesna',  c: '#6fa8d6' },
+    oblak:  { name: 'Oblačna',  c: '#a9a3b8' },
     malina: { name: 'Malinova', c: '#d4607f' },
     sliva:  { name: 'Slivova',  c: '#8b6fc0' },
     koral:  { name: 'Koralna',  c: '#ee8460' },
@@ -47,7 +48,7 @@
     srcki:   { name: 'Srčki' },
     mavrica: { name: 'Mavrica' }
   };
-  const FREE = { body: ['gozd', 'med', 'nebo'], belly: Object.keys(BELLY),
+  const FREE = { body: ['gozd', 'med', 'nebo', 'oblak'], belly: Object.keys(BELLY),
                  eyes: ['rjave', 'zelene', 'modre'], pattern: ['brez'] };
   // vsak mejnik odklene eno možnost, v tem vrstnem redu (= _pet_unlocks)
   const UNLOCKS = ['malina', 'pike', 'sliva', 'proge', 'koral', 'zvezde', 'polnoc', 'srcki', 'zlata', 'mavrica'];
@@ -105,7 +106,7 @@
         ? `<path d="${starPath(x, y + r * .05, r * .55)}" fill="${ec}" stroke="${OL}" stroke-width="1.5" stroke-linejoin="round"/>`
         : `<circle cx="${x}" cy="${y + r * .08}" r="${r * .66}" fill="${ec}"/><circle cx="${x}" cy="${y + r * .12}" r="${r * .36}" fill="${OL}"/>`;
       return `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" stroke="${OL}" stroke-width="2.6"/>${pupil}`
-        + `<circle cx="${x - r * .32}" cy="${y - r * .3}" r="${r * .24}" fill="#fff"/>`;
+        + `<circle cx="${x - r * .32}" cy="${y - r * .3}" r="${r * .26}" fill="#fff"/><circle cx="${x + r * .3}" cy="${y + r * .32}" r="${r * .11}" fill="#fff" opacity=".85"/>`;
     }).join('');
   }
   function starPath(cx, cy, r) {
@@ -115,64 +116,107 @@
   }
 
   /* ── vrste ──
-     Vsaka vrsta vrne { back, front }: back je za telesom (rep, krila),
-     front je glava z vsem na njej. Telo in trebušček sta skupna. */
+     Vsaka vrsta vrne:
+       back  — za telesom (rep, krila)
+       front — za glavo (ušesa, rogovi, puhasta lica)
+       face  — na glavi (gobček, kljun, nos, brki)
+       belly — na trebuščku (luske, perje)
+       arms  — ali ima prednje tačke (sova ima krila)
+       feet  — barva nog, če ni kot telo
+     Telo, trebušček, glava in oči so skupni (creature). */
   const SP = {
-    zmaj(c, b, e) {
-      const D = shade(c);
+    zmaj(c, b) {
+      const D = shade(c), L = light(c), B = shade(b);
+      // rep z bodicami in konico v obliki pike
+      const tail = shape('M138 160 C170 166 184 146 178 124 C188 140 186 168 150 176 Z', c,
+          `<path d="M150 160 L195 160 L195 180 L150 180 Z" fill="${D}"/>`)
+        + [[160, 158], [172, 148]].map(([x, y]) => shape(`M${x - 5} ${y + 2} L${x + 2} ${y - 9} L${x + 6} ${y + 3} Z`, D, '', 2.5)).join('')
+        + shape('M178 124 C170 116 172 104 182 98 C186 108 190 116 178 124 Z', b, '', 3);
+      // krila: opna z rebri
+      const wing = (sx) => {
+        const m = x => 100 + (x - 100) * sx;
+        return shape(`M${m(64)} 120 C${m(36)} 96 ${m(24)} 108 ${m(28)} 132 C${m(36)} 126 ${m(42)} 130 ${m(46)} 138 C${m(52)} 130 ${m(58)} 132 ${m(64)} 138 Z`, D,
+            `<path d="M${m(30)} 112 L${m(64)} 112 L${m(64)} 140 L${m(30)} 140 Z" fill="${shade(D)}" opacity=".35"/>`, 3.5)
+          + line(`M${m(62)} 122 L${m(34)} 112`, 2.2, OL) + line(`M${m(62)} 126 L${m(44)} 132`, 2.2, OL);
+      };
       return {
-        back: shape('M140 150 C172 150 182 128 172 112 C184 126 186 158 150 168 Z', c, `<path d="M150 150 L190 150 L190 175 L150 175 Z" fill="${D}"/>`)
-            + shape('M166 110 L182 100 L178 120 Z', b)
-            + shape('M62 118 C36 96 30 120 40 132 C46 124 56 126 62 134 Z', D)
-            + shape('M138 118 C164 96 170 120 160 132 C154 124 144 126 138 134 Z', D),
-        front: shape('M76 44 L70 22 L88 38 Z', b) + shape('M124 44 L130 22 L112 38 Z', b)
-             + [86, 100, 114].map((x, i) => shape(`M${x - 6} ${44 - (i === 1 ? 4 : 0)} L${x} ${30 - (i === 1 ? 4 : 0)} L${x + 6} ${44 - (i === 1 ? 4 : 0)} Z`, D, '', 3)).join(''),
-        face: shape('M80 90 C80 80 120 80 120 90 C120 104 80 104 80 90 Z', b, '', 3)
-            + `<circle cx="93" cy="92" r="2" fill="${OL}"/><circle cx="107" cy="92" r="2" fill="${OL}"/>`
-            + line('M94 99 Q100 103 106 99', 2.4)
+        back: tail + wing(1) + wing(-1),
+        front: shape('M74 46 C68 34 66 24 70 16 C78 24 84 34 88 40 Z', b, line('M70 30 L80 28', 2, B) + line('M73 38 L84 35', 2, B), 3.5)
+             + shape('M126 46 C132 34 134 24 130 16 C122 24 116 34 112 40 Z', b, line('M130 30 L120 28', 2, B) + line('M127 38 L116 35', 2, B), 3.5)
+             + [[90, 36, 0], [100, 32, 1], [110, 36, 0]].map(([x, y]) => shape(`M${x - 6} ${y + 6} L${x} ${y - 7} L${x + 6} ${y + 6} Z`, D, '', 3)).join(''),
+        face: shape('M78 92 C78 80 122 80 122 92 C122 106 78 106 78 92 Z', light(b), '', 3)
+            + `<ellipse cx="92" cy="90" rx="2.6" ry="3.2" fill="${OL}"/><ellipse cx="108" cy="90" rx="2.6" ry="3.2" fill="${OL}"/>`
+            + line('M92 99 Q100 104 108 99', 2.4)
+            + `<path d="M103 100 L106 106 L109 99.5" fill="#fff" stroke="${OL}" stroke-width="1.8" stroke-linejoin="round"/>`,
+        belly: [140, 150, 160].map(y => line(`M${80} ${y} Q100 ${y + 5} ${120} ${y}`, 2, B)).join(''),
+        arms: true
       };
     },
-    lisica(c, b, e) {
+    lisica(c, b) {
       const D = shade(c);
+      // košat rep s čopkom (belo konico) in nekaj dlakami
+      const tail = shape('M136 166 C176 176 196 140 180 102 C176 92 166 92 164 102 C170 124 160 146 138 146 Z', c,
+          `<path d="M160 104 C168 92 186 96 186 116 C180 118 170 116 162 112 Z" fill="${b}"/>`
+        + `<path d="M150 170 L200 170 L200 190 L150 190 Z" fill="${D}"/>`)
+        + line('M168 140 L176 136', 2, D) + line('M160 154 L168 152', 2, D);
       return {
-        back: shape('M138 160 C176 168 190 126 170 104 C176 132 160 146 140 144 Z', c,
-                    `<path d="M168 100 C186 112 186 132 178 142 C170 130 162 118 160 108 Z" fill="${b}"/>`),
-        front: shape('M66 60 L60 18 L94 46 Z', c, `<path d="M68 52 L65 30 L84 46 Z" fill="${b}"/>`)
-             + shape('M134 60 L140 18 L106 46 Z', c, `<path d="M132 52 L135 30 L116 46 Z" fill="${b}"/>`),
-        face: shape('M66 86 C80 96 90 90 100 104 C110 90 120 96 134 86 C132 108 116 118 100 118 C84 118 68 108 66 86 Z', b, '', 3)
-            + `<ellipse cx="100" cy="102" rx="6" ry="4.5" fill="${OL}"/>`
-            + line('M95 109 Q100 113 105 109', 2.4)
+        back: tail,
+        front: shape('M62 66 L56 16 L96 44 Z', c, `<path d="M66 56 L62 28 L84 44 Z" fill="${b}"/><path d="M64 40 L72 46 M62 48 L70 52" stroke="${shade(b)}" stroke-width="2" stroke-linecap="round"/>`, 4)
+             + shape('M138 66 L144 16 L104 44 Z', c, `<path d="M134 56 L138 28 L116 44 Z" fill="${b}"/><path d="M136 40 L128 46 M138 48 L130 52" stroke="${shade(b)}" stroke-width="2" stroke-linecap="round"/>`, 4)
+             // puhasta lica ob strani glave
+             + shape('M62 92 L46 100 L58 104 L48 112 L66 110 Z', b, '', 3) + shape('M138 92 L154 100 L142 104 L152 112 L134 110 Z', b, '', 3),
+        face: shape('M64 86 C78 96 90 92 100 104 C110 92 122 96 136 86 C134 108 118 120 100 120 C82 120 66 108 64 86 Z', b, '', 3)
+            + `<ellipse cx="100" cy="101" rx="7" ry="5" fill="${OL}"/><ellipse cx="98" cy="99.5" rx="2.2" ry="1.4" fill="#fff" opacity=".7"/>`
+            + line('M100 106 L100 110', 2.2) + line('M93 110 Q96.5 114 100 110 Q103.5 114 107 110', 2.4)
+            // pramen na čelu
+            + line('M96 34 Q100 42 104 34', 2.2, D),
+        arms: true
       };
     },
-    sova(c, b, e) {
-      const D = shade(c);
+    sova(c, b) {
+      const D = shade(c), B = shade(b);
+      // krila s pernatim robom
+      const wing = (sx) => {
+        const m = x => 100 + (x - 100) * sx;
+        return shape(`M${m(60)} 110 C${m(36)} 122 ${m(34)} 158 ${m(54)} 174 L${m(56)} 164 L${m(62)} 172 L${m(62)} 160 L${m(68)} 166 C${m(64)} 146 ${m(64)} 128 ${m(68)} 118 Z`, D,
+            line(`M${m(48)} 132 L${m(58)} 136`, 2, shade(D)) + line(`M${m(46)} 146 L${m(58)} 150`, 2, shade(D)), 3.5);
+      };
       return {
-        back: shape('M56 112 C36 128 40 162 62 170 C58 150 60 132 66 122 Z', D)
-            + shape('M144 112 C164 128 160 162 138 170 C142 150 140 132 134 122 Z', D),
-        front: shape('M66 50 L58 22 L84 42 Z', D) + shape('M134 50 L142 22 L116 42 Z', D),
-        face: `<circle cx="84" cy="78" r="17" fill="${b}" stroke="${OL}" stroke-width="2.6"/><circle cx="116" cy="78" r="17" fill="${b}" stroke="${OL}" stroke-width="2.6"/>`
-            + shape('M93 92 L107 92 L100 106 Z', '#f0a640', '', 3),
+        back: wing(1) + wing(-1),
+        front: shape('M64 52 L54 18 L72 30 L76 22 L86 42 Z', D, '', 3.5) + shape('M136 52 L146 18 L128 30 L124 22 L114 42 Z', D, '', 3.5),
+        // obrazni disk v obliki srca, obrvi, kljun z odsevom
+        face: shape('M100 66 C88 52 60 56 62 80 C64 98 84 102 100 92 C116 102 136 98 138 80 C140 56 112 52 100 66 Z', b, '', 3)
+            + line('M72 60 Q84 54 94 62', 3, D) + line('M128 60 Q116 54 106 62', 3, D)
+            + shape('M92 90 L108 90 L100 106 Z', '#f0a640', `<path d="M92 90 L100 90 L98 100 Z" fill="#f7c27a"/>`, 3),
+        belly: [[88, 140], [100, 136], [112, 140], [94, 154], [106, 154], [100, 166]].map(([x, y]) => line(`M${x - 5} ${y} L${x} ${y + 5} L${x + 5} ${y}`, 2, B)).join(''),
+        arms: false,
         feet: '#f0a640'
       };
     },
-    jez(c, b, e) {
-      const D = shade(c), spikes = [];
-      // bodice v pahljači okoli glave; korena so skrita za glavo
-      for (let i = 0; i <= 12; i++) {
-        const a = Math.PI * (.92 + i * .097), r1 = 36, r2 = 62, cx = 100, cy = 78;
-        const x0 = cx + r1 * Math.cos(a - .16), y0 = cy + r1 * Math.sin(a - .16);
-        const x1 = cx + r2 * Math.cos(a), y1 = cy + r2 * Math.sin(a);
-        const x2 = cx + r1 * Math.cos(a + .16), y2 = cy + r1 * Math.sin(a + .16);
-        spikes.push(shape(`M${x0.toFixed(1)} ${y0.toFixed(1)} L${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)} Z`, D, '', 3));
-      }
+    macka(c, b) {
+      const D = shade(c);
+      // rep kot vprašaj, s progami in svetlo konico
+      const tail = shape('M140 168 C170 172 178 150 170 128 C164 112 172 98 184 100 C190 102 190 110 184 112 C178 114 176 124 182 136 C192 160 176 184 140 182 Z', c,
+          [[168, 160], [176, 140], [176, 120]].map(([x, y]) => `<path d="M${x - 10} ${y} L${x + 12} ${y - 4}" stroke="${D}" stroke-width="5" stroke-linecap="round"/>`).join('')
+        + `<circle cx="186" cy="106" r="8" fill="${b}"/>`);
       return {
-        back: spikes.join(''),
-        front: '',
-        face: shape('M70 84 C76 70 124 70 130 84 C130 106 116 116 100 116 C84 116 70 106 70 84 Z', b, '', 3)
-            + `<circle cx="100" cy="100" r="5.5" fill="${OL}"/>` + line('M95 108 Q100 112 105 108', 2.4)
+        back: tail,
+        front: shape('M60 70 L62 22 L96 46 Z', c, `<path d="M66 58 L67 34 L86 47 Z" fill="#f4a9b8"/>`, 4)
+             + shape('M140 70 L138 22 L104 46 Z', c, `<path d="M134 58 L133 34 L114 47 Z" fill="#f4a9b8"/>`, 4)
+             // puhasta lica
+             + shape('M60 96 L48 100 L58 104 L50 110 L64 108 Z', c, '', 3) + shape('M140 96 L152 100 L142 104 L150 110 L136 108 Z', c, '', 3),
+        face: shape('M84 100 C84 92 116 92 116 100 C116 112 84 112 84 100 Z', b, '', 2.6)
+            + `<path d="M95 96 L105 96 L100 102 Z" fill="#e8798f" stroke="${OL}" stroke-width="2" stroke-linejoin="round"/>`
+            + line('M100 102 L100 105', 2) + line('M93 105 Q96.5 109 100 105 Q103.5 109 107 105', 2.2)
+            // brki
+            + ['M80 100 L60 96', 'M80 104 L60 106', 'M120 100 L140 96', 'M120 104 L140 106'].map(d => line(d, 1.8)).join('')
+            // proge na čelu
+            + line('M100 36 L100 46', 3, D) + line('M90 38 L92 46', 3, D) + line('M110 38 L108 46', 3, D),
+        arms: true
       };
     }
   };
+  SP.jez = SP.macka;   // stari ježki (pred 19. 10. 2026) so postali mucke
 
   /* ── oprema iz trgovine (supabase_ljubljencek.sql, pet_shop) ──
      Reže: glava (na vrhu glave), obraz (čez oči), vrat (pod brado).
@@ -226,29 +270,38 @@
   /* Odrasla žival; head = koliko večja je glava (mladiči imajo večjo). */
   function creature(pet, head) {
     const c = (BODY[pet.body] || BODY.gozd).c, b = (BELLY[pet.belly] || BELLY.krema).c;
-    const sp = (SP[pet.species] || SP.zmaj)(c, b, pet.eyes);
+    const sp = (SP[pet.species] || SP.zmaj)(c, b);
     const D = shade(c), L = light(c);
     const bodyD = 'M52 140 C52 112 74 100 100 100 C126 100 148 112 148 140 C148 170 128 182 100 182 C72 182 52 170 52 140 Z';
     const body = shape(bodyD, c,
         patternFill(pet.pattern, c, 100, 142, 46)
       + `<path d="M40 160 L160 160 L160 190 L40 190 Z" fill="${D}" opacity=".55"/>`
-      + `<ellipse cx="100" cy="150" rx="28" ry="26" fill="${b}" stroke="${OL}" stroke-width="2.6"/>`);
+      + `<ellipse cx="66" cy="124" rx="8" ry="12" fill="${L}" opacity=".45" transform="rotate(30 66 124)"/>`
+      + `<ellipse cx="100" cy="150" rx="28" ry="26" fill="${b}" stroke="${OL}" stroke-width="2.6"/>`
+      + `<ellipse cx="92" cy="140" rx="9" ry="6" fill="#fff" opacity=".35"/>`
+      + (sp.belly || ''));
     const fc = sp.feet || D;
-    const feet = shape('M70 178 C70 168 90 168 90 178 C90 186 70 186 70 178 Z', fc, '', 3)
-               + shape('M110 178 C110 168 130 168 130 178 C130 186 110 186 110 178 Z', fc, '', 3);
+    const foot = x => shape(`M${x} 178 C${x} 167 ${x + 22} 167 ${x + 22} 178 C${x + 22} 187 ${x} 187 ${x} 178 Z`, fc, '', 3)
+      + line(`M${x + 8} 181 L${x + 8} 185`, 1.8) + line(`M${x + 14} 181 L${x + 14} 185`, 1.8);
+    const feet = foot(69) + foot(109);
+    // prednje tačke ob trebuščku (sova ima namesto njih krila)
+    const paw = (x, flip) => shape(`M${x} 134 C${x - 9 * flip} 140 ${x - 8 * flip} 154 ${x + 3 * flip} 154 C${x + 12 * flip} 154 ${x + 12 * flip} 142 ${x + 6 * flip} 134 Z`, c,
+        `<path d="M${x - 14} 148 L${x + 14} 148 L${x + 14} 160 L${x - 14} 160 Z" fill="${D}" opacity=".5"/>`, 3)
+      + line(`M${x + 1 * flip} 150 L${x + 1 * flip} 154`, 1.6) + line(`M${x + 5 * flip} 150 L${x + 5 * flip} 154`, 1.6);
+    const arms = sp.arms ? paw(76, 1) + paw(124, -1) : '';
     const headD = 'M58 76 C58 44 78 30 100 30 C122 30 142 44 142 76 C142 106 124 120 100 120 C76 120 58 106 58 76 Z';
     const headS = shape(headD, c,
         patternFill(pet.pattern, c, 100, 66, 30)
       + `<path d="M50 104 C80 122 120 122 150 104 L150 130 L50 130 Z" fill="${D}" opacity=".45"/>`
       + `<ellipse cx="80" cy="46" rx="14" ry="7" fill="${L}" opacity=".7" transform="rotate(-20 80 46)"/>`);
-    const cheeks = `<ellipse cx="72" cy="94" rx="7" ry="4.5" fill="#f08aa0" opacity=".55"/><ellipse cx="128" cy="94" rx="7" ry="4.5" fill="#f08aa0" opacity=".55"/>`;
+    const cheeks = `<ellipse cx="71" cy="95" rx="7.5" ry="4.5" fill="#f08aa0" opacity=".5"/><ellipse cx="129" cy="95" rx="7.5" ry="4.5" fill="#f08aa0" opacity=".5"/>`;
     const eyeY = pet.species === 'sova' ? 78 : 74, eyeR = pet.species === 'sova' ? 11 : 10;
     const eq = pet.equip || {};
     const headAll = sp.front + headS + cheeks + sp.face + eyes(pet.eyes, 84, 116, eyeY, eyeR)
       + accFace(eq.obraz, eyeY, eyeR) + accHead(eq.glava);
     // glavo povečamo okoli vratu (100, 112)
     const k = head || 1;
-    return sp.back + body + feet + accNeck(eq.vrat)
+    return sp.back + body + feet + arms + accNeck(eq.vrat)
       + `<g transform="translate(100 112) scale(${k}) translate(-100 -112)">${headAll}</g>`;
   }
 
@@ -259,8 +312,9 @@
       zmaj: [0, 1, 2].map(i => line(`M${70 + i * 20} ${120} q10 -10 20 0`, 3, shade(c))).join(''),
       lisica: `<path d="M48 150 C80 140 120 140 152 150 L152 190 L48 190 Z" fill="${b}"/>`,
       sova: [0, 1, 2, 3].map(i => line(`M${66 + i * 20} ${108} l10 8 l10 -8`, 3, shade(c))).join(''),
-      jez: [0, 1, 2, 3, 4].map(i => `<path d="M${72 + i * 14} 60 l7 -12 l7 12 Z" fill="${shade(c)}"/>`).join('')
-    }[pet.species] || '';
+      // mucka: odtis tačke
+      macka: `<g fill="${shade(c)}"><ellipse cx="100" cy="122" rx="11" ry="9"/><circle cx="86" cy="106" r="4.5"/><circle cx="96" cy="100" r="4.5"/><circle cx="106" cy="100" r="4.5"/><circle cx="115" cy="106" r="4.5"/></g>`
+    }[pet.species === 'jez' ? 'macka' : pet.species] || '';
     return shape(d, c, patternFill(pet.pattern, c, 100, 120, 52) + hint
       + `<circle cx="80" cy="140" r="7" fill="${b}" opacity=".9"/><circle cx="118" cy="96" r="5" fill="${b}" opacity=".9"/><circle cx="124" cy="150" r="9" fill="${b}" opacity=".9"/>`
       + `<path d="M120 50 L160 50 L160 190 L120 190 Z" fill="${shade(c)}" opacity=".35"/>`
