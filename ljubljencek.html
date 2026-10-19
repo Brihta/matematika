@@ -98,6 +98,25 @@ h2 { font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform:
 .coll-it { width: 110px; text-align: center; font-size: .74rem; font-weight: 700; }
 .coll-it svg { width: 100px; height: 100px; }
 
+/* priboljški in trgovina */
+.treats { margin-top: 14px; display: flex; align-items: center; gap: 10px; background: var(--sand); border-radius: 14px; padding: 10px 12px; text-align: left; }
+.treats .ico { font-size: 1.7rem; }
+.treats b { font-size: 1.25rem; font-weight: 900; }
+.treats small { display: block; color: var(--muted); font-weight: 700; font-size: .74rem; }
+.today-bar { height: 6px; background: #fffef8; border-radius: 999px; margin-top: 5px; overflow: hidden; }
+.today-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--lime), var(--leaf)); border-radius: 999px; }
+.shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.it { background: var(--cream); border: 2px solid var(--sand-2); border-radius: 16px; padding: 6px 6px 8px; text-align: center; }
+.it.on { border-color: var(--leaf-2); background: #f4f8e3; }
+.it svg { width: 96px; height: 96px; display: block; margin: 0 auto; }
+.it .nm { font-weight: 800; font-size: .8rem; margin: 2px 0 6px; }
+.it button { width: 100%; border: 0; border-radius: 10px; padding: 7px 6px; font: 800 .76rem system-ui, sans-serif; cursor: pointer; }
+.it .buy { background: var(--grad); color: var(--forest); box-shadow: 0 3px 10px var(--glow); }
+.it .buy:disabled { background: var(--sand); color: #9aa492; box-shadow: none; cursor: not-allowed; }
+.it .wear { background: #fffef8; color: var(--forest); box-shadow: inset 0 0 0 2px var(--leaf); }
+.it.on .wear { background: var(--forest); color: var(--cream); box-shadow: none; }
+.comp { display: flex; gap: 10px; flex-wrap: wrap; }
+.comp .it { width: 132px; }
 .empty { text-align: center; padding: 40px 10px; color: var(--muted); font-weight: 700; }
 .toast { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 140px); background: var(--forest); color: var(--cream); border-radius: 14px; padding: 10px 16px; font-weight: 800; transition: transform .3s; z-index: 10; }
 .toast.on { transform: translate(-50%, 0); }
@@ -186,6 +205,7 @@ function render() {
             ? `<small>Še ${next.from - count} do stopnje »${next.name}«${count === 0 ? ' — prvi mejnik izvali jajce!' : ''}</small>`
             : '<small>Končna oblika! Bravo, vse računi do 20 znaš na pamet.</small>'}</div>
         </div>
+        ${treatsBox()}
       </div>
       <div>
         <div class="card section">
@@ -215,12 +235,67 @@ function render() {
             vsaj 90 % pravilnih in skoraj vse (80 %) hitreje kot v 3 sekundah. Šteje samo <b>tipkovnica</b> —
             v kvizu lahko odgovor uganeš.</div>
         </div>
-        ${(S.collection || []).length ? `<div class="card section"><h2>Zbirka</h2><div class="coll">${S.collection.map(c =>
-          `<div class="coll-it">${A.draw(c, c.stage)}<div>${esc(c.name) || (A.SPECIES.find(x => x.id === c.species) || {}).name}</div>
-           <div style="color:var(--muted)">${esc(c.season_name)}</div></div>`).join('')}</div></div>` : ''}
+        ${shopCard(stage)}
+        ${companionCard(stage)}
       </div>
     </div>`;
   wire();
+}
+
+const tw = n => { const m = n % 100; return m === 1 ? 'priboljšek' : m === 2 ? 'priboljška' : m === 3 || m === 4 ? 'priboljški' : 'priboljškov'; };
+function treatsBox() {
+  const t = S.treats || { balance: 0, today: 0, cap: 20 };
+  return `<div class="treats"><span class="ico">🍎</span><div style="flex:1"><b>${t.balance}</b> ${tw(t.balance)}
+    <small>Danes ${t.today} / ${t.cap} · za vajo do 20 (tipkovnica več kot kviz)</small>
+    <div class="today-bar"><i style="width:${Math.min(100, t.today / t.cap * 100)}%"></i></div></div></div>`;
+}
+/* Trgovina: predmet pokažemo na tvojem ljubljenčku (jajce ga ne more nositi,
+   zato ga pokažemo odraslega). Kupljeno ostane za vedno. */
+function shopCard(stage) {
+  const owned = new Set(S.owned || []), bal = (S.treats || {}).balance || 0, eq = draft.equip || {};
+  // v jajcu in lupini se predmet ne vidi dobro — pokažemo ga na odraslem
+  const look = stage === 'jajce' || stage === 'mladicek' ? 'odrasel' : stage;
+  const bySlot = {};
+  (S.shop || []).forEach(x => (bySlot[x.slot] = bySlot[x.slot] || []).push(x));
+  return `<div class="card section"><h2>Trgovina za ljubljenčka</h2>${Object.keys(A.SLOT_NAME).filter(sl => bySlot[sl]).map(sl =>
+    `<div class="note" style="margin:8px 0 6px;font-weight:800;color:var(--forest)">${A.SLOT_NAME[sl]}</div><div class="shop">${bySlot[sl].map(x => {
+      const own = owned.has(x.id), on = eq[sl] === x.id, nm = (A.ACC[x.id] || {}).name || x.id;
+      const pic = A.draw({ ...draft, equip: { ...eq, [sl]: x.id } }, look);
+      const btn = own
+        ? `<button class="wear" data-wear="${x.id}" data-slot="${sl}">${on ? '✓ Nosi' : 'Obleci'}</button>`
+        : `<button class="buy" data-buy="${x.id}" ${bal < x.price ? 'disabled' : ''}>🍎 ${x.price}</button>`;
+      return `<div class="it${on ? ' on' : ''}">${pic}<div class="nm">${nm}</div>${btn}</div>`;
+    }).join('')}</div>`).join('')}
+    <div class="note">${stage === 'jajce' ? 'Jajce še ne more nositi ničesar — predmete pa lahko že kupiš.' : 'Klikni še enkrat, da predmet snameš.'}</div></div>`;
+}
+/* Kdo gre z likom (vitez …): ta ljubljenček ali kateri iz prejšnjih sezon. */
+function companionCard(stage) {
+  const cur = S.companion, list = [];
+  list.push({ ...draft, season: S.season.id, season_name: S.season.name, stage });
+  (S.collection || []).forEach(c => list.push(c));
+  return `<div class="card section"><h2>Spremljevalec tvojega lika</h2><div class="comp">${list.map(c => {
+      const on = cur && cur.season === c.season, egg = c.stage === 'jajce';
+      return `<div class="it${on ? ' on' : ''}">${A.draw(c, c.stage)}<div class="nm">${esc(c.name) || (A.SPECIES.find(x => x.id === c.species) || {}).name}
+        <br><span style="color:var(--muted);font-weight:700">${esc(c.season_name)}</span></div>
+        ${egg ? '<button class="wear" disabled>Še v jajcu</button>'
+              : `<button class="wear" data-comp="${on ? '' : c.season}">${on ? '✓ Gre s tabo' : 'Vzemi s seboj'}</button>`}</div>`;
+    }).join('')}</div>
+    <div class="note">${cur ? 'Tvoj ljubljenček stoji ob tvojem liku namesto spremljevalca iz trgovine lika.' : 'Ko se izvali, ga lahko vzameš s seboj — stal bo ob tvojem liku.'}</div></div>`;
+}
+/* Nakup, oprema, spremljevalec: baza preveri in vrne novo stanje. */
+async function act(fn, params, okMsg) {
+  const a = api(); if (!a || saving) return;
+  saving = true;
+  const r = await a.rpc(fn, { p_student: a.profile().id, ...params });
+  saving = false;
+  if (!r || r.unreachable) { toast('⚠️ Ni povezave — poskusi znova.'); return; }
+  if (r.error) {
+    toast({ PREMALO: 'Premalo priboljškov — vadi še malo!', ZE_IMAS: 'To že imaš.', JAJCE: 'Najprej se mora izvaliti.',
+            NI_LJUBLJENCKA: 'Najprej izberi jajce.' }[r.error] || 'Ni šlo.');
+    return;
+  }
+  setState(r);
+  if (okMsg) toast(okMsg);
 }
 
 function swatches(kind, list, count) {
@@ -281,6 +356,19 @@ function wire() {
   const commit = () => { const v = ni.value.trim(); if (v !== (draft.name || '')) { $('nameMsg').textContent = ''; save({ ...draft, name: v }, 'Ime shranjeno.'); } };
   ni.addEventListener('blur', commit);
   ni.addEventListener('keydown', e => { if (e.key === 'Enter') ni.blur(); });
+  document.querySelectorAll('[data-buy]').forEach(b => b.addEventListener('click', () => {
+    const id = b.dataset.buy, nm = (A.ACC[id] || {}).name || id;
+    act('pet_buy', { p_item: id }, `Kupljeno: ${nm}! 🎉`);
+  }));
+  document.querySelectorAll('[data-wear]').forEach(b => b.addEventListener('click', () => {
+    if (S.stage === 'jajce') { toast('Jajce še ne more nositi ničesar.'); return; }
+    const on = (draft.equip || {})[b.dataset.slot] === b.dataset.wear;
+    act('pet_equip', { p_slot: b.dataset.slot, p_item: on ? null : b.dataset.wear });
+  }));
+  document.querySelectorAll('[data-comp]').forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.comp;
+    act('pet_set_companion', { p_season: v ? +v : null }, v ? 'Zdaj gre s tvojim likom! 🛡️' : 'Ostane doma.');
+  }));
   document.querySelectorAll('.m-go').forEach(b => b.addEventListener('click', () => {
     const a = api(); if (a && a.practice) a.practice(b.dataset.g, b.dataset.op);
   }));

@@ -17,7 +17,10 @@
 --      vsaj 90 % pravilnih, vsaj 80 % pravilnih hitreje kot v 3 s.
 --   3. student_pets, pet_state, pet_save — ljubljenček in njegov videz.
 --      Kaj je odklenjeno, odloča baza; aplikacija samo riše.
---   4. merge_students z dodanima blokoma.
+--   3b. Priboljški in trgovina za ljubljenčka, spremljevalec ob liku.
+--   4. merge_students z dodanimi bloki.
+--
+-- Datoteko lahko zaženeš večkrat: podatki in stikalo ostanejo.
 --
 -- Zahteva supabase_do20.sql in supabase_album.sql (sezone). Zaženi v
 -- Supabase → SQL Editor (celo datoteko naenkrat).
@@ -202,12 +205,85 @@ create table if not exists student_pets (
   primary key (student_id, season)
 );
 alter table student_pets enable row level security;
+-- oprema iz trgovine (3b): {"glava": "kapa", "vrat": "sal", "obraz": "ocala"}
+alter table student_pets add column if not exists equip jsonb not null default '{}'::jsonb;
 
 -- Stopnja rasti iz števila mejnikov.
 create or replace function public._pet_stage(p_count int)
 returns text language sql immutable as $$
   select case when p_count >= 10 then 'koncna' when p_count >= 7 then 'odrasel'
               when p_count >= 4 then 'mlad' when p_count >= 1 then 'mladicek' else 'jajce' end;
+$$;
+
+-- ── 3b. Priboljški, trgovina, spremljevalec ──────────────────────────────
+-- PRIBOLJŠKI so valuta samo za ljubljenčka; nikoli se ne spremenijo v
+-- cekine. Baza jih izračuna iz vadbe Do 20 (nič se ne pošilja "+5"):
+--   na dan: 1 za vsakih 10 pravilnih na tipkovnici (do20_facts),
+--           1 za vsakih 20 pravilnih v kvizu (do20_stats minus tipkovnica),
+--           +5, če je bilo tisti dan vsaj 10 pravilnih (dan vadbe),
+--           skupaj največ 20 na dan — nagrajuje vračanje, ne garanja.
+-- Stanje = vsi zasluženi − cene kupljenega. Kupljeno ostane za vedno in
+-- ga lahko nosi vsak ljubljenček (tudi iz prejšnjih sezon).
+create or replace function public._pet_treats_by_day(p_student uuid)
+returns table(day date, treats int)
+language sql stable security definer set search_path = public as $$
+  select d.day,
+         least(20, (coalesce(k.c, 0) / 10) + (greatest(d.c - coalesce(k.c, 0), 0) / 20)
+                   + case when d.c >= 10 then 5 else 0 end)::int
+    from (select day, sum(correct)::int c from do20_stats
+           where student_id = p_student group by day) d
+    left join (select day, sum(correct)::int c from do20_facts
+                where student_id = p_student group by day) k using (day);
+$$;
+
+create table if not exists pet_shop (
+  id     text     primary key,
+  slot   text     not null check (slot in ('glava', 'vrat', 'obraz')),
+  price  int      not null check (price > 0),
+  season smallint not null default 1
+);
+alter table pet_shop enable row level security;
+-- Risbe so v pet-art.js (ACC) — imena morajo biti enaka.
+insert into pet_shop (id, slot, price) values
+  ('pentlja',   'glava', 15), ('rozica', 'glava', 20), ('kapa', 'glava', 35), ('cilinder', 'glava', 50),
+  ('ovratnica', 'vrat',  15), ('sal',    'vrat',  25), ('metuljcek', 'vrat', 30),
+  ('ocala',     'obraz', 30), ('soncna', 'obraz', 45)
+on conflict (id) do update set slot = excluded.slot, price = excluded.price;
+
+create table if not exists pet_items (
+  student_id uuid not null references students(id) on delete cascade,
+  item_id    text not null references pet_shop(id),
+  price      int  not null,            -- cena ob nakupu (če se cena kasneje spremeni)
+  bought_at  timestamptz not null default now(),
+  primary key (student_id, item_id)
+);
+alter table pet_items enable row level security;
+
+create or replace function public._pet_balance(p_student uuid)
+returns int language sql stable security definer set search_path = public as $$
+  select (coalesce((select sum(treats) from _pet_treats_by_day(p_student)), 0)
+        - coalesce((select sum(price) from pet_items where student_id = p_student), 0))::int;
+$$;
+
+-- Kateri ljubljenček (iz katere sezone) spremlja lik. Brez vrstice = nobeden;
+-- takrat ostane spremljevalec iz trgovine lika (sova, mucek …).
+create table if not exists pet_companion (
+  student_id uuid     primary key references students(id) on delete cascade,
+  season     smallint not null
+);
+alter table pet_companion enable row level security;
+
+-- Ljubljenček ene sezone, s stopnjo, ki jo je v tisti sezoni dosegel.
+create or replace function public._pet_json(p_student uuid, p_season smallint)
+returns json language sql stable security definer set search_path = public as $$
+  select json_build_object(
+           'season', p.season, 'season_name', se.name,
+           'species', p.species, 'name', p.name, 'body', p.body, 'belly', p.belly,
+           'eyes', p.eyes, 'pattern', p.pattern, 'equip', p.equip,
+           'stage', _pet_stage(_pet_count(p_student, coalesce(se.starts, _album_today()),
+                                          least(se.ends, _album_today()))))
+    from student_pets p join seasons se on se.id = p.season
+   where p.student_id = p_student and p.season = p_season;
 $$;
 
 -- Vse, kar potrebuje stran ljubljenčka.
@@ -231,8 +307,16 @@ begin
     'stage', _pet_stage(coalesce(v_count, 0)),
     'unlocks', to_json(_pet_unlocks()),
     'pet', (select json_build_object('species', species, 'name', name, 'body', body, 'belly', belly,
-                                     'eyes', eyes, 'pattern', pattern)
+                                     'eyes', eyes, 'pattern', pattern, 'equip', equip)
               from student_pets where student_id = p_student and season = s.id),
+    'treats', json_build_object(
+       'balance', _pet_balance(p_student),
+       'today', coalesce((select treats from _pet_treats_by_day(p_student) where day = v_to), 0),
+       'cap', 20),
+    'shop', coalesce((select json_agg(json_build_object('id', id, 'slot', slot, 'price', price) order by slot, price)
+                        from pet_shop where season <= coalesce(s.id, 1)), '[]'::json),
+    'owned', coalesce((select json_agg(item_id) from pet_items where student_id = p_student), '[]'::json),
+    'companion', (select _pet_json(p_student, c.season) from pet_companion c where c.student_id = p_student),
     'milestones', case when s.id is null then '[]'::json else (
        select json_agg(json_build_object(
                 'g', g, 'op', o,
@@ -245,11 +329,7 @@ begin
               lateral _pet_progress(p_student, g, o, s.starts, v_to) pr) end,
     -- zbirka: ljubljenčki preteklih sezon, s stopnjo, ki so jo dosegli
     'collection', coalesce((
-       select json_agg(json_build_object(
-                'season', p.season, 'season_name', se.name,
-                'species', p.species, 'name', p.name, 'body', p.body, 'belly', p.belly,
-                'eyes', p.eyes, 'pattern', p.pattern,
-                'stage', _pet_stage(_pet_count(p_student, se.starts, least(se.ends, v_to)))) order by p.season)
+       select json_agg(_pet_json(p_student, p.season) order by p.season)
          from student_pets p join seasons se on se.id = p.season
         where p.student_id = p_student and p.season is distinct from s.id
           and se.starts is not null), '[]'::json)
@@ -296,9 +376,71 @@ begin
   return pet_state(p_student);
 end; $$;
 
+-- Nakup v trgovini. Vrne pet_state ali {"error": ...}.
+create or replace function public.pet_buy(p_student uuid, p_item text)
+returns json language plpgsql security definer set search_path = public as $$
+declare v_price int;
+begin
+  if not exists (select 1 from students where id = p_student) then return null; end if;
+  if not _pet_visible(p_student) then return json_build_object('error', 'ZAPRTO'); end if;
+  perform pg_advisory_xact_lock(hashtext('pet:' || p_student::text));
+  select price into v_price from pet_shop where id = p_item;
+  if v_price is null then return json_build_object('error', 'NI_PREDMETA'); end if;
+  if exists (select 1 from pet_items where student_id = p_student and item_id = p_item) then
+    return json_build_object('error', 'ZE_IMAS');
+  end if;
+  if _pet_balance(p_student) < v_price then return json_build_object('error', 'PREMALO'); end if;
+  insert into pet_items (student_id, item_id, price) values (p_student, p_item, v_price);
+  return pet_state(p_student);
+end; $$;
+
+-- Obleci (p_item) ali sleci (p_item null) predmet ljubljenčku te sezone.
+create or replace function public.pet_equip(p_student uuid, p_slot text, p_item text)
+returns json language plpgsql security definer set search_path = public as $$
+declare s seasons;
+begin
+  if not exists (select 1 from students where id = p_student) then return null; end if;
+  if not _pet_visible(p_student) then return json_build_object('error', 'ZAPRTO'); end if;
+  if p_slot not in ('glava', 'vrat', 'obraz') then return json_build_object('error', 'REZA'); end if;
+  s := _album_season_for(p_student);
+  if s.id is null then return json_build_object('error', 'NI_SEZONE'); end if;
+  if nullif(p_item, '') is not null and not exists (
+       select 1 from pet_items i join pet_shop sh on sh.id = i.item_id
+        where i.student_id = p_student and i.item_id = p_item and sh.slot = p_slot) then
+    return json_build_object('error', 'NI_TVOJE');
+  end if;
+  update student_pets
+     set equip = case when nullif(p_item, '') is null then equip - p_slot
+                      else equip || jsonb_build_object(p_slot, p_item) end,
+         updated_at = now()
+   where student_id = p_student and season = s.id;
+  if not found then return json_build_object('error', 'NI_LJUBLJENCKA'); end if;
+  return pet_state(p_student);
+end; $$;
+
+-- Ljubljenček (iz te ali prejšnje sezone) gre z likom; null = nobeden.
+-- Jajce ne more iti: najprej se mora izvaliti.
+create or replace function public.pet_set_companion(p_student uuid, p_season smallint)
+returns json language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (select 1 from students where id = p_student) then return null; end if;
+  if not _pet_visible(p_student) then return json_build_object('error', 'ZAPRTO'); end if;
+  if p_season is null then
+    delete from pet_companion where student_id = p_student;
+    return pet_state(p_student);
+  end if;
+  if coalesce(_pet_json(p_student, p_season)->>'stage', 'jajce') = 'jajce' then
+    return json_build_object('error', 'JAJCE');
+  end if;
+  insert into pet_companion (student_id, season) values (p_student, p_season)
+  on conflict (student_id) do update set season = excluded.season;
+  return pet_state(p_student);
+end; $$;
+
 -- ── 4. Združevanje računov učencev ────────────────────────────────────────
--- Ista funkcija kot v supabase_do20.sql, z dodanima blokoma za do20_facts
--- in student_pets. Ta datoteka je zdaj zadnja različica.
+-- Ista funkcija kot v supabase_do20.sql, z dodanimi bloki za do20_facts,
+-- student_pets, pet_testers, pet_items in pet_companion. Ta datoteka je
+-- zdaj zadnja različica.
 create or replace function public.merge_students(
   p_teacher_id uuid, p_from text, p_into text)
 returns text
@@ -405,6 +547,13 @@ begin
     on conflict (student_id, season) do nothing;
     delete from student_pets where student_id = v_from;
     insert into pet_testers (student_id) select v_into from pet_testers where student_id = v_from
+    on conflict do nothing;
+    -- kupljeno ostane (cilj ohrani svoje, če ima isti predmet); spremljevalec ciljnega računa ostane
+    insert into pet_items (student_id, item_id, price, bought_at)
+    select v_into, item_id, price, bought_at from pet_items where student_id = v_from
+    on conflict do nothing;
+    insert into pet_companion (student_id, season)
+    select v_into, season from pet_companion where student_id = v_from
     on conflict do nothing;
 
     -- Ime in razred: če jih ciljni račun nima, jih vzemi od starega

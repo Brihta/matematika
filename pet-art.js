@@ -174,6 +174,55 @@
     }
   };
 
+  /* ── oprema iz trgovine (supabase_ljubljencek.sql, pet_shop) ──
+     Reže: glava (na vrhu glave), obraz (čez oči), vrat (pod brado).
+     Glava in obraz se rišeta v skupini glave, zato se z njo povečata. */
+  const ACC = {
+    pentlja:   { slot: 'glava', name: 'Pentljica' },
+    rozica:    { slot: 'glava', name: 'Rožica' },
+    kapa:      { slot: 'glava', name: 'Kapa' },
+    cilinder:  { slot: 'glava', name: 'Cilinder' },
+    ovratnica: { slot: 'vrat',  name: 'Ovratnica' },
+    sal:       { slot: 'vrat',  name: 'Šal' },
+    metuljcek: { slot: 'vrat',  name: 'Metuljček' },
+    ocala:     { slot: 'obraz', name: 'Očala' },
+    soncna:    { slot: 'obraz', name: 'Sončna očala' }
+  };
+  const SLOT_NAME = { glava: 'Na glavo', vrat: 'Okoli vratu', obraz: 'Na oči' };
+  function accHead(id) {
+    if (id === 'pentlja') return shape('M124 40 L108 30 L110 50 Z', '#e86a8a', '', 3) + shape('M124 40 L140 30 L138 50 Z', '#e86a8a', '', 3)
+      + `<circle cx="124" cy="40" r="5" fill="#f59ab0" stroke="${OL}" stroke-width="2.5"/>`;
+    if (id === 'rozica') return [0, 72, 144, 216, 288].map(a => {
+        const r = a * Math.PI / 180, x = 74 + 8 * Math.cos(r), y = 38 + 8 * Math.sin(r);
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6.5" fill="#fff4f8" stroke="${OL}" stroke-width="2.2"/>`;
+      }).join('') + `<circle cx="74" cy="38" r="5" fill="#f2c94a" stroke="${OL}" stroke-width="2.2"/>`;
+    if (id === 'kapa') return shape('M58 60 C58 26 142 26 142 60 C120 52 80 52 58 60 Z', '#4f86c6',
+        `<path d="M50 44 L150 44 L150 50 L50 50 Z" fill="#fdfcf3" opacity=".8"/><path d="M50 32 L150 32 L150 37 L50 37 Z" fill="#fdfcf3" opacity=".8"/>`, 3.5)
+      + shape('M56 62 C80 52 120 52 144 62 L144 70 C120 60 80 60 56 70 Z', '#3b6aa3', '', 3)
+      + `<circle cx="100" cy="24" r="8" fill="#fdfcf3" stroke="${OL}" stroke-width="3"/>`;
+    if (id === 'cilinder') return `<g transform="rotate(-8 100 40)">`
+      + shape('M80 40 L84 6 L116 6 L120 40 Z', '#2f2a36', `<path d="M80 30 L120 30 L120 36 L80 36 Z" fill="#c0392b"/>`, 3.5)
+      + shape('M68 40 C80 34 120 34 132 40 C120 46 80 46 68 40 Z', '#2f2a36', '', 3.5) + `</g>`;
+    return '';
+  }
+  function accFace(id, y, r) {
+    if (id !== 'ocala' && id !== 'soncna') return '';
+    const R = r + 4, fill = id === 'soncna' ? '#2b2530' : 'rgba(255,255,255,.15)', op = id === 'soncna' ? .92 : 1;
+    return [84, 116].map(x => `<circle cx="${x}" cy="${y}" r="${R}" fill="${fill}" opacity="${op}" stroke="${OL}" stroke-width="3.2"/>`).join('')
+      + (id === 'soncna' ? [84, 116].map(x => `<path d="M${x - 7} ${y - 5} L${x - 2} ${y - 9}" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>`).join('') : '')
+      + line(`M${84 + R} ${y} Q100 ${y - 6} ${116 - R} ${y}`, 3);
+  }
+  function accNeck(id) {
+    if (id === 'ovratnica') return shape('M70 116 C86 126 114 126 130 116 L130 124 C114 134 86 134 70 124 Z', '#c0392b', '', 3)
+      + `<circle cx="100" cy="134" r="6" fill="#f2c94a" stroke="${OL}" stroke-width="2.5"/>`;
+    if (id === 'sal') return shape('M66 114 C86 128 114 128 134 114 L136 126 C114 140 86 140 64 126 Z', '#e0874a',
+        `<path d="M60 118 L140 118 L140 122 L60 122 Z" fill="#fdfcf3" opacity=".7"/>`, 3)
+      + shape('M114 128 L126 128 L130 160 L116 160 Z', '#e0874a', `<path d="M110 146 L134 146 L134 150 L110 150 Z" fill="#fdfcf3" opacity=".7"/>`, 3);
+    if (id === 'metuljcek') return shape('M100 124 L82 114 L82 134 Z', '#6a4fc0', '', 3) + shape('M100 124 L118 114 L118 134 Z', '#6a4fc0', '', 3)
+      + `<circle cx="100" cy="124" r="5" fill="#8a6fe0" stroke="${OL}" stroke-width="2.5"/>`;
+    return '';
+  }
+
   /* Odrasla žival; head = koliko večja je glava (mladiči imajo večjo). */
   function creature(pet, head) {
     const c = (BODY[pet.body] || BODY.gozd).c, b = (BELLY[pet.belly] || BELLY.krema).c;
@@ -193,11 +242,13 @@
       + `<path d="M50 104 C80 122 120 122 150 104 L150 130 L50 130 Z" fill="${D}" opacity=".45"/>`
       + `<ellipse cx="80" cy="46" rx="14" ry="7" fill="${L}" opacity=".7" transform="rotate(-20 80 46)"/>`);
     const cheeks = `<ellipse cx="72" cy="94" rx="7" ry="4.5" fill="#f08aa0" opacity=".55"/><ellipse cx="128" cy="94" rx="7" ry="4.5" fill="#f08aa0" opacity=".55"/>`;
-    const eyeY = pet.species === 'sova' ? 78 : 74;
-    const headAll = sp.front + headS + cheeks + sp.face + eyes(pet.eyes, 84, 116, eyeY, pet.species === 'sova' ? 11 : 10);
+    const eyeY = pet.species === 'sova' ? 78 : 74, eyeR = pet.species === 'sova' ? 11 : 10;
+    const eq = pet.equip || {};
+    const headAll = sp.front + headS + cheeks + sp.face + eyes(pet.eyes, 84, 116, eyeY, eyeR)
+      + accFace(eq.obraz, eyeY, eyeR) + accHead(eq.glava);
     // glavo povečamo okoli vratu (100, 112)
     const k = head || 1;
-    return sp.back + body + feet
+    return sp.back + body + feet + accNeck(eq.vrat)
       + `<g transform="translate(100 112) scale(${k}) translate(-100 -112)">${headAll}</g>`;
   }
 
@@ -232,10 +283,13 @@
     else {
       if (stage === 'koncna') s = `<circle cx="100" cy="110" r="88" fill="#dde236" opacity=".22"/><circle cx="100" cy="110" r="70" fill="#dde236" opacity=".18"/>` + s;
       s += creature(pet, 1);
-      if (stage === 'koncna') s += crown() + sparkle(30, 60, 9) + sparkle(172, 48, 7) + sparkle(168, 140, 8) + sparkle(28, 150, 6);
+      if (stage === 'koncna') s += (pet.equip && pet.equip.glava ? '' : crown())
+        + sparkle(30, 60, 9) + sparkle(172, 48, 7) + sparkle(168, 140, 8) + sparkle(28, 150, 6);
     }
+    /* inner: samo vsebina, za vgradnjo v drugo risbo (spremljevalec ob liku) */
+    if (o.inner) return s;
     return `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" class="pa-svg">${s}</svg>`;
   }
 
-  window.PetArt = { draw, SPECIES, BODY, BELLY, EYES, PATTERN, FREE, UNLOCKS, STAGES, stageOf, allowed, unlockAt };
+  window.PetArt = { draw, SPECIES, BODY, BELLY, EYES, PATTERN, FREE, UNLOCKS, STAGES, ACC, SLOT_NAME, stageOf, allowed, unlockAt };
 })();

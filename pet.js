@@ -84,7 +84,12 @@
   };
 
   /* ljubljencek.html pokliče ob vsakem novem stanju iz baze. */
-  window.petChanged = function (st) { apply(st, false); };
+  window.petChanged = function (st) {
+    apply(st, false);
+    // lik v albumu (lik.html) naj takoj pokaže novega spremljevalca
+    const lik = document.querySelector('#alFrameBox iframe');
+    try { if (lik && lik.contentWindow.petCompanion) lik.contentWindow.petCompanion(st && st.companion); } catch (e) {}
+  };
 
   function apply(st, announce) {
     const prev = state;

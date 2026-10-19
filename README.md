@@ -68,8 +68,16 @@ Zahteva `supabase_ljubljencek.sql` (za `supabase_do20.sql` in
 `pet_testers`. Računi se medtem beležijo za vse, zato ob odprtju mejniki
 štejejo vso vadbo sezone. Ukazi (dodaj preizkuševalca, odpri za vse) so na
 vrhu `supabase_ljubljencek.sql`; za vse ga odpreš z
-`update pet_config set open = true;`. Še ni: priboljški in trgovina za ljubljenčka,
-ljubljenček kot spremljevalec ob liku.
+`update pet_config set open = true;`.
+
+- **Priboljški 🍎** — valuta samo za ljubljenčka, nikoli cekini. Baza jih
+  izračuna iz vadbe Do 20: na dan 1 za vsakih 10 pravilnih na tipkovnici,
+  1 za vsakih 20 v kvizu, +5 za dan vadbe (vsaj 10 pravilnih), največ 20.
+- **Trgovina** — 9 predmetov (na glavo, okoli vratu, na oči) za 15–50
+  priboljškov. Kupljeno ostane za vedno, nosi ga lahko vsak ljubljenček.
+- **Spremljevalec** — izvaljenega ljubljenčka (tudi iz prejšnjih sezon)
+  učenec "vzame s seboj": stoji ob liku namesto spremljevalca iz trgovine
+  lika. Nakup ali izbira spremljevalca v trgovini lika ga spet zamenja.
 
 ### Parametri
 
