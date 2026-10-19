@@ -28,6 +28,13 @@
       </button>
 
       <div class="topbar-ctrls" id="topbarCtrls">
+        <div class="ctrl-block" id="subjectBlock">
+          <div class="ctrl-label">Vadim</div>
+          <div class="btn-group" id="subjectBtnGroup">
+            <button class="seg-btn active" data-subject="post">Poštevanka</button>
+            <button class="seg-btn" data-subject="do20">Do 20</button>
+          </div>
+        </div>
         <div class="ctrl-block" id="modeBlock">
           <div class="ctrl-label">Način</div>
           <div class="btn-group" id="modeBtnGroup">
@@ -53,7 +60,7 @@
       <div class="toolbar-controls">
         <div class="ctrl-block tables-block">
           <div class="ctrl-label-row">
-            <span class="ctrl-label">Poštevanke</span>
+            <span class="ctrl-label" id="pickLabel">Poštevanke</span>
             <div class="quick-group">
               <button class="quick-btn" id="selAll">Vse</button>
               <button class="quick-btn" id="selNone">Nič</button>
@@ -70,6 +77,14 @@
             <button class="table-btn active" data-n="8">8</button>
             <button class="table-btn active" data-n="9">9</button>
             <button class="table-btn active" data-n="10">10</button>
+          </div>
+          <!-- Računi do 20: namesto poštevank koraki, kot jih uvaja pouk -->
+          <div class="filter-row group-row" id="groupRow" style="display:none">
+            <button class="group-btn active" data-g="d10">Do 10<small>4 + 3</small></button>
+            <button class="group-btn active" data-g="p10">Prijatelji 10<small>7 + 3</small></button>
+            <button class="group-btn active" data-g="dv">Dvojčki<small>6 + 6</small></button>
+            <button class="group-btn active" data-g="b20">Do 20<small>13 + 4</small></button>
+            <button class="group-btn active" data-g="pr">Čez 10<small>8 + 5</small></button>
           </div>
         </div>
       </div>
@@ -152,5 +167,7 @@
 <script src="script.js"></script>
 <script src="battle.js"></script>
 <script src="album.js"></script>
+<script src="pet-art.js"></script>
+<script src="pet.js"></script>
 </body>
 </html>

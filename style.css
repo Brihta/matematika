@@ -1808,3 +1808,193 @@ body.bitka .comp-board-row.me {
   .hall-record-score { font-size: 2.4rem; }
   .hall-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
 }
+
+/* ══════════════════════════
+   DO 20 — seštevanje in odštevanje
+══════════════════════════ */
+/* Skupine imajo besedilo, ne številke, zato jih je pet v vrsti in vsaka
+   pokaže primer računa — tretješolec ne ve, kaj je "Čez 10", 8 + 5 pa pozna. */
+.group-row { grid-template-columns: repeat(5, 1fr); }
+.group-btn {
+  background: rgba(0,0,0,0.25); color: #777;
+  border: 1px solid transparent; border-radius: 8px;
+  padding: 6px 2px; font-size: .82rem; font-weight: 700; line-height: 1.15;
+  font-family: inherit; cursor: pointer; transition: all .12s;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.group-btn small { font-size: .7rem; font-weight: 600; opacity: .75; }
+.group-btn:hover:not(.active) { background: rgba(255,255,255,0.08); color: #ccc; }
+.group-btn.active {
+  background: #f0a500; color: #000; border-color: #ffc300;
+  box-shadow: 0 1px 4px rgba(240,165,0,0.35);
+}
+@media (max-width: 420px) {
+  .group-row { grid-template-columns: repeat(5, 1fr); }
+  .group-btn { font-size: .66rem; }
+  .group-btn small { font-size: .62rem; }
+}
+@media (min-width: 900px) {
+  .group-row { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .group-btn { font-size: .95rem; padding: 7px 4px; }
+}
+/* Tekmovanje in bitka pri Do 20 ne obstajata */
+#modeBtnGroup .seg-btn.mode-off { opacity: .3; }
+/* Pod 900 px "Vadim" dobi svojo vrsto, način in vrsta računa ostaneta skupaj */
+@media (max-width: 899px) {
+  .topbar-ctrls { flex-wrap: wrap; }
+  #subjectBlock { flex-basis: 100%; }
+}
+.ptable-grp { font-size: .85rem; min-width: 96px; text-align: left; }
+/* pregled razreda: skupine imajo daljše glave kot številke poštevank */
+.td-th-grp { font-size: 0.66rem; white-space: nowrap; }
+.td-cell-grp { width: 62px; min-width: 62px; }
+@media (min-width: 1200px) {
+  .td-cell-grp { width: 104px; min-width: 104px; }
+  .td-th-grp { font-size: 0.85rem; }
+}
+/* Z dodanim "Vadim" zgornja vrstica med 900 in 1200 px ne gre več v eno
+   vrsto (na 1024 px je segla 67 px čez rob). Načini tam ostanejo samo z
+   ikonami, kot so že pod 900 px. */
+@media (min-width: 900px) and (max-width: 1199px) {
+  #modeBtnGroup .seg-label { display: none; }
+  #modeBtnGroup .seg-btn { font-size: 1.1rem; padding: 7px 12px; }
+}
+
+/* ══════════════════════════
+   🌿 DO 20 — svetla naravna tema
+   Ob Do 20 se prebarva cela stran, da je takoj jasno, kaj se vadi:
+   temno modra z oranžno = poštevanka, svetla zelena = računi do 20.
+
+   Paleta po Ninovi predlogi (vrt, sveža zelenjava): kremasta, peščena,
+   rumeno-zelena, listno zelena in temno gozdna. Temne zelene različice
+   (mentolna, žadasta, gozdna, #65c936) niso delovale — ta je svetla, tekst
+   je temno gozdni, zelena pa je le na gumbih in poudarkih.
+   Kontrast: gozdni tekst na kremasti ~15 : 1, na listno zeleni ~8 : 1.
+══════════════════════════ */
+body.do20 {
+  --g-cream:   #fdfcf3;
+  --g-sand:    #f6e5cd;
+  --g-sand-2:  #ecd9bc;
+  --g-lime:    #dde236;
+  --g-leaf:    #9ac334;
+  --g-leaf-2:  #7fa82a;
+  --g-forest:  #05270b;
+  --g-muted:   #5d6b52;
+  --g-grad:    linear-gradient(135deg, #a9cf45, #8ab52c);
+  --g-glow:    rgba(122,160,40,0.30);
+  color: var(--g-forest);
+  background:
+    radial-gradient(1000px 500px at 50% -10%, rgba(221,226,54,0.16), transparent 65%),
+    var(--g-cream);
+}
+
+/* zgornja plošča in rezultat */
+body.do20 .toolbar {
+  background: #fffef8;
+  box-shadow: 0 2px 14px rgba(5,39,11,0.08), inset 0 0 0 1px var(--g-sand-2);
+}
+body.do20 .score-hud {
+  background: var(--g-sand);
+  box-shadow: inset 0 0 0 1px var(--g-sand-2);
+}
+body.do20 .brand { color: var(--g-forest); }
+body.do20 .ctrl-label { color: var(--g-muted); }
+body.do20 .score-lbl { color: var(--g-muted); }
+body.do20 .score-correct .score-val { color: #4f7f15; }
+body.do20 .score-wrong .score-val { color: #c2392b; }
+body.do20 .score-pct .score-val,
+body.do20 .hud-medal-name { color: var(--g-forest); }
+body.do20 .score-sep { background: rgba(5,39,11,0.12); }
+body.do20 .profile-btn,
+body.do20 .summary-chip {
+  background: var(--g-cream); color: var(--g-forest);
+  border-color: var(--g-sand-2);
+}
+body.do20 .summary-chip:hover,
+body.do20 .profile-btn:hover { background: #fff; border-color: var(--g-leaf); }
+body.do20 .summary-chip.is-open {
+  background: rgba(154,195,52,0.18); border-color: var(--g-leaf); color: var(--g-forest);
+}
+body.do20 .quick-btn { color: var(--g-muted); border-color: var(--g-sand-2); }
+body.do20 .quick-btn:hover { background: var(--g-sand); color: var(--g-forest); }
+
+/* gumbi v nastavitvah */
+body.do20 .btn-group { background: var(--g-sand); }
+body.do20 .seg-btn { color: var(--g-muted); }
+body.do20 .seg-btn:hover:not(.active) { background: rgba(5,39,11,0.06); color: var(--g-forest); }
+body.do20 .group-btn:not(.active) {
+  background: var(--g-cream); color: var(--g-muted); border-color: var(--g-sand-2);
+}
+body.do20 .group-btn:hover:not(.active) { background: #fff; color: var(--g-forest); border-color: var(--g-leaf); }
+body.do20 .seg-btn.active,
+body.do20 .group-btn.active {
+  background: var(--g-grad);
+  color: var(--g-forest); font-weight: 800;
+  border-color: transparent;
+  box-shadow: 0 4px 14px var(--g-glow);
+}
+
+/* račun: temno gozdna kartica, da pogled pade nanjo */
+body.do20 .quiz-question {
+  background: linear-gradient(135deg, #0d3a14, var(--g-forest));
+  color: var(--g-cream);
+  border-color: var(--g-leaf);
+  box-shadow: 0 10px 30px rgba(5,39,11,0.22);
+}
+
+/* odgovori in tipkovnica */
+body.do20 .quiz-opt-btn,
+body.do20 .keypad-btn:not(.keypad-back):not(.keypad-ok) {
+  background: #fffef8; color: var(--g-forest);
+  border-color: var(--g-sand-2);
+  box-shadow: 0 3px 10px rgba(5,39,11,0.06);
+}
+body.do20 .quiz-opt-btn { border-radius: 16px; }
+body.do20 .quiz-opt-btn:hover:not(:disabled),
+body.do20 .keypad-btn:not(.keypad-back):not(.keypad-ok):hover:not(:disabled) {
+  background: #f7fae8; border-color: var(--g-leaf);
+  box-shadow: 0 6px 16px var(--g-glow);
+}
+body.do20 .quiz-opt-btn.correct {
+  background: var(--g-grad) !important; border-color: var(--g-leaf-2) !important;
+  color: var(--g-forest);
+  box-shadow: 0 0 0 3px rgba(154,195,52,0.30), 0 6px 18px var(--g-glow);
+}
+body.do20 .quiz-opt-btn.wrong {
+  background: #fde4df !important; border-color: #d9584a !important; color: #8b1d15;
+}
+body.do20 .keypad-display {
+  background: #fffef8; color: var(--g-forest); border-color: var(--g-sand-2);
+}
+body.do20 .keypad-display:not(.correct):not(.wrong) { border-color: var(--g-leaf); }
+body.do20 .keypad-display.correct { background: #eef6d6; border-color: var(--g-leaf-2); color: var(--g-forest); }
+body.do20 .keypad-display.wrong { background: #fde4df; border-color: #d9584a; }
+body.do20 .keypad-display-correct { color: #4f7f15; }
+body.do20 .keypad-strike { color: #c2392b; }
+body.do20 .keypad-display-arrow { color: var(--g-muted); }
+body.do20 .keypad-back {
+  background: #fbe9e4 !important; border-color: #efc4ba !important; color: #b5382b !important;
+}
+body.do20 .keypad-back:hover:not(:disabled) { background: #f8d9d1 !important; border-color: #d9584a !important; }
+/* potrdi: rumeno-zelena, najsvetlejši poudarek palete */
+body.do20 .keypad-ok {
+  background: linear-gradient(135deg, var(--g-lime), var(--g-leaf)) !important;
+  border-color: transparent !important;
+  color: var(--g-forest) !important; font-weight: 900;
+  box-shadow: 0 5px 18px var(--g-glow);
+}
+body.do20 .keypad-ok:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--g-lime), var(--g-leaf)) !important;
+  box-shadow: 0 8px 24px var(--g-glow);
+}
+body.do20 .quiz-advance-bar-wrap { background: var(--g-sand); }
+body.do20 .quiz-advance-bar { background: linear-gradient(90deg, var(--g-lime), var(--g-leaf)); }
+body.do20 .streak-badge, body.do20 .streak-hud {
+  background: rgba(221,226,54,0.35); border-color: var(--g-leaf); color: var(--g-forest);
+}
+body.do20 .quiz-empty { color: var(--g-muted); }
+body.do20 .keyboard-hint { color: var(--g-muted); }
+/* barvo naslednje medalje nastavi JS (svetla siva, srebrna …) — na peščeni
+   podlagi je ne bi bilo videti */
+body.do20 .hud-medal-next { color: var(--g-muted) !important; }

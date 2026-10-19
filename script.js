@@ -167,6 +167,26 @@ let opType   = 'both';
 let tables   = new Set([1,2,3,4,5,6,7,8,9,10]);
 let cards    = [];
 
+/* Kaj se vadi: poštevanka ali seštevanje in odštevanje do 20.
+   Pri Do 20 ostaneta isti dve vrsti računa (opType), le gumba sta druga:
+   'multiply' je tam +, 'divide' je −. Tako vse, kar že dela z opType
+   (kviz, tipkovnica, prednastavitve), dela tudi za Do 20. */
+let subject  = 'post';
+/* Računi do 20 so razdeljeni po korakih, kot jih uvaja pouk v 1. in 2.
+   razredu, ne po številih: učiteljica vklopi samo tisto, kar so že jemali.
+   Vsak račun je v natanko eni skupini (do20Group), sicer statistika ne bi
+   povedala, kje otrok res še računa na prste. */
+const DO20_GROUPS = [
+  { key: 'd10', label: 'Do 10',         short: 'Do 10'   },
+  { key: 'p10', label: 'Prijatelji 10', short: 'Prij. 10' },
+  { key: 'dv',  label: 'Dvojčki',       short: 'Dvojčki' },
+  { key: 'b20', label: 'Do 20',         short: 'Do 20'   },
+  { key: 'pr',  label: 'Čez 10',        short: 'Čez 10'  }
+];
+const DO20_KEYS = DO20_GROUPS.map(g => g.key);
+let groups   = new Set(DO20_KEYS);
+const MINUS  = '−';   // pravi minus, ne vezaj: na tabli in v zvezku je tak
+
 let qQueue = [], qIdx = 0, qOk = 0, qNo = 0, qStreak = 0, qTimer = null;
 
 let kQueue = [], kIdx = 0, kOk = 0, kNo = 0, kStreak = 0;
@@ -197,6 +217,8 @@ let pendingAnswerCount = 0;
 let lastAnswerTs = 0;               // for estimating practice time in quiz/keypad
 let pendingSpeed = {};              // { "t_op": {t,op,n,f} } — see FAST_SECONDS
 let pendingFacts = {};              // { "t_op_k": {t,op,k,c,w,n,f} } — supabase_racuni.sql
+let pendingDo20 = {};               // { "g_op": {g,op,c,w,n,f} } — supabase_do20.sql
+let pendingDo20Facts = {};          // { "g_op_x_y": {g,op,x,y,c,w,n,f} } — supabase_ljubljencek.sql
 let questionShownTs = 0;            // when the current question appeared
 
 /* Hitrost: cilj poštevanke je priklic na pamet, ne računanje na prste.
@@ -248,6 +270,9 @@ function saveSettings() {
      p    1-10, comma separated, or "vse"   (poštevanke)
      op   x | d | both                       (vrsta računa)
      mode kviz | tipkovnica | tekmovanje | bitka
+     v    do20 | postevanka                  (kaj se vadi)
+     g    d10,p10,dv,b20,pr ali "vse"        (skupine računov do 20)
+   Pri Do 20 je op p (+), m (−) ali both.
    Applied after the saved settings, so a link always wins, and saved so the
    choice survives a refresh without the query string. */
 function applyPresetFromURL() {
@@ -265,8 +290,21 @@ function applyPresetFromURL() {
   const o = (q.get('op') || '').toLowerCase();
   const opMap = { x:'multiply', mult:'multiply', multiply:'multiply', krat:'multiply',
                   d:'divide', div:'divide', divide:'divide', deljenje:'divide',
-                  both:'both', xd:'both', obe:'both' };
+                  both:'both', xd:'both', obe:'both',
+                  // Do 20: + in − sta prvi in drugi gumb, kot × in ÷
+                  p:'multiply', plus:'multiply', m:'divide', minus:'divide', pm:'both' };
   if (opMap[o]) { opType = opMap[o]; touched = true; }
+
+  const v = (q.get('v') || '').toLowerCase();
+  const graw = (q.get('g') || '').toLowerCase();
+  if (['do20', '20', 'sestevanje'].includes(v) || graw) { subject = 'do20'; touched = true; }
+  else if (['postevanka', 'post', 'x'].includes(v))      { subject = 'post'; touched = true; }
+  if (graw === 'vse' || graw === 'all') {
+    groups = new Set(DO20_KEYS);
+  } else if (graw) {
+    const arr = graw.split(',').map(x => x.trim()).filter(x => DO20_KEYS.includes(x));
+    if (arr.length) groups = new Set(arr);
+  }
 
   const praw = (q.get('p') || q.get('t') || '').toLowerCase();
   if (praw === 'vse' || praw === 'all') {
@@ -276,15 +314,18 @@ function applyPresetFromURL() {
       .map(x => parseInt(x.trim(), 10))
       .filter(n => Number.isInteger(n) && n >= 1 && n <= 10);
     if (arr.length) { tables = new Set(arr); touched = true; }
+    subject = 'post';
   }
   /* Asking for particular tables only makes sense in a practice mode —
      tekmovanje and bitka always use the full deck. Without this, a child
      whose last session ended there opens the teacher's link and sees the
      preset silently ignored. */
-  const askedForContent = praw || opMap[o];
+  const askedForContent = praw || opMap[o] || graw || v;
   if (askedForContent && !modeMap[m] && (mode === 'tekmovanje' || mode === 'bitka')) {
     mode = 'quiz'; touched = true;
   }
+  // tekmovanje in bitka sta samo za poštevanko
+  if (subject === 'do20' && (mode === 'tekmovanje' || mode === 'bitka')) mode = 'quiz';
   if (touched) saveSettings();
   return touched;
 }
@@ -354,8 +395,51 @@ function parseQuestion(q) {
     const p = q.replace(/\s*=\s*$/, '').split(':').map(s => parseInt(s.trim()));
     return { op:'divide', a:p[0], b:p[1] };
   }
+  if (q.includes('+')) {
+    const p = q.replace(/\s*=\s*$/, '').split('+').map(s => parseInt(s.trim()));
+    return { op:'add', a:p[0], b:p[1] };
+  }
+  if (q.includes(MINUS)) {
+    const p = q.replace(/\s*=\s*$/, '').split(MINUS).map(s => parseInt(s.trim()));
+    return { op:'sub', a:p[0], b:p[1] };
+  }
   return null;
 }
+
+/* Skupina računa x + y (odštevanje s − y = x spada k x + y). Vrstni red
+   preverjanja je pomemben: 5 + 5 je prijatelj števila 10, ne dvojček, in
+   6 + 6 je dvojček, čeprav gre čez desetico. null = račun ni v nobeni
+   skupini (npr. 14 + 7, ki gre čez 20). */
+function do20Group(x, y) {
+  const s = x + y;
+  if (x < 1 || y < 1 || s > 20) return null;
+  if (s === 10 && x <= 9 && y <= 9) return 'p10';
+  if (x === y && x <= 10) return 'dv';
+  if (s < 10) return 'd10';
+  const big = Math.max(x, y), small = Math.min(x, y);
+  if (big >= 10 && small <= 9 && big % 10 + small <= 10) return 'b20';
+  if (big <= 9 && small >= 2) return 'pr';
+  return null;
+}
+/* Kup računov do 20 se sestavi tukaj, ne v JSON: pravila skupin so tako na
+   enem mestu. Seštevanje v obeh vrstnih redih (3 + 4 in 4 + 3), odštevanje
+   kot obratni račun. Pri Do 20 samo odštevanje enice (17 − 4 = 13), ne
+   17 − 13: to je že odštevanje desetic, ki pride pozneje. */
+function buildDo20Cards() {
+  const out = [];
+  for (let x = 1; x <= 19; x++) {
+    for (let y = 1; y <= 19; y++) {
+      const g = do20Group(x, y);
+      if (!g) continue;
+      const s = x + y;
+      out.push({ question: `${x} + ${y} =`, answer: String(s), g, op: 'add' });
+      if (g === 'b20' && y >= 10) continue;
+      out.push({ question: `${s} ${MINUS} ${y} =`, answer: String(x), g, op: 'sub' });
+    }
+  }
+  return out;
+}
+const do20Cards = buildDo20Cards();
 
 /* FILTER:
    A problem belongs to the multiplication table of its SECOND operand.
@@ -363,6 +447,13 @@ function parseQuestion(q) {
    - c : b  →  table b   (e.g. 24 : 8 is in the 8-times table, 24 : 3 in the 3-times table)
    So in both cases the relevant table is p.b — show only if that table is selected. */
 function getFilteredCards() {
+  if (subject === 'do20') {
+    return do20Cards.filter(c => {
+      if (opType === 'multiply' && c.op !== 'add') return false;
+      if (opType === 'divide'   && c.op !== 'sub') return false;
+      return groups.has(c.g);
+    });
+  }
   return allCards.filter(card => {
     const p = parseQuestion(card.question);
     if (!p) return false;
@@ -375,10 +466,12 @@ function getFilteredCards() {
 function getWrongAnswers(correct) {
   const n = parseInt(correct);
   const cands = new Set();
-  [-2,-1,1,2,-3,3,-5,5,10,-10,-4,4].forEach(d => { const v=n+d; if(v>0&&v!==n) cands.add(v); });
+  // pri Do 20 nobene ponudbe nad 20: 23 pri 7 + 6 otrok izloči brez računanja
+  const max = subject === 'do20' ? 20 : Infinity;
+  [-2,-1,1,2,-3,3,-5,5,10,-10,-4,4].forEach(d => { const v=n+d; if(v>0&&v<=max&&v!==n) cands.add(v); });
   if (String(n).length===2) {
     const rev = parseInt(String(n)[1]+String(n)[0]);
-    if (rev!==n && rev>0) cands.add(rev);
+    if (rev!==n && rev>0 && rev<=max) cands.add(rev);
   }
   const pool = shuffle([...cands]), res = [];
   for (const c of pool) { if (res.length>=3) break; res.push(String(c)); }
@@ -472,7 +565,66 @@ function updateControlLock() {
     .forEach(b => { b.disabled = lock; });
   document.getElementById('opBtnGroup').classList.toggle('locked', lock);
   document.getElementById('filterRow').classList.toggle('locked', lock);
+  /* Tekmovanje in bitka imata lestvico in nagrade samo za poštevanko — pri
+     Do 20 ju ni, da se tretješolec ne bi meril s petošolci. */
+  const do20 = subject === 'do20';
+  document.querySelectorAll('#modeBtnGroup .seg-btn').forEach(b => {
+    const race = b.dataset.mode === 'tekmovanje' || b.dataset.mode === 'bitka';
+    b.disabled = do20 && race;
+    b.classList.toggle('mode-off', do20 && race);
+    b.title = do20 && race ? 'Tekmovanje in bitka sta samo za poštevanko' : '';
+  });
 }
+
+/* Poštevanka ↔ Do 20: drugi gumbi za vrsto računa in druga izbira
+   (poštevanke ali skupine), vse ostalo ostane isto. */
+function applySubjectUI() {
+  const do20 = subject === 'do20';
+  document.querySelectorAll('#subjectBtnGroup .seg-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.subject === subject);
+  });
+  const LABELS = do20 ? { both: '+ −', multiply: '+', divide: '−' }
+                      : { both: '× ÷', multiply: '×', divide: '÷' };
+  document.querySelectorAll('#opBtnGroup .seg-btn').forEach(b => {
+    b.textContent = LABELS[b.dataset.op];
+  });
+  /* Brskalnik ima lahko še star index.html (brez teh elementov) in nov
+     script.js — takrat ne sme pasti cel zagon, kot pri brandBtn. */
+  const fr = document.getElementById('filterRow'), gr = document.getElementById('groupRow');
+  const pl = document.getElementById('pickLabel');
+  if (fr) fr.style.display = do20 ? 'none' : '';
+  if (gr) gr.style.display = do20 ? '' : 'none';
+  if (pl) pl.textContent = do20 ? 'Računi do 20' : 'Poštevanke';
+  document.querySelectorAll('.group-btn').forEach(b => {
+    b.classList.toggle('active', groups.has(b.dataset.g));
+  });
+  document.body.classList.toggle('do20', do20);
+}
+
+document.querySelectorAll('#subjectBtnGroup .seg-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    if (this.dataset.subject === subject) return;
+    subject = this.dataset.subject;
+    if (subject === 'do20' && (mode === 'tekmovanje' || mode === 'bitka')) {
+      mode = 'quiz';
+      applyUIFromState();
+      showPanel(mode);
+      saveSettings();
+    }
+    applySubjectUI();
+    updateControlLock();
+    triggerRestart();
+  });
+});
+
+document.querySelectorAll('.group-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const g = this.dataset.g;
+    if (groups.has(g)) { groups.delete(g); this.classList.remove('active'); }
+    else               { groups.add(g);    this.classList.add('active'); }
+    triggerRestartDebounced();
+  });
+});
 
 /* ── OP BUTTONS ── */
 document.querySelectorAll('#opBtnGroup .seg-btn').forEach(btn => {
@@ -499,6 +651,7 @@ document.querySelectorAll('.table-btn').forEach(btn => {
   });
 });
 document.getElementById('selAll').addEventListener('click', () => {
+  if (subject === 'do20') { groups = new Set(DO20_KEYS); applySubjectUI(); triggerRestart(); return; }
   tables = new Set([1,2,3,4,5,6,7,8,9,10]);
   document.querySelectorAll('.table-btn').forEach(b => b.classList.add('active'));
   updateSummary();
@@ -506,6 +659,7 @@ document.getElementById('selAll').addEventListener('click', () => {
   triggerRestart();
 });
 document.getElementById('selNone').addEventListener('click', () => {
+  if (subject === 'do20') { groups = new Set(); applySubjectUI(); triggerRestart(); return; }
   tables = new Set();
   document.querySelectorAll('.table-btn').forEach(b => b.classList.remove('active'));
   updateSummary();
@@ -523,6 +677,7 @@ function applyUIFromState() {
   document.querySelectorAll('.table-btn').forEach(b => {
     b.classList.toggle('active', tables.has(parseInt(b.dataset.n)));
   });
+  applySubjectUI();
 }
 
 function showPanel(m) {
@@ -680,6 +835,10 @@ document.body.addEventListener('click', e => {
 /* ══════════════════════════
    QUIZ MODE
 ══════════════════════════ */
+function emptyPickMsg() {
+  return subject === 'do20' ? 'Izberi vsaj eno skupino računov v nastavitvah.'
+                            : 'Izberi vsaj eno poštevanko v nastavitvah.';
+}
 function startQuiz() {
   qQueue = shuffle(cards); qIdx = 0; qOk = 0; qNo = 0; qStreak = 0;
   updateScoreHUD(0,0,0);
@@ -688,7 +847,7 @@ function startQuiz() {
 function renderQuizQ() {
   const area = document.getElementById('quizArea');
   if (!qQueue.length) {
-    area.innerHTML = '<div class="quiz-empty">Ni računov. Izberi vsaj eno poštevanko v nastavitvah.</div>';
+    area.innerHTML = `<div class="quiz-empty">Ni računov. ${emptyPickMsg()}</div>`;
     return;
   }
   if (qIdx >= qQueue.length) {
@@ -758,7 +917,7 @@ function startKeypad() {
 function renderKeypadQ() {
   const area = document.getElementById('keypadArea');
   if (!kQueue.length) {
-    area.innerHTML = '<div class="quiz-empty">Ni računov. Izberi vsaj eno poštevanko v nastavitvah.</div>';
+    area.innerHTML = `<div class="quiz-empty">Ni računov. ${emptyPickMsg()}</div>`;
     return;
   }
   if (kIdx >= kQueue.length) {
@@ -1222,6 +1381,10 @@ function openRazredPrompt(onDone) {
 /* ── Stats logging ── */
 function recordStat(modeKey, correct, wrong, points, seconds) {
   if (!profile) return;
+  /* Odgovori Do 20 gredo samo v do20_stats. `stats` hrani poštevanko: iz nje
+     se računajo stolpec Odgovori v pregledu, nizi v albumu in cekini — Do 20
+     bi jih napihnil z lažjimi računi. */
+  if (subject === 'do20') return;
   if (!pendingStats[modeKey]) pendingStats[modeKey] = { correct:0, wrong:0, points:0, seconds:0 };
   const s = pendingStats[modeKey];
   s.correct += correct; s.wrong += wrong; s.points += points; s.seconds += seconds;
@@ -1232,6 +1395,7 @@ function recordStat(modeKey, correct, wrong, points, seconds) {
 function recordTableStat(question, isCorrect) {
   if (!profile) return;
   const p = parseQuestion(question);
+  if (p && (p.op === 'add' || p.op === 'sub')) { recordDo20Stat(p, isCorrect); return; }
   if (!p || !(p.b >= 1 && p.b <= 10)) return;
   const op = p.op === 'multiply' ? 'x' : 'd';
   const key = p.b + '_' + op;
@@ -1260,6 +1424,33 @@ function recordFactStat(p, op, isCorrect, timed, fast) {
   if (isCorrect) f.c++; else f.w++;
   if (timed) { f.n++; if (fast) f.f++; }
 }
+/* Do 20: po skupini in operaciji, s hitrostjo kot pri poštevanki. Tudi kviz
+   se šteje, tako kot v table_stats. */
+function recordDo20Stat(p, isCorrect) {
+  // seštevanec in drugi seštevanec: pri odštevanju s − y = x je to x + y
+  const x0 = p.op === 'add' ? p.a : p.a - p.b, y0 = p.b;
+  const g = do20Group(x0, y0);
+  if (!g) return;
+  const op = p.op === 'add' ? 'p' : 'm';
+  const key = g + '_' + op;
+  const e = pendingDo20[key] || (pendingDo20[key] = { g, op, c: 0, w: 0, n: 0, f: 0 });
+  if (isCorrect) e.c++; else e.w++;
+  const sec = isCorrect && questionShownTs ? (Date.now() - questionShownTs) / 1000 : null;
+  const timed = sec !== null && sec <= SPEED_IGNORE, fast = timed && sec < FAST_SECONDS;
+  if (timed) { e.n++; if (fast) e.f++; }
+  /* Po računih za ljubljenčka (mejniki). Kot pri poštevanki samo tipkovnica:
+     v kvizu lahko otrok odgovor ugane med štirimi. Račun je par {x, y}, zato
+     so 3 + 4, 4 + 3 in 7 − 3 isti par — ločeno za + in −. */
+  if (mode !== 'quiz') {
+    const x = Math.min(x0, y0), y = Math.max(x0, y0);
+    const fk = key + '_' + x + '_' + y;
+    const fe = pendingDo20Facts[fk] || (pendingDo20Facts[fk] = { g, op, x, y, c: 0, w: 0, n: 0, f: 0 });
+    if (isCorrect) fe.c++; else fe.w++;
+    if (timed) { fe.n++; if (fast) fe.f++; }
+  }
+  // recordStat tu ne šteje, zato pošiljanje sproži sam
+  if (++pendingAnswerCount >= 10) flushStats();
+}
 /* time since the previous answer, capped so idle time doesn't inflate it */
 function answerSeconds() {
   const now = Date.now();
@@ -1272,13 +1463,17 @@ function answerSeconds() {
    read the stats back (openStatsOverlay) can await it instead of racing it. */
 function flushStats(useKeepalive) {
   if (!profile) {
-    pendingStats = {}; pendingTableStats = {}; pendingSpeed = {}; pendingFacts = {}; pendingAnswerCount = 0;
+    pendingStats = {}; pendingTableStats = {}; pendingSpeed = {}; pendingFacts = {}; pendingDo20 = {}; pendingDo20Facts = {}; pendingAnswerCount = 0;
     return Promise.resolve();
   }
   const toSend = pendingStats;
   const toSendTables = pendingTableStats;
   const toSendSpeed = pendingSpeed;
   const toSendFacts = pendingFacts;
+  const toSendDo20 = pendingDo20;
+  const toSendDo20Facts = pendingDo20Facts;
+  pendingDo20 = {};
+  pendingDo20Facts = {};
   pendingStats = {};
   pendingTableStats = {};
   pendingSpeed = {};
@@ -1316,6 +1511,20 @@ function flushStats(useKeepalive) {
   if (factData.length) {
     writes.push(supabaseRPC('add_fact_stats', {
       p_student: profile.id, p_day: day, p_data: factData
+    }, extra));
+  }
+  /* Do 20 (supabase_do20.sql). Dokler funkcije ni, klic tiho spodleti. */
+  const do20Data = Object.keys(toSendDo20).map(k => toSendDo20[k]);
+  if (do20Data.length) {
+    writes.push(supabaseRPC('add_do20_stats', {
+      p_student: profile.id, p_day: day, p_data: do20Data
+    }, extra));
+  }
+  /* Računi za ljubljenčka (supabase_ljubljencek.sql). */
+  const do20FactData = Object.keys(toSendDo20Facts).map(k => toSendDo20Facts[k]);
+  if (do20FactData.length) {
+    writes.push(supabaseRPC('add_do20_facts', {
+      p_student: profile.id, p_day: day, p_data: do20FactData
     }, extra));
   }
   return Promise.all(writes);
@@ -1737,6 +1946,10 @@ async function openStatsOverlay() {
         <span>🐢 pravilno, a počasi</span>
       </div>
       <div class="ptable-tip" id="ptableTip"></div>
+      <div id="do20Section" style="display:none">
+        <div class="stats-section-title">➕ Računi do 20</div>
+        <div class="ptable-list" id="do20List"></div>
+      </div>
     </div>`;
   document.body.appendChild(div);
   activeOverlay = div;
@@ -1749,9 +1962,10 @@ async function openStatsOverlay() {
 
   await flushStats();           // make sure latest answers are counted
   /* ── Poštevanke section ── */
-  const [tableRows, speedRows] = await Promise.all([
+  const [tableRows, speedRows, do20Rows] = await Promise.all([
     fetchStudentTableStats(),
-    supabaseRPC('get_my_speed', { p_student: profile.id })
+    supabaseRPC('get_my_speed', { p_student: profile.id }),
+    supabaseRPC('get_my_do20', { p_student: profile.id })
   ]);
   const recentSince = getRecentSinceKey();
 
@@ -1809,6 +2023,7 @@ async function openStatsOverlay() {
           </span>
         </div>`);
     }
+    renderDo20(window);
     const tip = div.querySelector('#ptableTip');
     if (worst !== null && worstPct < 85) {
       tip.textContent = `💡 Največ napak: poštevanka ${worst}. Tam še vadi!`;
@@ -1819,6 +2034,29 @@ async function openStatsOverlay() {
     } else {
       tip.textContent = 'Igraj nekaj računov, da se pokaže napredek.';
     }
+  }
+  /* Do 20 se pokaže samo otroku, ki je kaj vadil — petošolcu bi bila prazna
+     tabela samo v napoto. Isto okno (2 tedna / ves čas) kot poštevanke. */
+  function renderDo20(window) {
+    const rows = asRows(do20Rows);
+    const sec = div.querySelector('#do20Section');
+    if (!rows.length) { sec.style.display = 'none'; return; }
+    sec.style.display = '';
+    const agg = {};
+    for (const r of rows) {
+      if (window === 'recent' && r.day < recentSince) continue;
+      const a = agg[r.grp + '_' + r.op] || (agg[r.grp + '_' + r.op] = { c: 0, w: 0, n: 0, f: 0 });
+      a.c += r.correct || 0; a.w += r.wrong || 0;
+      a.n += r.timed || 0;   a.f += r.fast || 0;
+    }
+    div.querySelector('#do20List').innerHTML = DO20_GROUPS.map(g => `
+      <div class="ptable-row">
+        <span class="ptable-num ptable-grp">${g.label}</span>
+        <span class="ptable-ops">
+          <span class="ptable-op">+ ${chip(agg[g.key + '_p'])}</span>
+          <span class="ptable-op">${MINUS} ${chip(agg[g.key + '_m'])}</span>
+        </span>
+      </div>`).join('');
   }
   renderPtable('recent');
   div.querySelectorAll('#ptableToggle .ptable-tog-btn').forEach(b => {
@@ -1856,6 +2094,7 @@ async function openTeacherDashboard() {
         <div class="ptable-toggle" id="tdViewToggle">
           <button class="ptable-tog-btn active" data-v="lesson">👥 Učenci</button>
           <button class="ptable-tog-btn" data-v="matrix">📚 Poštevanke</button>
+          <button class="ptable-tog-btn" data-v="do20">➕ Do 20</button>
         </div>
         <select class="td-razred-select" id="tdRazredSelect" title="Filtriraj po razredu">
           <option value="">Vsi razredi</option>
@@ -1874,7 +2113,7 @@ async function openTeacherDashboard() {
         <span><span class="ptable-chip m-bad"></span> potrebuje vajo</span>
         <span><span class="ptable-chip m-early"></span> premalo odgovorov</span>
         <span><span class="ptable-chip m-none"></span> ni podatkov</span>
-        <span class="td-legend-ops">zgoraj × · spodaj ÷</span>
+        <span class="td-legend-ops" id="tdLegendOps">zgoraj × · spodaj ÷</span>
       </div>
       <div class="td-grid-wrap" id="tdGridWrap">
         <div class="comp-board-empty">Nalagam …</div>
@@ -1916,7 +2155,7 @@ async function openTeacherDashboard() {
   let refreshing = false;
   const razredMap = {};   // username → razred
 
-  function buildStudents(rows, modeRows, speedRows) {
+  function buildStudents(rows, modeRows, speedRows, do20Rows) {
     const students = {};
     for (const r of asRows(rows)) {
       if (!students[r.username]) {
@@ -1951,6 +2190,16 @@ async function openTeacherDashboard() {
       cell.all.n    = +r.timed_all;    cell.all.f    = +r.fast_all;
       cell.recent.n = +r.timed_recent; cell.recent.f = +r.fast_recent;
     }
+    /* Do 20 (supabase_do20.sql) — ločeni predali, ne mešajo se s
+       poštevanko, Brihtometrom ali stolpcem Odgovori. */
+    for (const r of asRows(do20Rows)) {
+      const s = students[r.username];
+      if (!s) continue;
+      (s.do20 = s.do20 || {})[r.grp + '_' + r.op] = {
+        all:    { c: +r.correct_all,    w: +r.wrong_all,    n: +r.timed_all,    f: +r.fast_all },
+        recent: { c: +r.correct_recent, w: +r.wrong_recent, n: +r.timed_recent, f: +r.fast_recent }
+      };
+    }
     return Object.values(students).sort(poAbecedi);
   }
 
@@ -1964,7 +2213,7 @@ async function openTeacherDashboard() {
        zaporedna klica bi ta interval po nepotrebnem podvojila.
        get_class_modes je novejši — če ga v bazi še ni, vrne null in
        pregled dela naprej, samo brez ikon načinov. */
-    const [rows, modeRows, speedRows] = await Promise.all([
+    const [rows, modeRows, speedRows, do20Rows] = await Promise.all([
       supabaseRPCAll('get_class_overview', {
         p_teacher_id: teacherSession.id, p_recent_since: since
       }, 'username,table_n,op'),
@@ -1973,9 +2222,12 @@ async function openTeacherDashboard() {
       }, 'username,mode'),
       supabaseRPCAll('get_class_speed', {
         p_teacher_id: teacherSession.id, p_recent_since: since
-      }, 'username,table_n,op')
+      }, 'username,table_n,op'),
+      supabaseRPCAll('get_class_do20', {
+        p_teacher_id: teacherSession.id, p_recent_since: since
+      }, 'username,grp,op')
     ]);
-    return rows === RPC_UNREACHABLE ? null : buildStudents(rows, modeRows, speedRows);
+    return rows === RPC_UNREACHABLE ? null : buildStudents(rows, modeRows, speedRows, do20Rows);
   }
 
   async function ensureWindow(win) {
@@ -2266,13 +2518,71 @@ async function openTeacherDashboard() {
   }
 
   function renderGrid() {
-    div.querySelector('#tdLegend').style.display = curView === 'matrix' ? '' : 'none';
-    // Summary follows the class filter in both views, not just the lesson one.
+    div.querySelector('#tdLegend').style.display = curView === 'lesson' ? 'none' : '';
+    div.querySelector('#tdLegendOps').textContent =
+      curView === 'do20' ? `zgoraj + · spodaj ${MINUS}` : 'zgoraj × · spodaj ÷';
+    // Summary follows the class filter in all views, not just the lesson one.
     const slot = curWin === 'all' ? 'all' : 'recent';
-    updateClassSum(baseList().map(s => summarise(s, slot)));
+    updateClassSum(baseList().map(s =>
+      curView === 'do20' ? summariseDo20(s, slot) : summarise(s, slot)));
     updateDupWarn();
     if (curView === 'lesson') renderLesson();
+    else if (curView === 'do20') renderDo20Matrix();
     else renderMatrix();
+  }
+
+  function summariseDo20(s, slot) {
+    let correct = 0, wrong = 0;
+    for (const cell of Object.values(s.do20 || {})) {
+      const v = cell[slot];
+      if (v) { correct += v.c; wrong += v.w; }
+    }
+    return { correct, wrong, answers: correct + wrong };
+  }
+
+  /* Ista mreža kot pri poštevankah, le stolpci so skupine računov do 20.
+     Tisti, ki Do 20 niso vadili (vsi starejši razredi), so zloženi stran. */
+  function renderDo20Matrix() {
+    const slot = curWin === 'all' ? 'all' : 'recent';
+    const active = [], idle = [];
+    for (const s of baseList()) (summariseDo20(s, slot).answers ? active : idle).push(s);
+    const folded = !showIdle && idle.length > 8;
+    const filtered = folded ? active : active.concat(idle);
+    if (!filtered.length) {
+      wrap.innerHTML = `<div class="comp-board-empty">${
+        curRazred ? `V razredu ${curRazred} ni podatkov.` : 'Še ni podatkov o učencih.'}</div>`;
+      return;
+    }
+    let head = '<div class="td-row td-head"><span class="td-name"></span>'
+             + '<span class="td-ops td-ops-head"></span>';
+    for (const g of DO20_GROUPS) head += `<span class="td-cell td-th td-th-grp">${g.short}</span>`;
+    head += '</div>';
+    const body = filtered.map(s => {
+      const rz = razredMap[s.username];
+      const rzTag = (!curRazred && rz) ? `<span class="td-razred">${rz}</span>` : '';
+      let row = `<div class="td-row"><span class="td-name" data-username="${esc(s.username)}"`
+        + ` title="Klikni za ponastavitev gesla">${esc(s.emoji || '🦉')} ${imeUcenca(s)}${rzTag}</span>`
+        + `<span class="td-ops"><span>+</span><span>${MINUS}</span></span>`;
+      for (const g of DO20_GROUPS) {
+        const cp = s.do20 && s.do20[g.key + '_p'], cm = s.do20 && s.do20[g.key + '_m'];
+        const vp = cp ? cp[slot] : null, vm = cm ? cm[slot] : null;
+        const pc = vp ? vp.c : 0, pw = vp ? vp.w : 0;
+        const mc = vm ? vm.c : 0, mw = vm ? vm.w : 0;
+        const tip = `${g.label}\n+ ${pc}✓/${pw}✗\n${MINUS} ${mc}✓/${mw}✗`;
+        if (!pc && !pw && !mc && !mw) {
+          row += `<span class="td-cell td-cell-grp m-none" title="${tip}"></span>`;
+        } else {
+          const pp = masteryPct(pc, pw), mp = masteryPct(mc, mw);
+          row += `<span class="td-cell td-cell-grp td-cell-split" title="${tip}">`
+            + `<span class="td-half ${vp ? cellClass(pc, pw, vp.n, vp.f) : 'm-none'}">${pp === null ? '–' : pp}</span>`
+            + `<span class="td-half ${vm ? cellClass(mc, mw, vm.n, vm.f) : 'm-none'}">${mp === null ? '–' : mp}</span>`
+            + `</span>`;
+        }
+      }
+      return row + '</div>';
+    }).join('');
+    wrap.innerHTML = head + body + (folded ? foldButton(idle.length) : '');
+    wireFold();
   }
 
   function renderMatrix() {

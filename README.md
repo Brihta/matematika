@@ -16,12 +16,70 @@ zato vaja ostane enaka tudi po osvežitvi strani.
 | Vse poštevanke, × in ÷ | `.../matematika/?p=vse&op=both` |
 | Poštevanka 8 na tipkovnici | `.../matematika/?p=8&mode=tipkovnica` |
 
+### Računi do 20 (seštevanje in odštevanje)
+
+Na vrhu je stikalo **Vadim: Poštevanka | Do 20**. Pri Do 20 so namesto
+poštevank skupine računov po korakih pouka:
+
+| Skupina | Ključ | Primer |
+|---|---|---|
+| Do 10 | `d10` | 4 + 3, 9 − 5 |
+| Prijatelji 10 | `p10` | 7 + 3, 10 − 4 |
+| Dvojčki | `dv` | 6 + 6, 12 − 6 |
+| Do 20 (brez prehoda) | `b20` | 13 + 4, 17 − 4 |
+| Čez 10 | `pr` | 8 + 5, 14 − 6 |
+
+| Kaj želim | Povezava |
+|---|---|
+| Do 10 in prijatelji 10, samo seštevanje | `.../matematika/?g=d10,p10&op=p` |
+| Vse do 20, + in − | `.../matematika/?v=do20` |
+| Čez 10, odštevanje, tipkovnica | `.../matematika/?g=pr&op=m&mode=tipkovnica` |
+
+Tekmovanja in bitke pri Do 20 ni, ker sta lestvica in album za poštevanko.
+Odgovori se beležijo v `do20_stats` (ne v `stats`), zato ne vplivajo na
+stolpec Odgovori, Brihtometer, nize ali cekine. Učiteljica jih vidi v
+pregledu pod **➕ Do 20**, učenec pa v svojem profilu, ko jih kaj vadi.
+Zahteva `supabase_do20.sql`.
+
+#### 🐣 Ljubljenček
+
+Do 20 ne daje cekinov — ves trud gre v **ljubljenčka**, ki si ga učenec sam
+oblikuje (gumb z ljubljenčkom zgoraj, viden samo pri Do 20). Ob začetku
+sezone izbere jajce (zmajček, lisička, sovica, ježek), mu da ime, barvo,
+trebušček, oči in vzorec.
+
+- **Mejniki:** 10 = 5 skupin × (+, −). Mejnik je dosežen, ko je v sezoni
+  vsak par računov skupine vsaj enkrat pravilen (3 + 4, 4 + 3, 7 − 3 in
+  7 − 4 so isti par), vsaj 20 odgovorov, vsaj 90 % pravilnih in vsaj 80 %
+  pravilnih hitreje kot v 3 s. Šteje samo **tipkovnica**.
+- **Rast:** jajce → mladiček (1. mejnik izvali jajce) → mlad (4) →
+  odrasel (7) → končna oblika s krono (10).
+- **Odklepanje:** vsak mejnik odklene eno barvo, vzorec ali oči.
+- **Sezone:** vsaka sezona ima svojega ljubljenčka; stari ostanejo v zbirki.
+- Med vajo Do 20 je ljubljenček spodaj levo in poskoči ob pravilnem
+  odgovoru; nov mejnik pokaže obvestilo.
+
+Kaj je doseženo, odloča baza (`pet_state`, `pet_save`). Risbe so v
+`pet-art.js`, stran v `ljubljencek.html`, povezava z aplikacijo v `pet.js`.
+Zahteva `supabase_ljubljencek.sql` (za `supabase_do20.sql` in
+`supabase_album.sql`).
+
+**Stikalo:** po zagonu je ljubljenček zaprt — vidijo ga samo učenci v
+`pet_testers`. Računi se medtem beležijo za vse, zato ob odprtju mejniki
+štejejo vso vadbo sezone. Ukazi (dodaj preizkuševalca, odpri za vse) so na
+vrhu `supabase_ljubljencek.sql`; za vse ga odpreš z
+`update pet_config set open = true;`. Še ni: priboljški in trgovina za ljubljenčka,
+ljubljenček kot spremljevalec ob liku.
+
 ### Parametri
 
 - **`p`** — poštevanke: ena številka (`7`), več ločenih z vejico (`3,4,6`),
   ali `vse`
 - **`op`** — vrsta računa: `x` (množenje), `d` (deljenje), `both` (oboje)
 - **`mode`** — način: `kviz`, `tipkovnica`, `tekmovanje` ali `bitka`
+- **`v`** — kaj se vadi: `do20` ali `postevanka`
+- **`g`** — skupine računov do 20, ločene z vejico (`d10,p10`), ali `vse`;
+  sama po sebi vklopi Do 20. Pri Do 20 je `op` `p` (+), `m` (−) ali `both`
 
 Če povezava določa poštevanke ali vrsto računa, se način samodejno preklopi
 iz tekmovanja v kviz — tekmovanje namreč vedno uporablja vse poštevanke in

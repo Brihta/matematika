@@ -209,7 +209,8 @@
   const busy = () => !!cTimer || ['lobby', 'countdown', 'game', 'waiting'].includes(btView)
     || !!document.querySelector('.timed-overlay');
   function autoEnvelope() {
-    if (!active() || !ready() || busy()) return;
+    // pri Do 20 je v ospredju ljubljenček — album počaka na poštevanko
+    if (!active() || !ready() || busy() || subject === 'do20') return;
     const w = W(), next = (state.stickers || []).find(s => s.state === 'pending' && !shown.has(s.id));
     if ((!next && !w.S.classWin) || Date.now() < (w.S.calmUntil || 0)) return;
     if (!overlay.classList.contains('on')) {
@@ -255,7 +256,8 @@
   };
   const origRecord = window.recordTableStat;
   window.recordTableStat = function (question, isCorrect) {
-    if (active()) {
+    // Do 20 je ljubljenčkov (pet.js): tam lik ne skače in namig o sličicah ne velja
+    if (active() && subject !== 'do20') {
       if (isCorrect) { buddy.classList.remove('hop'); void buddy.offsetWidth; buddy.classList.add('hop'); }
       if (mode === 'quiz' && !quizHinted) {
         quizHinted = true;
@@ -268,7 +270,7 @@
   /* Lik spodaj levo je viden samo med vadbo. */
   const panels = ['quizPanel', 'keypadPanel', 'tekmovanjePanel', 'bitkaPanel'].map(id => $(id));
   setInterval(() => {
-    buddy.classList.toggle('on', !!active() && !overlay.classList.contains('on') && panels.some(p => p && p.style.display !== 'none'));
+    buddy.classList.toggle('on', !!active() && subject !== 'do20' && !overlay.classList.contains('on') && panels.some(p => p && p.style.display !== 'none'));
     autoEnvelope();
   }, 500);
 
