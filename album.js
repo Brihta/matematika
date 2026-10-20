@@ -170,7 +170,7 @@
         return p.hasPet() ? 'skip' : 'show';
       },
       html: () => `<div class="ico">🐣</div><h3>Novo: ljubljenček!</h3>`
-        + `<p>Izberi si svojega ljubljenčka — <b>zmajčka, lisičko, sovico ali muceka</b>. Raste, ko računaš <b>do 20</b> hitro in brez napak, in lahko stoji ob tvojem liku.</p>`,
+        + `<p>Izberi si svojega ljubljenčka — <b>zmajčka, lisičko, sovico ali mucka</b>. Raste, ko računaš <b>do 20</b> hitro in brez napak, in lahko stoji ob tvojem liku.</p>`,
       go: { label: 'Izberi ljubljenčka', tab: 'pet' }
     }
   };
