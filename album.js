@@ -60,6 +60,16 @@
     .al-chip.on ~ .profile-btn .profile-name { display: none; }
     .topbar:has(.al-chip.on) { gap: 12px; }
   }
+  /* Enkratno obvestilo (album_notices): okno sredi zaslona, gumb V redu */
+  .al-note { position: fixed; inset: 0; z-index: 5200; background: rgba(10,8,16,.55); display: none; align-items: center; justify-content: center; padding: 18px; }
+  .al-note.on { display: flex; }
+  .al-note-box { background: #fff8ec; color: #2b2233; border: 2px solid #f08c2e; border-radius: 20px; padding: 22px 22px 18px; max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.4); text-align: center; animation: alVoj .4s cubic-bezier(.34,1.56,.64,1); }
+  .al-note-box .ico { font-size: 2.6rem; line-height: 1; }
+  .al-note-box h3 { margin: 8px 0 6px; font-size: 1.25rem; }
+  .al-note-box p { margin: 0 0 10px; line-height: 1.45; color: #4a4152; }
+  .al-note-box button { margin-top: 6px; background: #f08c2e; color: #fff; border: 0; border-radius: 999px; padding: 10px 28px;
+    font: 800 1rem inherit; font-family: inherit; cursor: pointer; }
   @media (max-width: 600px) { .al-buddy.on { display: none; } }   /* na telefonu bi prekril namig pod tipkovnico */
   /* Med tekmovanjem sta logotip in profil v prvi vrsti, način pod njima. */
   body.competition .al-chip { order: 2; margin-left: auto; }
@@ -70,7 +80,8 @@
   document.body.insertAdjacentHTML('beforeend', `
     <div class="al-overlay" id="alOverlay"><div class="al-frame" id="alFrameBox"><button class="al-close" id="alClose" title="Zapri">✕</button></div></div>
     <div class="al-buddy" id="alBuddy"></div>
-    <div class="al-toast" id="alToast"></div>`);
+    <div class="al-toast" id="alToast"></div>
+    <div class="al-note" id="alNote"><div class="al-note-box" id="alNoteBox"></div></div>`);
 
   const chip = document.createElement('button');
   chip.className = 'al-chip'; chip.id = 'alChip'; chip.title = 'Moj lik in album'; chip.type = 'button';
@@ -119,6 +130,7 @@
     const prev = state;
     state = st;
     render();
+    if (!prev && st) checkNotices();
     if (!prev || !st || !st.season) return;
     const was = new Set((prev.stickers || []).map(s => s.id));
     const fresh = (st.stickers || []).filter(s => s.state === 'pending' && !was.has(s.id));
@@ -167,6 +179,42 @@
     } else toast(`<span style="font-size:1.6rem">⚔️</span><div>Vojaška služba: <b>${head}</b>${sub ? `<small>${sub}</small>` : ''}</div>`, 6000);
     if (!inState && state && r.coins) { state.coins += r.coins; render(); }
   };
+
+  /* Enkratna obvestila iz baze (album_notices, supabase_spremljevalci.sql).
+     Preverimo jih ob prvem stanju po prijavi, pokažemo, ko otrok ni sredi
+     igre, in po "V redu" označimo kot prebrana. */
+  const NOTICE = {
+    'spremljevalci-2026-10': d => {
+      const nm = { mucek: 'Mačko', lisicka: 'Lisičko' };
+      const what = (d.items || []).map(id => nm[id]).filter(Boolean).join(' in ');
+      const n = d.coins || 0, coin = W() && W().cek ? W().cek(n) : 'cekinov';
+      return `<div class="ico">🐾</div><h3>Spremljevalci so se preselili</h3>`
+        + `<p>V trgovini lika ni več spremljevalcev. Svojega spremljevalca si zdaj izbereš in vzgojiš pri vadbi <b>računov do 20</b> — to je tvoj ljubljenček, ki stoji ob tvojem liku.</p>`
+        + `<p>Zato smo ti vrnili <b>${n} ${coin}</b>${what ? ` za ${what}` : ''}.</p>`;
+    }
+  };
+  let noticesChecked = false;
+  const notices = [];
+  async function checkNotices() {
+    if (noticesChecked || !isPupil()) return;
+    noticesChecked = true;
+    const list = await supabaseRPC('album_notices', { p_student: profile.id });
+    if (!Array.isArray(list)) return;
+    list.forEach(n => { if (NOTICE[n.code]) notices.push(n); });
+  }
+  function showNotice() {
+    const note = $('alNote');
+    if (!notices.length || note.classList.contains('on') || busy() || overlay.classList.contains('on')) return;
+    const n = notices[0];
+    $('alNoteBox').innerHTML = NOTICE[n.code](n.data || {}) + '<button type="button" id="alNoteOk">V redu</button>';
+    if (document.activeElement) document.activeElement.blur();   // tipke naj ne tečejo v vajo za oknom
+    note.classList.add('on');
+    $('alNoteOk').addEventListener('click', () => {
+      note.classList.remove('on');
+      notices.shift();
+      supabaseRPC('album_notice_seen', { p_student: profile.id, p_code: n.code });
+    });
+  }
 
   function render() {
     const on = active();
@@ -272,6 +320,7 @@
   setInterval(() => {
     buddy.classList.toggle('on', !!active() && subject !== 'do20' && !overlay.classList.contains('on') && panels.some(p => p && p.style.display !== 'none'));
     autoEnvelope();
+    showNotice();
   }, 500);
 
   if (isPupil()) ensureFrame();

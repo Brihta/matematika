@@ -359,9 +359,7 @@ insert into items (id, season, char_id, slot, price, reward_season, reward_page)
   ('plasc',        1, 'vitez', 'hrbet',         120,  null, null),
   ('plasc-kralj',  1, 'vitez', 'hrbet',         300,  null, null),
   ('sova',         1, null,    'spremljevalec', null, 1, 'post'),
-  ('mucek',        1, null,    'spremljevalec', 90,   null, null),
-  ('lisicka',      1, null,    'spremljevalec', 180,  null, null),
-  ('zmajcek',      1, null,    'spremljevalec', null, 2, 'zve'),
+  -- mucek, lisicka, zmajcek odstranjeni 20. 10. 2026 (supabase_spremljevalci.sql)
   ('travnik',      1, null,    'ozadje',        0,    null, null),
   ('bojisce',      1, null,    'ozadje',        150,  null, null),   -- bojišče s šotori in prapori, dodano 11. 10. 2026
   ('zmajeva-gora', 1, null,    'ozadje',        300,  null, null),   -- gora z zmajem, dodano 11. 10. 2026

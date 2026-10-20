@@ -649,39 +649,6 @@ const owl = () => part('M66 408 L70 380 L88 400 Z', '#8a5a3b', { w: 4 }) + part(
   + part('M92 432 C106 432 112 444 112 454 C112 466 102 472 92 472 C82 472 72 466 72 454 C72 444 78 432 92 432 Z', '#e3c49d', { w: 3 })
   + [80, 104].map(x => `<circle cx="${x}" cy="420" r="12" fill="#fff" stroke="${OL}" stroke-width="3"/><circle cx="${x}" cy="421" r="8" fill="#f4c542"/><circle cx="${x}" cy="421" r="4.5" fill="${OL}"/><circle cx="${x - 3}" cy="417" r="2" fill="#fff"/>`).join('')
   + part('M87 432 L97 432 L92 442 Z', '#f08c2e', { w: 3 }) + line('M84 474 L82 482 M90 474 L90 482 M100 474 L102 482', 3, '#f08c2e');
-const cat = () => line('M118 468 C148 468 152 432 136 418', 15) + line('M118 468 C148 468 152 432 136 418', 8, '#f2a65a')
-  + part('M92 410 C118 410 126 440 124 458 C122 474 108 478 92 478 C76 478 62 474 60 458 C58 440 66 410 92 410 Z', '#f2a65a', { shadow: 'M100 400 L140 400 L140 484 L100 484 Z',
-      inner: line('M66 440 L76 442 M64 454 L76 454', 3, '#d9823a') })
-  + `<ellipse cx="80" cy="476" rx="9" ry="6" fill="#fff" stroke="${OL}" stroke-width="3"/><ellipse cx="104" cy="476" rx="9" ry="6" fill="#fff" stroke="${OL}" stroke-width="3"/>`
-  + part('M66 394 L68 360 L86 378 Z', '#f2a65a', { w: 4 }) + part('M118 394 L116 360 L98 378 Z', '#f2a65a', { w: 4 })
-  + `<path d="M71 384 L72 370 L80 378 Z M113 384 L112 370 L104 378 Z" fill="#ffb3c1"/>`
-  + part('M92 372 C114 372 124 386 124 400 C124 418 108 428 92 428 C76 428 60 418 60 400 C60 386 70 372 92 372 Z', '#f2a65a', { shadow: 'M104 360 L140 360 L140 440 L104 440 Z',
-      inner: line('M86 374 L88 386 M98 374 L96 386', 3, '#d9823a') })
-  + `<ellipse cx="81" cy="398" rx="5.5" ry="7.5" fill="${OL}"/><ellipse cx="103" cy="398" rx="5.5" ry="7.5" fill="${OL}"/><circle cx="83" cy="395" r="2" fill="#fff"/><circle cx="105" cy="395" r="2" fill="#fff"/>`
-  + `<path d="M88 407 L96 407 L92 412 Z" fill="#ff8fa3"/>` + line('M92 412 Q88 418 84 416 M92 412 Q96 418 100 416', 2.5)
-  + line('M70 410 L52 406 M70 414 L52 416 M114 410 L132 406 M114 414 L132 416', 2);
-const fox = () => part('M116 470 C162 468 166 410 140 396 C146 428 134 452 110 460 Z', '#e67e22', { w: 4,
-      inner: '<path d="M140 396 C156 404 160 420 156 432 C150 422 144 410 132 404 Z" fill="#fff"/>' })
-  + part('M92 418 C116 418 124 444 122 460 C120 474 106 478 92 478 C78 478 64 474 62 460 C60 444 68 418 92 418 Z', '#e67e22', { shadow: 'M100 410 L130 410 L130 484 L100 484 Z' })
-  + part('M92 430 C102 440 102 462 92 474 C82 462 82 440 92 430 Z', '#fff', { w: 3 })
-  + `<ellipse cx="80" cy="477" rx="8" ry="5" fill="${OL}"/><ellipse cx="104" cy="477" rx="8" ry="5" fill="${OL}"/>`
-  + part('M66 398 L62 360 L86 382 Z', '#e67e22', { w: 4 }) + part('M118 398 L122 360 L98 382 Z', '#e67e22', { w: 4 })
-  + `<path d="M68 388 L66 368 L79 381 Z M116 388 L118 368 L105 381 Z" fill="${OL}" opacity=".7"/>`
-  + part('M92 376 C116 376 124 392 122 404 C120 418 106 428 92 434 C78 428 64 418 62 404 C60 392 68 376 92 376 Z', '#e67e22', { shadow: 'M104 366 L130 366 L130 440 L104 440 Z',
-      inner: '<path d="M62 404 Q80 410 92 434 Q72 428 62 404 Z M122 404 Q104 410 92 434 Q112 428 122 404 Z" fill="#fff"/>' })
-  + `<circle cx="81" cy="400" r="4.5" fill="${OL}"/><circle cx="103" cy="400" r="4.5" fill="${OL}"/><circle cx="82.5" cy="398.5" r="1.6" fill="#fff"/><circle cx="104.5" cy="398.5" r="1.6" fill="#fff"/>`
-  + `<ellipse cx="92" cy="427" rx="5" ry="4" fill="${OL}"/>`;
-const dragon = () => line('M116 470 C150 476 158 452 148 434', 15) + line('M116 470 C150 476 158 452 148 434', 8, '#4caf50')
-  + part('M148 434 L140 418 L158 424 Z', '#f4e08a', { w: 3 })
-  + part('M108 424 C122 392 148 388 156 400 C144 404 146 416 152 424 C138 424 132 432 124 440 Z', '#7fd38a', { w: 4, inner: line('M114 424 L148 400', 2, '#3f8f4a') })
-  + part('M92 412 C118 412 126 440 124 458 C122 474 108 478 92 478 C76 478 62 474 60 458 C58 440 66 412 92 412 Z', '#4caf50', { shadow: 'M100 404 L140 404 L140 484 L100 484 Z' })
-  + part('M92 428 C106 436 108 460 100 474 L84 474 C76 460 78 436 92 428 Z', '#f4e08a', { w: 3, inner: line('M82 446 L102 446 M80 458 L104 458', 2, '#d9b84a') })
-  + `<ellipse cx="78" cy="477" rx="9" ry="5" fill="#3f8f4a" stroke="${OL}" stroke-width="3"/><ellipse cx="106" cy="477" rx="9" ry="5" fill="#3f8f4a" stroke="${OL}" stroke-width="3"/>`
-  + part('M70 380 L58 352 L82 372 Z', '#f4e08a', { w: 3.5 }) + part('M112 378 L124 350 L102 370 Z', '#f4e08a', { w: 3.5 })
-  + part('M90 366 C116 364 128 380 128 396 C128 414 112 426 92 426 C72 426 58 414 58 398 C58 382 68 368 90 366 Z', '#4caf50', { shadow: 'M106 356 L140 356 L140 436 L106 436 Z', hi: 'M70 380 Q80 370 92 370 Q80 376 74 388 Z' })
-  + [80, 104].map(x => `<circle cx="${x}" cy="394" r="9" fill="#fff" stroke="${OL}" stroke-width="2.5"/><circle cx="${x + 1}" cy="395" r="6" fill="#f4c542"/><circle cx="${x + 1}" cy="395" r="3.2" fill="${OL}"/><circle cx="${x - 2}" cy="391" r="1.8" fill="#fff"/>`).join('')
-  + `<circle cx="87" cy="413" r="2" fill="${OL}"/><circle cx="97" cy="413" r="2" fill="${OL}"/>` + line('M82 418 Q92 424 102 418', 2.5)
-  + sparkle(134, 372, 7);
 /* ── ozadja ──
    Lik stoji na sredini (x 150–360), spremljevalec spodaj levo, ščit levo:
    zanimive stvari zato na straneh in zgoraj. Ozadja so brez črnih obrob,
@@ -838,10 +805,9 @@ const ITEMS = {
       `<circle cx="326" cy="430" r="44" fill="#ffd75e" opacity=".25"/>` + line('M326 374 L326 400', 5)
       + part('M308 398 L344 398 L344 408 L308 408 Z', '#3a3550', { w: 4 }) + part('M311 408 L341 408 L341 452 L311 452 Z', '#ffd75e', { w: 4 }) + line('M326 410 L326 450', 3) + part('M308 452 L344 452 L344 461 L308 461 Z', '#3a3550', { w: 4 }) },
   sova:         { slot: 'spremljevalec', char: null, season: 1, name: 'Sovica Brihta', acc: 'Sovico Brihta', rarity: 'nagrada', reward: [1, 'post'], draw: owl },
-  mucek:        { slot: 'spremljevalec', char: null, season: 1, name: 'Mačka', acc: 'Mačko', rarity: 'navaden', price: 90, draw: cat },
-  lisicka:      { slot: 'spremljevalec', char: null, season: 1, name: 'Lisička', acc: 'Lisičko', rarity: 'redek', price: 180, draw: fox },
-  /* Napoved: vidi se že jeseni, dobi se v zimi (polna stran Zvestoba). */
-  zmajcek:      { slot: 'spremljevalec', char: null, season: 1, name: 'Zmajček', acc: 'Zmajčka', rarity: 'nagrada', reward: [2, 'zve'], draw: dragon },
+  /* Mačka, Lisička in Zmajček so bili tu do 20. 10. 2026. Spremljevalce
+     zdaj dobiš pri Do 20 (ljubljenček); kupcem so bili cekini vrnjeni
+     (supabase_spremljevalci.sql). Sovica ostane kot nagrada albuma. */
   travnik:      { slot: 'ozadje', char: null, season: 1, name: 'Travnik', rarity: 'navaden', price: 0, draw: () => bg('travnik') },
   zahod:        { slot: 'ozadje', char: null, season: 1, name: 'Sončni zahod', rarity: 'nagrada', reward: [1, 'pog'], draw: () => bg('zahod') },
   grad:         { slot: 'ozadje', char: null, season: 1, name: 'Grad', rarity: 'nagrada', reward: [1, 'razred'], draw: () => bg('grad') },
