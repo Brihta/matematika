@@ -16,10 +16,12 @@
     { id: 'zmaj',   name: 'Zmajček', acc: 'zmajčka', start: 'jajce'  },
     { id: 'lisica', name: 'Lisička', acc: 'lisičko', start: 'kosara' },
     { id: 'sova',   name: 'Sovica',  acc: 'sovico',  start: 'jajce'  },
-    { id: 'macka',  name: 'Mucka',   acc: 'mucko',   start: 'kosara' }
+    { id: 'macka',  name: 'Mucek',   acc: 'mucka',   start: 'kosara' }
   ];
   /* Prva stopnja (v bazi za vse 'jajce'): zmajček in sovica sta v jajcu in
-     se izvalita, lisička in mucka spita zviti v košarici in se zbudita. */
+     se izvalita, lisička in mucek spita zvita v košarici in se zbudita.
+     Ključ 'macka' ostane (baza); ime je od 20. 10. 2026 Mucek, da sta dva
+     fanta in dve punci (zmajček, mucek; lisička, sovica). */
   const startOf = id => (SPECIES.find(s => s.id === (id === 'jez' ? 'macka' : id)) || SPECIES[0]).start;
   const hatches = id => startOf(id) === 'jajce';
   const WORDS = {
@@ -343,7 +345,7 @@
       + line('M44 136 C60 150 140 150 156 136', 11, OL) + line('M44 136 C60 150 140 150 156 136', 6, WICK_L)
       + `</g>`;
   }
-  /* Spanček v košarici (lisička, mucka): zvit klobčič, glava na boku,
+  /* Spanček v košarici (lisička, mucek): zvit klobčič, glava na boku,
      rep ovit naokoli. */
   function sleeper(pet) {
     const c = (BODY[pet.body] || BODY.gozd).c, b = (BELLY[pet.belly] || BELLY.krema).c;
@@ -351,7 +353,7 @@
     const body = shape('M70 120 C70 100 92 94 116 96 C140 98 152 110 152 124 C152 136 140 142 116 142 C92 142 70 138 70 120 Z', c,
         patternFill(pet.pattern, c, 120, 116, 26), 4.2);
     const tipEar = d => shape(d, c, (fox ? `<path d="M20 40 L180 40 L180 74 L20 74 Z" fill="${SOCK}"/>` : ''), 4);
-    // lisička ima visoka ušesa s temnimi konicami, mucka nižja z rožnato notranjostjo
+    // lisička ima visoka ušesa s temnimi konicami, mucek nižja z rožnato notranjostjo
     const ears = fox
       ? tipEar('M52 98 C46 84 46 70 52 60 C60 64 70 72 74 82 Z') + tipEar('M90 84 C94 74 102 64 112 60 C114 70 112 84 106 92 Z')
         + `<path d="M56 90 C53 82 53 74 56 68 C60 71 65 76 68 82 Z" fill="${b}"/><path d="M97 83 C100 77 104 72 108 69 C109 75 108 81 104 87 Z" fill="${b}"/>`

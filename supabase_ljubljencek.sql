@@ -276,7 +276,7 @@ returns int language sql stable security definer set search_path = public as $$
 $$;
 
 -- Kateri ljubljenček (iz katere sezone) spremlja lik. Brez vrstice = nobeden;
--- takrat ostane spremljevalec iz trgovine lika (sova, mucek …).
+-- takrat ostane spremljevalec iz trgovine lika (sova, mačka …).
 create table if not exists pet_companion (
   student_id uuid     primary key references students(id) on delete cascade,
   season     smallint not null
