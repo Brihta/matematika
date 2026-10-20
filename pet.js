@@ -115,7 +115,7 @@
     if (!active()) { buddy.classList.remove('on'); const hp = $('homePet'); if (hp) hp.innerHTML = ''; return; }
     const pet = state.pet || { species: 'zmaj' };
     const stage = state.pet ? state.stage : 'jajce';
-    $('ptFace').innerHTML = PetArt.draw(pet, stage, { viewBox: stage === 'jajce' ? '40 40 120 150' : '50 20 100 100' });
+    $('ptFace').innerHTML = PetArt.draw(pet, stage, { viewBox: PetArt.faceBox(stage) });
     $('ptTxt').textContent = state.pet && state.pet.name ? state.pet.name : 'Ljubljenček';
     const b = $('ptBadge');
     b.textContent = state.pet ? '' : '!';      // še nima ljubljenčka: povabi ga

@@ -409,6 +409,14 @@
   const shell = () => shape('M44 160 L56 150 L66 162 L80 148 L92 162 L104 148 L116 162 L130 148 L142 160 L156 152 C158 176 138 192 100 192 C62 192 42 176 44 160 Z',
     '#fbf6e6', `<path d="M40 176 L160 176 L160 200 L40 200 Z" fill="#e8dcc0"/>`, 3.5);
 
+  /* Izrez glave za majhno okroglo sličico (ploščica ljubljenčka v vrstici
+     zgoraj). Mladiček in mlad sta narisana manjša in nižje, zato ima vsaka
+     stopnja svoj izrez; izračunano iz glave (x 34–166 z lički, y 10–116)
+     in povečav v draw(). */
+  const FACE_BOX = { jajce: '40 40 120 150', mladicek: '46 54 108 108', mlad: '38 30 124 124',
+                     odrasel: '32 4 136 136', koncna: '32 0 136 136' };
+  const faceBox = stage => FACE_BOX[stage] || FACE_BOX.odrasel;
+
   /* Glavna risba. stage: jajce | mladicek | mlad | odrasel | koncna */
   function draw(pet, stage, o = {}) {
     pet = Object.assign({ species: 'zmaj', body: 'gozd', belly: 'krema', eyes: 'rjave', pattern: 'brez' }, pet || {});
@@ -431,5 +439,5 @@
     return `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" class="pa-svg">${s}</svg>`;
   }
 
-  window.PetArt = { draw, hatches, startOf, words, stageName, SPECIES, BODY, BELLY, EYES, PATTERN, FREE, UNLOCKS, MILESTONES, STAGES, ACC, SLOT_NAME, stageOf, allowed, unlockAt };
+  window.PetArt = { draw, faceBox, hatches, startOf, words, stageName, SPECIES, BODY, BELLY, EYES, PATTERN, FREE, UNLOCKS, MILESTONES, STAGES, ACC, SLOT_NAME, stageOf, allowed, unlockAt };
 })();
