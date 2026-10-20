@@ -329,15 +329,15 @@ function milestone(m) {
 
 function renderPick() {
   $('app').innerHTML = `
-    <h1>🐾 Izberi svojega ljubljenčka<small>Sezona ${esc(S.season.name)} · zmajček in sovica se izvalita iz jajca, lisička in mucka spita v košarici</small></h1>
+    <h1>🐾 Izberi svojega ljubljenčka<small>Sezona ${esc(S.season.name)} · sovica se izvali iz jajca, zmajček, lisička in mucka pa spijo, dokler jih ne zbudiš</small></h1>
     <div class="card pick" style="margin-top:16px">
       <div class="row">${A.SPECIES.map(x => `<button class="species-btn" data-new="${x.id}">
         ${A.draw({ species: x.id, body: START[x.id] }, 'jajce')}${x.name}</button>`).join('')}</div>
-      <div class="note">Ko rešiš prvi mejnik pri računih do 20, se jajce izvali ali se ljubljenček v košarici zbudi. Potem raste z vsakim novim mejnikom.</div>
+      <div class="note">Ko rešiš prvi mejnik pri računih do 20, se jajce izvali ali se ljubljenček zbudi. Potem raste z vsakim novim mejnikom.</div>
     </div>`;
   document.querySelectorAll('[data-new]').forEach(b => b.addEventListener('click', () => {
     const sp = b.dataset.new;
-    save({ species: sp, name: '', body: START[sp], belly: 'krema', eyes: 'rjave', pattern: 'brez' }, A.hatches(sp) ? 'Jajce je tvoje! 🥚' : 'Košarica je tvoja! 🧺');
+    save({ species: sp, name: '', body: START[sp], belly: 'krema', eyes: 'rjave', pattern: 'brez' }, A.words(sp).mine);
   }));
 }
 
