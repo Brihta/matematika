@@ -13,11 +13,20 @@
   const OL = '#3a2a3a';
 
   const SPECIES = [
-    { id: 'zmaj',   name: 'Zmajček', acc: 'zmajčka' },
-    { id: 'lisica', name: 'Lisička', acc: 'lisičko' },
-    { id: 'sova',   name: 'Sovica',  acc: 'sovico'  },
-    { id: 'macka',  name: 'Mucka',   acc: 'mucko'   }
+    { id: 'zmaj',   name: 'Zmajček', acc: 'zmajčka', egg: true  },
+    { id: 'lisica', name: 'Lisička', acc: 'lisičko', egg: false },
+    { id: 'sova',   name: 'Sovica',  acc: 'sovico',  egg: true  },
+    { id: 'macka',  name: 'Mucka',   acc: 'mucko',   egg: false }
   ];
+  /* Zmajček in sovica se izvalita iz jajca, lisička in mucka pa sta
+     sesalca: na začetku spita zvita v košarici in se ob prvem mejniku
+     zbudita. V bazi je prva stopnja za vse 'jajce'. */
+  const hatches = id => (SPECIES.find(s => s.id === (id === 'jez' ? 'macka' : id)) || SPECIES[0]).egg;
+  const WORDS = {
+    egg:  { first: 'Jajce', icon: '🥚', born: 'Jajce se je izvalilo! 🐣', wait: 'se izvali', waitPast: 'se je izvalil', still: 'Še v jajcu' },
+    nest: { first: 'Spi v košarici', icon: '🧺', born: 'Ljubljenček se je zbudil! ☀️', wait: 'se zbudi', waitPast: 'se je zbudil', still: 'Še spi' }
+  };
+  const words = id => WORDS[hatches(id) ? 'egg' : 'nest'];
   const BODY = {
     gozd:   { name: 'Gozdna',   c: '#6f9a4a' },
     med:    { name: 'Medena',   c: '#e0a84a' },
@@ -59,6 +68,7 @@
     { id: 'odrasel',  name: 'Odrasel',       from: 7 },
     { id: 'koncna',   name: 'Končna oblika', from: 10 }
   ];
+  const stageName = (id, species) => id === 'jajce' ? words(species).first : (STAGES.find(s => s.id === id) || {}).name;
   const stageOf = n => STAGES.slice().reverse().find(s => n >= s.from).id;
   function allowed(kind, val, count) {
     if (FREE[kind].includes(val)) return true;
@@ -388,6 +398,65 @@
       + sleepy, 4.2);
   }
 
+  /* Košarica: zadnji rob (notranjost) in sprednji del s pletenjem in
+     odejico v barvi trebuščka, ki visi čez rob. dy = zamik navzdol. */
+  const WICKER = '#dda566', WICK_D = '#b47a3e', WICK_L = '#f0c88c';
+  const basketBack = (dy = 0) => `<g transform="translate(0 ${dy})">`
+    + shape('M46 136 C46 122 154 122 154 136 C154 146 46 146 46 136 Z', '#8a5a34', '', 3.5) + `</g>`;
+  function basketFront(dy = 0, pet = {}) {
+    const b = (BELLY[pet.belly] || BELLY.krema).c;
+    const front = 'M44 136 C60 150 140 150 156 136 C156 168 132 188 100 188 C68 188 44 168 44 136 Z';
+    const weave = [154, 166, 177].map(y => line(`M40 ${y} Q100 ${y + 12} 160 ${y}`, 2.4, WICK_D)).join('')
+      + [[62, 150], [82, 154], [102, 156], [122, 154], [140, 150], [70, 163], [92, 168], [112, 168], [132, 163], [84, 179], [104, 181], [122, 178]]
+        .map(([x, y]) => line(`M${x} ${y} L${x + 4} ${y + 8}`, 2.2, WICK_D)).join('');
+    return `<g transform="translate(0 ${dy})">`
+      + shape(front, WICKER, weave + `<path d="M120 140 L170 140 L170 200 L120 200 Z" fill="${WICK_D}" opacity=".3"/>`, 3.5)
+      // odejica čez rob, s srčkom
+      + shape('M58 138 C70 146 86 148 98 148 C98 156 94 166 86 168 C76 164 66 154 58 138 Z', b,
+          `<path d="M50 152 L100 152 L100 172 L50 172 Z" fill="${shade(b)}" opacity=".25"/>`, 3)
+      + heart(84, 154, 4, '#f08aa0')
+      // rob košarice kot debela vrv
+      + line('M44 136 C60 150 140 150 156 136', 10, OL) + line('M44 136 C60 150 140 150 156 136', 5.5, WICK_L)
+      + `</g>`;
+  }
+  /* Spanček v košarici: zvit klobčič, glava na tačkah, rep ovit spredaj. */
+  function sleeper(pet) {
+    const c = (BODY[pet.body] || BODY.gozd).c, b = (BELLY[pet.belly] || BELLY.krema).c, D = shade(c);
+    const fox = pet.species === 'lisica';
+    const inner = fox ? b : '#f4a9b8';
+    const body = shape('M70 118 C70 98 92 92 116 94 C140 96 152 108 152 124 C152 136 140 142 116 142 C92 142 70 136 70 118 Z', c,
+        patternFill(pet.pattern, c, 120, 116, 26)
+      + `<path d="M60 130 L160 130 L160 150 L60 150 Z" fill="${D}" opacity=".35"/>`
+      + `<ellipse cx="124" cy="102" rx="12" ry="5" fill="${light(c)}" opacity=".6" transform="rotate(8 124 102)"/>`
+      + (fox ? '' : [112, 124, 136].map(x => line(`M${x} 96 Q${x + 3} 104 ${x} 110`, 3.5, D)).join('')), 3.5);
+    // ušesi: lisička ima višji, šilasti, mucka okroglejši
+    const ear = (d, di) => shape(d, c, `<path d="${di}" fill="${inner}"/>`, 3.2);
+    const ears = fox
+      ? ear('M52 96 C46 82 46 66 52 58 C60 62 70 72 74 82 Z', 'M55 88 C52 80 52 72 55 66 C60 70 66 76 68 82 Z')
+        + ear('M92 82 C96 72 104 62 112 60 C114 70 110 84 104 92 Z', 'M98 82 C101 76 106 70 109 68 C110 74 108 80 104 86 Z')
+      : ear('M52 98 C48 86 50 74 56 66 C64 70 72 78 76 86 Z', 'M56 90 C55 84 56 78 59 74 C64 77 68 81 70 86 Z')
+        + ear('M90 86 C96 76 104 70 112 68 C114 78 110 88 104 96 Z', 'M96 86 C100 80 104 77 108 75 C109 81 107 86 104 90 Z');
+    const headD = 'M46 118 C46 98 60 88 78 88 C96 88 110 98 110 116 C110 134 96 142 78 142 C60 142 46 134 46 118 Z';
+    const head = shape(headD, c,
+        patternFill(pet.pattern, c, 78, 112, 18)
+      + (fox ? `<path d="M40 122 C54 124 68 120 78 130 C88 120 102 124 116 122 L116 150 L40 150 Z" fill="${b}"/>`
+             : `<ellipse cx="78" cy="130" rx="13" ry="8" fill="${b}"/>` + [70, 78, 86].map(x => line(`M${x} 90 L${x} 97`, 2.8, D)).join(''))
+      + `<ellipse cx="62" cy="100" rx="9" ry="5" fill="${light(c)}" opacity=".7" transform="rotate(-30 62 100)"/>`, 3.5);
+    const face = line('M60 117 Q66 122 72 117', 2.8) + line('M84 117 Q90 122 96 117', 2.8)
+      + `<ellipse cx="57" cy="126" rx="6" ry="4" fill="#ff8fa8" opacity=".55"/><ellipse cx="99" cy="126" rx="6" ry="4" fill="#ff8fa8" opacity=".55"/>`
+      + (fox ? `<path d="M74 125 C74 122.5 82 122.5 82 125 C82 127.5 80 129 78 129 C76 129 74 127.5 74 125 Z" fill="${OL}"/>`
+             : `<path d="M75 125 C75 123.5 81 123.5 81 125 C81 126.5 79.5 128 78 128 C76.5 128 75 126.5 75 125 Z" fill="#e8798f" stroke="${OL}" stroke-width="1.5"/>`)
+      + line('M74 132 Q76 134.5 78 132 Q80 134.5 82 132', 1.8);
+    // rep ovit okoli spredaj, konica pod brado
+    const tail = shape('M150 122 C162 138 140 150 110 150 C92 150 74 150 62 144 C66 136 82 140 100 139 C124 138 144 136 150 122 Z', c,
+        (fox ? `<ellipse cx="62" cy="144" rx="16" ry="10" fill="${b}"/>`
+             : [92, 112, 132].map(x => line(`M${x} 138 L${x - 2} 150`, 4, D)).join('') + `<ellipse cx="64" cy="144" rx="8" ry="7" fill="${b}"/>`)
+      + `<path d="M60 146 L160 146 L160 160 L60 160 Z" fill="${D}" opacity=".3"/>`, 3.2);
+    const zzz = [[134, 82, 13], [148, 66, 10], [158, 54, 8]].map(([x, y, f]) =>
+      `<text x="${x}" y="${y}" font-size="${f}" font-weight="900" font-family="system-ui, sans-serif" fill="#6f6a9a" opacity=".85">z</text>`).join('');
+    return basketBack() + body + ears + head + face + tail + basketFront(0, pet) + zzz;
+  }
+
   const crown = () => `<g transform="translate(0 -6)">${shape('M78 34 L84 10 L94 26 L100 6 L106 26 L116 10 L122 34 Z', '#f4c542',
       `<path d="M70 28 L130 28 L130 40 L70 40 Z" fill="#d89936"/>`, 3.5)}<circle cx="100" cy="20" r="3.5" fill="#e86a8a" stroke="${OL}" stroke-width="2"/></g>`;
   const shell = () => shape('M44 160 L56 150 L66 162 L80 148 L92 162 L104 148 L116 162 L130 148 L142 160 L156 152 C158 176 138 192 100 192 C62 192 42 176 44 160 Z',
@@ -398,8 +467,10 @@
     pet = Object.assign({ species: 'zmaj', body: 'gozd', belly: 'krema', eyes: 'rjave', pattern: 'brez' }, pet || {});
     const vb = o.viewBox || '0 0 200 200';
     let s = `<ellipse cx="100" cy="188" rx="${stage === 'jajce' ? 46 : 52}" ry="7" fill="#05270b" opacity=".12"/>`;
-    if (stage === 'jajce') s += `<g class="pa-egg">${egg(pet)}</g>`;
-    else if (stage === 'mladicek') s += `<g transform="translate(100 192) scale(.66) translate(-100 -186)">${creature(pet, 1.22)}</g>` + shell();
+    const egg1 = hatches(pet.species);
+    if (stage === 'jajce') s += `<g class="pa-egg">${egg1 ? egg(pet) : sleeper(pet)}</g>`;
+    else if (stage === 'mladicek') s += (egg1 ? '' : basketBack(10))
+      + `<g transform="translate(100 192) scale(.66) translate(-100 -186)">${creature(pet, 1.22)}</g>` + (egg1 ? shell() : basketFront(10, pet));
     else if (stage === 'mlad') s += `<g transform="translate(100 188) scale(.82) translate(-100 -186)">${creature(pet, 1.1)}</g>`;
     else {
       if (stage === 'koncna') s = `<circle cx="100" cy="110" r="88" fill="#dde236" opacity=".22"/><circle cx="100" cy="110" r="70" fill="#dde236" opacity=".18"/>` + s;
@@ -412,5 +483,5 @@
     return `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" class="pa-svg">${s}</svg>`;
   }
 
-  window.PetArt = { draw, SPECIES, BODY, BELLY, EYES, PATTERN, FREE, UNLOCKS, STAGES, ACC, SLOT_NAME, stageOf, allowed, unlockAt };
+  window.PetArt = { draw, hatches, words, stageName, SPECIES, BODY, BELLY, EYES, PATTERN, FREE, UNLOCKS, STAGES, ACC, SLOT_NAME, stageOf, allowed, unlockAt };
 })();

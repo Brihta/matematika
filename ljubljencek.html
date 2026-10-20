@@ -177,7 +177,7 @@ async function save(next, okMsg) {
   if (!r || r.unreachable) { draft = prev; render(); toast('⚠️ Ni povezave — poskusi znova.'); return; }
   if (r.error) {
     draft = prev; render();
-    const m = { IME: 'Ime naj ima samo črke (do 14).', ZAKLENJENO: 'To se odklene z mejnikom.', IZVALJEN: 'Ljubljenček se je že izvalil — vrsta ostane.', VRSTA: 'Te vrste ni.' }[r.error] || 'Ni šlo.';
+    const m = { IME: 'Ime naj ima samo črke (do 14).', ZAKLENJENO: 'To se odklene z mejnikom.', IZVALJEN: 'Ljubljenček je že buden — vrsta ostane.', VRSTA: 'Te vrste ni.' }[r.error] || 'Ni šlo.';
     if (r.error === 'IME') { const el = $('nameMsg'); if (el) el.textContent = m; } else toast(m);
     return;
   }
@@ -189,7 +189,7 @@ function render() {
   if (!S) return;
   if (!draft) return renderPick();
   const count = S.count, stage = S.stage;
-  const st = A.STAGES.find(x => x.id === stage), next = A.STAGES.find(x => x.from > count);
+  const next = A.STAGES.find(x => x.from > count), W = A.words(draft.species);
   const sp = A.SPECIES.find(x => x.id === draft.species) || A.SPECIES[0];
   $('app').innerHTML = `
     <h1>🐣 Moj ljubljenček<small>Sezona ${esc(S.season.name)} · raste, ko računaš do 20 hitro in brez napak</small></h1>
@@ -197,12 +197,12 @@ function render() {
       <div class="card stage-card">
         <div class="pet-big">${A.draw(draft, stage)}</div>
         <div class="pet-name">${esc(draft.name) || `<span style="color:var(--muted)">${sp.name}</span>`}</div>
-        <span class="pet-stage">${st.name}</span>
+        <span class="pet-stage">${A.stageName(stage, draft.species)}</span>
         <div class="growth">
           <div class="growth-bar"><div class="growth-fill" style="width:${count * 10}%"></div></div>
-          <div class="growth-marks">${A.STAGES.map(x => `<span class="${count >= x.from ? 'on' : ''}">${x.from ? x.from : '🥚'}</span>`).join('')}</div>
+          <div class="growth-marks">${A.STAGES.map(x => `<span class="${count >= x.from ? 'on' : ''}">${x.from ? x.from : W.icon}</span>`).join('')}</div>
           <div class="growth-txt">${count} / 10 mejnikov${next
-            ? `<small>Še ${next.from - count} do stopnje »${next.name}«${count === 0 ? ' — prvi mejnik izvali jajce!' : ''}</small>`
+            ? `<small>Še ${next.from - count} do stopnje »${next.name}«${count === 0 ? ` — ob prvem mejniku ${W.wait}!` : ''}</small>`
             : '<small>Končna oblika! Bravo, vse računi do 20 znaš na pamet.</small>'}</div>
         </div>
         ${treatsBox()}
@@ -215,7 +215,7 @@ function render() {
           <h2 style="margin-top:12px">Vrsta</h2>
           <div class="row">${A.SPECIES.map(x => `<button class="species-btn${x.id === draft.species ? ' on' : ''}" data-sp="${x.id}" ${count > 0 && x.id !== draft.species ? 'disabled' : ''}>
               ${A.draw({ ...draft, species: x.id }, count > 0 ? 'odrasel' : 'jajce')}${x.name}</button>`).join('')}</div>
-          <div class="note">${count > 0 ? 'Ljubljenček se je izvalil, zato vrsta ostane ista vso sezono.' : 'Dokler je jajce, lahko vrsto še zamenjaš.'}</div>
+          <div class="note">${count > 0 ? `Ljubljenček ${W.waitPast}, zato vrsta ostane ista vso sezono.` : 'Dokler spi, lahko vrsto še zamenjaš.'}</div>
         </div>
         <div class="card section">
           <h2>Barva</h2>
@@ -249,11 +249,11 @@ function treatsBox() {
     <small>Danes ${t.today} / ${t.cap} · za vajo do 20 (tipkovnica več kot kviz)</small>
     <div class="today-bar"><i style="width:${Math.min(100, t.today / t.cap * 100)}%"></i></div></div></div>`;
 }
-/* Trgovina: predmet pokažemo na tvojem ljubljenčku (jajce ga ne more nositi,
+/* Trgovina: predmet pokažemo na tvojem ljubljenčku (dokler spi, ga ne more nositi,
    zato ga pokažemo odraslega). Kupljeno ostane za vedno. */
 function shopCard(stage) {
   const owned = new Set(S.owned || []), bal = (S.treats || {}).balance || 0, eq = draft.equip || {};
-  // v jajcu in lupini se predmet ne vidi dobro — pokažemo ga na odraslem
+  // v jajcu, lupini ali košarici se predmet ne vidi dobro — pokažemo ga na odraslem
   const look = stage === 'jajce' || stage === 'mladicek' ? 'odrasel' : stage;
   const bySlot = {};
   (S.shop || []).forEach(x => (bySlot[x.slot] = bySlot[x.slot] || []).push(x));
@@ -266,7 +266,7 @@ function shopCard(stage) {
         : `<button class="buy" data-buy="${x.id}" ${bal < x.price ? 'disabled' : ''}>🍎 ${x.price}</button>`;
       return `<div class="it${on ? ' on' : ''}">${pic}<div class="nm">${nm}</div>${btn}</div>`;
     }).join('')}</div>`).join('')}
-    <div class="note">${stage === 'jajce' ? 'Jajce še ne more nositi ničesar — predmete pa lahko že kupiš.' : 'Klikni še enkrat, da predmet snameš.'}</div></div>`;
+    <div class="note">${stage === 'jajce' ? 'Ljubljenček še spi in ne more nositi ničesar — predmete pa lahko že kupiš.' : 'Klikni še enkrat, da predmet snameš.'}</div></div>`;
 }
 /* Kdo gre z likom (vitez …): ta ljubljenček ali kateri iz prejšnjih sezon. */
 function companionCard(stage) {
@@ -277,10 +277,10 @@ function companionCard(stage) {
       const on = cur && cur.season === c.season, egg = c.stage === 'jajce';
       return `<div class="it${on ? ' on' : ''}">${A.draw(c, c.stage)}<div class="nm">${esc(c.name) || (A.SPECIES.find(x => x.id === c.species) || {}).name}
         <br><span style="color:var(--muted);font-weight:700">${esc(c.season_name)}</span></div>
-        ${egg ? '<button class="wear" disabled>Še v jajcu</button>'
+        ${egg ? `<button class="wear" disabled>${A.words(c.species).still}</button>`
               : `<button class="wear" data-comp="${on ? '' : c.season}">${on ? '✓ Gre s tabo' : 'Vzemi s seboj'}</button>`}</div>`;
     }).join('')}</div>
-    <div class="note">${cur ? 'Tvoj ljubljenček stoji ob tvojem liku namesto spremljevalca iz trgovine lika.' : 'Ko se izvali, ga lahko vzameš s seboj — stal bo ob tvojem liku.'}</div></div>`;
+    <div class="note">${cur ? 'Tvoj ljubljenček stoji ob tvojem liku namesto spremljevalca iz trgovine lika.' : `Ko ${A.words(draft.species).wait}, ga lahko vzameš s seboj — stal bo ob tvojem liku.`}</div></div>`;
 }
 /* Nakup, oprema, spremljevalec: baza preveri in vrne novo stanje. */
 async function act(fn, params, okMsg) {
@@ -290,8 +290,8 @@ async function act(fn, params, okMsg) {
   saving = false;
   if (!r || r.unreachable) { toast('⚠️ Ni povezave — poskusi znova.'); return; }
   if (r.error) {
-    toast({ PREMALO: 'Premalo priboljškov — vadi še malo!', ZE_IMAS: 'To že imaš.', JAJCE: 'Najprej se mora izvaliti.',
-            NI_LJUBLJENCKA: 'Najprej izberi jajce.' }[r.error] || 'Ni šlo.');
+    toast({ PREMALO: 'Premalo priboljškov — vadi še malo!', ZE_IMAS: 'To že imaš.', JAJCE: 'Ljubljenček še spi — najprej se mora zbuditi.',
+            NI_LJUBLJENCKA: 'Najprej izberi ljubljenčka.' }[r.error] || 'Ni šlo.');
     return;
   }
   setState(r);
@@ -329,15 +329,15 @@ function milestone(m) {
 
 function renderPick() {
   $('app').innerHTML = `
-    <h1>🥚 Izberi svoje jajce<small>Sezona ${esc(S.season.name)} · iz njega se bo izvalil tvoj ljubljenček</small></h1>
+    <h1>🐾 Izberi svojega ljubljenčka<small>Sezona ${esc(S.season.name)} · zmajček in sovica se izvalita iz jajca, lisička in mucka spita v košarici</small></h1>
     <div class="card pick" style="margin-top:16px">
       <div class="row">${A.SPECIES.map(x => `<button class="species-btn" data-new="${x.id}">
         ${A.draw({ species: x.id, body: START[x.id] }, 'jajce')}${x.name}</button>`).join('')}</div>
-      <div class="note">Ko rešiš prvi mejnik pri računih do 20, se jajce izvali. Potem raste z vsakim novim mejnikom.</div>
+      <div class="note">Ko rešiš prvi mejnik pri računih do 20, se jajce izvali ali se ljubljenček v košarici zbudi. Potem raste z vsakim novim mejnikom.</div>
     </div>`;
   document.querySelectorAll('[data-new]').forEach(b => b.addEventListener('click', () => {
     const sp = b.dataset.new;
-    save({ species: sp, name: '', body: START[sp], belly: 'krema', eyes: 'rjave', pattern: 'brez' }, 'Jajce je tvoje! 🥚');
+    save({ species: sp, name: '', body: START[sp], belly: 'krema', eyes: 'rjave', pattern: 'brez' }, A.hatches(sp) ? 'Jajce je tvoje! 🥚' : 'Košarica je tvoja! 🧺');
   }));
 }
 
@@ -361,7 +361,7 @@ function wire() {
     act('pet_buy', { p_item: id }, `Kupljeno: ${nm}! 🎉`);
   }));
   document.querySelectorAll('[data-wear]').forEach(b => b.addEventListener('click', () => {
-    if (S.stage === 'jajce') { toast('Jajce še ne more nositi ničesar.'); return; }
+    if (S.stage === 'jajce') { toast('Ljubljenček še spi in ne more nositi ničesar.'); return; }
     const on = (draft.equip || {})[b.dataset.slot] === b.dataset.wear;
     act('pet_equip', { p_slot: b.dataset.slot, p_item: on ? null : b.dataset.wear });
   }));

@@ -103,7 +103,7 @@
     const m = fresh[0], pic = state.pet ? PetArt.draw(state.pet, state.stage) : '';
     const unlock = PetArt.UNLOCKS[state.count - 1];
     const what = unlock ? ({ ...PetArt.BODY, ...PetArt.EYES, ...PetArt.PATTERN }[unlock] || {}).name : null;
-    const head = prev.stage === 'jajce' && state.stage !== 'jajce' ? 'Jajce se je izvalilo! 🐣'
+    const head = prev.stage === 'jajce' && state.stage !== 'jajce' ? PetArt.words(state.pet && state.pet.species).born
       : prev.stage !== state.stage ? `Ljubljenček je zrasel: ${(PetArt.STAGES.find(s => s.id === state.stage) || {}).name}!`
       : `Nov mejnik: ${GROUP_NAME[m.g]} ${OPS[m.op]}!`;
     toast(`<span class="pic">${pic}</span><div>${head}<small>${state.count}/10 mejnikov${what ? ` · odklenjeno: ${what}` : ''} · tapni in poglej</small></div>`, 7000);
@@ -118,7 +118,7 @@
     $('ptFace').innerHTML = PetArt.draw(pet, stage, { viewBox: stage === 'jajce' ? '40 40 120 150' : '50 20 100 100' });
     $('ptTxt').textContent = state.pet && state.pet.name ? state.pet.name : 'Ljubljenček';
     const b = $('ptBadge');
-    b.textContent = state.pet ? '' : '!';      // še nima jajca: povabi ga
+    b.textContent = state.pet ? '' : '!';      // še nima ljubljenčka: povabi ga
     b.classList.toggle('on', !state.pet);
     buddy.innerHTML = state.pet ? PetArt.draw(state.pet, state.stage) : '';
     // ljubljenček pokuka iz ploščice Do 20 na začetnem zaslonu
