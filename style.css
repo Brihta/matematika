@@ -1848,10 +1848,12 @@ body.bitka .comp-board-row.me {
 }
 .ptable-grp { font-size: .85rem; min-width: 96px; text-align: left; }
 /* pregled razreda: skupine imajo daljše glave kot številke poštevank */
-.td-th-grp { font-size: 0.66rem; white-space: nowrap; }
-.td-cell-grp { width: 62px; min-width: 62px; }
+/* Glava stolpca mora biti široka kot stolpec, sicer se glave zamikajo in
+   prekrivajo. Daljša imena ("Brez prehoda") gredo v dve vrsti. */
+.td-th-grp { font-size: 0.66rem; white-space: normal; text-align: center; line-height: 1.1; align-self: end; }
+.td-cell-grp, .td-th-grp { width: 76px; min-width: 76px; }
 @media (min-width: 1200px) {
-  .td-cell-grp { width: 104px; min-width: 104px; }
+  .td-cell-grp, .td-th-grp { width: 120px; min-width: 120px; }
   .td-th-grp { font-size: 0.85rem; }
 }
 /* Z dodanim "Vadim" zgornja vrstica med 900 in 1200 px ne gre več v eno
