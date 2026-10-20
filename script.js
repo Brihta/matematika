@@ -1398,11 +1398,12 @@ function logoutTeacher() {
 }
 
 /* ── Student class (razred) ── */
-/* Oddelki, ki dejansko obstajajo na šoli — 2. in 3. razred imata samo A,
-   8. in 9. razreda ni. Ponujati oddelke, ki jih ni, samo vabi k napačni
+/* Oddelki, ki dejansko obstajajo na šoli — 2., 3. in 9. razred imajo samo
+   A, 8. razred ima tudi C. Ponujati oddelke, ki jih ni, samo vabi k napačni
    izbiri. */
 const RAZREDI = ['1A','1B','2A','3A','4A','4B',
-                 '5A','5B','6A','6B','7A','7B'];
+                 '5A','5B','6A','6B','7A','7B',
+                 '8A','8B','8C','9A'];
 /* Starši, stari starši, prijatelji … Namesto razreda dobijo to oznako, da jih
    aplikacija ne sprašuje več po razredu in da ne pridejo med učence. */
 const OBISK = 'OBISK';

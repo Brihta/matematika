@@ -9,6 +9,8 @@
 -- Aplikaciji se predstavi z oznako 'OBISK' namesto razreda — po njej ve, da
 -- ga ne sme več spraševati po razredu.
 --
+-- Oddelki A, B in C (8. razred ima tudi C).
+--
 -- Zaženi v Supabase → SQL Editor. Varno za ponoven zagon.
 
 -- ── 1. Nov stolpec ────────────────────────────────────────────────────────
@@ -55,9 +57,9 @@ begin
      where id = p_student;
     return;
   end if;
-  if p_razred !~ '^[1-9][AB]$' then return; end if;
+  if p_razred !~ '^[1-9][ABC]$' then return; end if;
   g := (substring(p_razred from '^[1-9]'))::int;
-  o := substring(p_razred from '[AB]$');
+  o := substring(p_razred from '[ABC]$');
   update students
      set letnik      = (public.sola_leto(current_date) - g + 1)::smallint,
          oddelek     = o,
@@ -86,9 +88,9 @@ begin
     return 'OK';
   end if;
 
-  if coalesce(p_razred, '') !~ '^[1-9][AB]$' then return 'SLAB_RAZRED'; end if;
+  if coalesce(p_razred, '') !~ '^[1-9][ABC]$' then return 'SLAB_RAZRED'; end if;
   g := (substring(p_razred from '^[1-9]'))::int;
-  o := substring(p_razred from '[AB]$');
+  o := substring(p_razred from '[ABC]$');
 
   update students
      set letnik      = (public.sola_leto(current_date) - g + 1)::smallint,
