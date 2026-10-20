@@ -8,12 +8,12 @@
 -- napačni, koliko pravilnih je bilo časovno izmerjenih in koliko od njih
 -- hitrejših od 3 s (prag je v script.js, FAST_SECONDS). Tudi kviz.
 --
--- SKUPINE (grp) — po korakih pouka, pravila so v script.js (do20Group):
---   d10  do 10                4 + 3,  9 − 5
---   p10  prijatelji števila 10   7 + 3, 10 − 4
---   dv   dvojčki              6 + 6, 12 − 6
---   b20  do 20 brez prehoda   13 + 4, 17 − 4
---   pr   čez desetico         8 + 5, 14 − 6
+-- SKUPINE (grp) — kot pri pouku, pravila so v script.js (do20Group):
+--   d10  do 10                4 + 3,  7 + 3, 10 − 4
+--   b20  do 20 brez prehoda   13 + 4, 17 − 4, 10 + 10
+--   pr   do 20 s prehodom     8 + 5,  6 + 6, 14 − 6
+-- Do 20. 10. 2026 sta bili še skupini p10 (prijatelji 10) in dv (dvojčki);
+-- ponoven zagon te datoteke jih prestavi (glej "Prehod" spodaj).
 -- op: 'p' = seštevanje (plus), 'm' = odštevanje (minus)
 --
 -- Vse je dodano POLEG obstoječega. Odgovori Do 20 namenoma NE gredo v
@@ -27,7 +27,7 @@
 create table if not exists do20_stats (
   student_id uuid     not null references students(id) on delete cascade,
   day        date     not null,
-  grp        text     not null check (grp in ('d10', 'p10', 'dv', 'b20', 'pr')),
+  grp        text     not null check (grp in ('d10', 'b20', 'pr')),
   op         text     not null check (op in ('p', 'm')),
   correct    int      not null default 0,
   wrong      int      not null default 0,
@@ -39,9 +39,30 @@ create table if not exists do20_stats (
 -- berejo samo funkcije spodaj (SECURITY DEFINER), tako kot pri fact_stats.
 alter table do20_stats enable row level security;
 
+-- Prehod (20. 10. 2026): p10 → d10. Dvojčkov se brez posameznih računov ne
+-- da razdeliti (3 + 3 je do 10, 7 + 7 s prehodom), zato gredo k prehodu,
+-- kamor spada večina. Po posameznih računih (do20_facts, mejniki) se
+-- razvrstijo natančno, glej supabase_ljubljencek.sql.
+alter table do20_stats drop constraint if exists do20_stats_grp_check;
+insert into do20_stats (student_id, day, grp, op, correct, wrong, timed, fast)
+select student_id, day, case grp when 'p10' then 'd10' else 'pr' end, op,
+       sum(correct), sum(wrong), sum(timed), sum(fast)
+  from do20_stats where grp in ('p10', 'dv')
+ group by student_id, day, case grp when 'p10' then 'd10' else 'pr' end, op
+on conflict (student_id, day, grp, op) do update
+   set correct = do20_stats.correct + excluded.correct,
+       wrong   = do20_stats.wrong   + excluded.wrong,
+       timed   = do20_stats.timed   + excluded.timed,
+       fast    = do20_stats.fast    + excluded.fast;
+delete from do20_stats where grp in ('p10', 'dv');
+alter table do20_stats add constraint do20_stats_grp_check check (grp in ('d10', 'b20', 'pr'));
+
 -- ── 2. Učenec zapiše ──────────────────────────────────────────────────────
 -- p_data: [{"g":"pr","op":"p","c":3,"w":1,"n":3,"f":2}, ...]
 -- Vrednosti so omejene na 0–500 na klic, tako kot pri add_fact_stats.
+-- Stara aplikacija (pred 20. 10. 2026) še pošilja p10 in dv: prestavimo ju
+-- kot pri prehodu zgoraj in seštejemo po skupini, da ena vrstica ne pride
+-- dvakrat v isti insert.
 create or replace function public.add_do20_stats(
   p_student uuid, p_day date, p_data jsonb)
 returns void
@@ -51,14 +72,16 @@ begin
   if not exists (select 1 from students where id = p_student) then return; end if;
 
   insert into do20_stats (student_id, day, grp, op, correct, wrong, timed, fast)
-  select p_student, p_day, e->>'g', e->>'op',
-         greatest(0, least(500, coalesce((e->>'c')::int, 0))),
-         greatest(0, least(500, coalesce((e->>'w')::int, 0))),
-         greatest(0, least(500, coalesce((e->>'n')::int, 0))),
-         greatest(0, least(500, coalesce((e->>'f')::int, 0)))
-    from jsonb_array_elements(coalesce(p_data, '[]'::jsonb)) e
-   where e->>'g' in ('d10', 'p10', 'dv', 'b20', 'pr')
-     and e->>'op' in ('p', 'm')
+  select p_student, p_day, g, op, least(500, sum(c)), least(500, sum(w)), least(500, sum(n)), least(500, sum(f))
+    from (select case e->>'g' when 'p10' then 'd10' when 'dv' then 'pr' else e->>'g' end g, e->>'op' op,
+                 greatest(0, least(500, coalesce((e->>'c')::int, 0))) c,
+                 greatest(0, least(500, coalesce((e->>'w')::int, 0))) w,
+                 greatest(0, least(500, coalesce((e->>'n')::int, 0))) n,
+                 greatest(0, least(500, coalesce((e->>'f')::int, 0))) f
+            from jsonb_array_elements(coalesce(p_data, '[]'::jsonb)) e
+           where e->>'g' in ('d10', 'p10', 'dv', 'b20', 'pr')
+             and e->>'op' in ('p', 'm')) t
+   group by g, op
   on conflict (student_id, day, grp, op) do update
      set correct = do20_stats.correct + excluded.correct,
          wrong   = do20_stats.wrong   + excluded.wrong,

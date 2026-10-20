@@ -9,7 +9,7 @@
    Kaj je doseženo, odloča baza (pet_state), ne ta datoteka. */
 (function () {
   const SYNC_MIN_MS = 20000;
-  const GROUP_NAME = { d10: 'Do 10', p10: 'Prijatelji 10', dv: 'Dvojčki', b20: 'Do 20', pr: 'Čez 10' };
+  const GROUP_NAME = { d10: 'Do 10', b20: 'Do 20 brez prehoda', pr: 'Do 20 s prehodom' };
   const OPS = { p: '+', m: '−' };
 
   document.head.insertAdjacentHTML('beforeend', `<style>
@@ -101,12 +101,12 @@
     const fresh = (state.milestones || []).filter(m => m.done && !was.has(m.g + m.op));
     if (!fresh.length) return;
     const m = fresh[0], pic = state.pet ? PetArt.draw(state.pet, state.stage) : '';
-    const unlock = PetArt.UNLOCKS[state.count - 1];
-    const what = unlock ? ({ ...PetArt.BODY, ...PetArt.EYES, ...PetArt.PATTERN }[unlock] || {}).name : null;
+    const all = { ...PetArt.BODY, ...PetArt.EYES, ...PetArt.PATTERN };
+    const what = PetArt.UNLOCKS.filter(v => PetArt.unlockAt(v) === state.count).map(v => (all[v] || {}).name).join(', ') || null;
     const head = prev.stage === 'jajce' && state.stage !== 'jajce' ? PetArt.words(state.pet && state.pet.species).born
       : prev.stage !== state.stage ? `Ljubljenček je zrasel: ${(PetArt.STAGES.find(s => s.id === state.stage) || {}).name}!`
       : `Nov mejnik: ${GROUP_NAME[m.g]} ${OPS[m.op]}!`;
-    toast(`<span class="pic">${pic}</span><div>${head}<small>${state.count}/10 mejnikov${what ? ` · odklenjeno: ${what}` : ''} · tapni in poglej</small></div>`, 7000);
+    toast(`<span class="pic">${pic}</span><div>${head}<small>${state.count}/${PetArt.MILESTONES} mejnikov${what ? ` · odklenjeno: ${what}` : ''} · tapni in poglej</small></div>`, 7000);
   }
 
   function render() {

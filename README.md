@@ -19,21 +19,22 @@ zato vaja ostane enaka tudi po osvežitvi strani.
 ### Računi do 20 (seštevanje in odštevanje)
 
 Na vrhu je stikalo **Vadim: Poštevanka | Do 20**. Pri Do 20 so namesto
-poštevank skupine računov po korakih pouka:
+poštevank sklopi računov kot pri pouku:
 
-| Skupina | Ključ | Primer |
+| Sklop | Ključ | Primer |
 |---|---|---|
-| Do 10 | `d10` | 4 + 3, 9 − 5 |
-| Prijatelji 10 | `p10` | 7 + 3, 10 − 4 |
-| Dvojčki | `dv` | 6 + 6, 12 − 6 |
-| Do 20 (brez prehoda) | `b20` | 13 + 4, 17 − 4 |
-| Čez 10 | `pr` | 8 + 5, 14 − 6 |
+| Do 10 | `d10` | 4 + 3, 7 + 3, 10 − 4 |
+| Do 20 brez prehoda | `b20` | 13 + 4, 17 − 4, 10 + 10 |
+| Do 20 s prehodom | `pr` | 8 + 5, 6 + 6, 14 − 6 |
 
 | Kaj želim | Povezava |
 |---|---|
-| Do 10 in prijatelji 10, samo seštevanje | `.../matematika/?g=d10,p10&op=p` |
+| Do 10, samo seštevanje | `.../matematika/?g=d10&op=p` |
 | Vse do 20, + in − | `.../matematika/?v=do20` |
-| Čez 10, odštevanje, tipkovnica | `.../matematika/?g=pr&op=m&mode=tipkovnica` |
+| S prehodom, odštevanje, tipkovnica | `.../matematika/?g=pr&op=m&mode=tipkovnica` |
+
+Stare povezave s `p10` (prijatelji 10) in `dv` (dvojčki) še delujejo:
+`p10` odpre Do 10, `dv` pa Do 10 in s prehodom.
 
 Tekmovanja in bitke pri Do 20 ni, ker sta lestvica in album za poštevanko.
 Odgovori se beležijo v `do20_stats` (ne v `stats`), zato ne vplivajo na

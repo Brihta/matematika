@@ -2,9 +2,11 @@
 --
 -- ZAKAJ: Do 20 ne daje cekinov (ti so za poštevanko). Ves trud gre v
 -- ljubljenčka, ki ga učenec sam oblikuje. Ljubljenček raste z znanjem:
--- 10 mejnikov = 5 skupin računov × (seštevanje, odštevanje). Vsak mejnik
--- odklene novo možnost videza; stopnje rasti so jajce → mladiček (1) →
--- mlad (4) → odrasel (7) → končna oblika (10). Odločeno 19. 10. 2026.
+-- 6 mejnikov = 3 sklopi (do 10, do 20 brez prehoda, do 20 s prehodom) ×
+-- (seštevanje, odštevanje). Mejniki odklepajo nove možnosti videza (prvi
+-- štirje po dve, zadnja dva po eno); stopnje rasti so jajce → mladiček (1) →
+-- mlad (3) → odrasel (5) → končna oblika (6). Do 20. 10. 2026 je bilo
+-- 5 skupin in 10 mejnikov; ponoven zagon datoteke vse prestavi.
 -- Vsaka sezona ima svojega ljubljenčka; stari ostanejo v zbirki.
 --
 -- KAJ JE V DATOTEKI:
@@ -42,26 +44,22 @@ create or replace function public._do20_group(x int, y int)
 returns text language sql immutable as $$
   select case
     when x < 1 or y < 1 or x + y > 20 then null
-    when x + y = 10 and x <= 9 and y <= 9 then 'p10'
-    when x = y and x <= 10 then 'dv'
-    when x + y < 10 then 'd10'
-    when greatest(x, y) >= 10 and least(x, y) <= 9
-         and greatest(x, y) % 10 + least(x, y) <= 10 then 'b20'
-    when greatest(x, y) <= 9 and least(x, y) >= 2 then 'pr'
+    when x + y <= 10 then 'd10'
+    when greatest(x, y) >= 10 and greatest(x, y) % 10 + least(x, y) <= 10 then 'b20'
+    when greatest(x, y) <= 9 then 'pr'
   end;
 $$;
 
 -- Koliko parov ima skupina (enako za + in −). Preverjeno s kupom v script.js.
 create or replace function public._do20_fact_count(p_grp text)
 returns int language sql immutable as $$
-  select case p_grp when 'd10' then 16 when 'p10' then 5 when 'dv' then 9
-                    when 'b20' then 54 when 'pr' then 16 end;
+  select case p_grp when 'd10' then 25 when 'b20' then 55 when 'pr' then 20 end;
 $$;
 
 create table if not exists do20_facts (
   student_id uuid     not null references students(id) on delete cascade,
   day        date     not null,
-  grp        text     not null check (grp in ('d10', 'p10', 'dv', 'b20', 'pr')),
+  grp        text     not null check (grp in ('d10', 'b20', 'pr')),
   op         text     not null check (op in ('p', 'm')),
   x          smallint not null,
   y          smallint not null,
@@ -74,8 +72,14 @@ create table if not exists do20_facts (
 );
 alter table do20_facts enable row level security;
 
+-- Prehod (20. 10. 2026): vsak par dobi skupino po novih pravilih. Par ima
+-- natanko eno skupino, zato ključ ne trči.
+alter table do20_facts drop constraint if exists do20_facts_grp_check;
+update do20_facts set grp = _do20_group(x, y) where grp is distinct from _do20_group(x, y);
+alter table do20_facts add constraint do20_facts_grp_check check (grp in ('d10', 'b20', 'pr'));
+
 -- p_data: [{"g":"pr","op":"p","x":5,"y":8,"c":1,"w":0,"n":1,"f":1}, ...]
--- Par mora res spadati v navedeno skupino, sicer se vrstica zavrže.
+-- Skupino določi baza iz para (stara aplikacija še pošilja p10 in dv).
 create or replace function public.add_do20_facts(
   p_student uuid, p_day date, p_data jsonb)
 returns void
@@ -85,7 +89,7 @@ begin
   if not exists (select 1 from students where id = p_student) then return; end if;
 
   insert into do20_facts (student_id, day, grp, op, x, y, correct, wrong, timed, fast)
-  select p_student, p_day, e->>'g', e->>'op', (e->>'x')::smallint, (e->>'y')::smallint,
+  select p_student, p_day, _do20_group((e->>'x')::int, (e->>'y')::int), e->>'op', (e->>'x')::smallint, (e->>'y')::smallint,
          greatest(0, least(500, coalesce((e->>'c')::int, 0))),
          greatest(0, least(500, coalesce((e->>'w')::int, 0))),
          greatest(0, least(500, coalesce((e->>'n')::int, 0))),
@@ -94,7 +98,7 @@ begin
    where (e->>'x') ~ '^[0-9]{1,2}$' and (e->>'y') ~ '^[0-9]{1,2}$'
      and (e->>'x')::int <= (e->>'y')::int
      and e->>'op' in ('p', 'm')
-     and _do20_group((e->>'x')::int, (e->>'y')::int) = e->>'g'
+     and _do20_group((e->>'x')::int, (e->>'y')::int) is not null
   on conflict (student_id, day, grp, op, x, y) do update
      set correct = do20_facts.correct + excluded.correct,
          wrong   = do20_facts.wrong   + excluded.wrong,
@@ -130,11 +134,11 @@ returns boolean language sql stable security definer set search_path = public as
     from _pet_progress(p_student, p_grp, p_op, p_from, p_to);
 $$;
 
--- Koliko mejnikov je učenec dosegel v obdobju (0–10).
+-- Koliko mejnikov je učenec dosegel v obdobju (0–6).
 create or replace function public._pet_count(p_student uuid, p_from date, p_to date)
 returns int language sql stable security definer set search_path = public as $$
   select count(*)::int
-    from unnest(array['d10', 'p10', 'dv', 'b20', 'pr']) g, unnest(array['p', 'm']) o
+    from unnest(array['d10', 'b20', 'pr']) g, unnest(array['p', 'm']) o
    where _pet_mastered(p_student, g, o, p_from, p_to);
 $$;
 
@@ -169,25 +173,29 @@ returns text[] language sql immutable as $$
 $$;
 
 -- Videz. Prosto: prve štiri barve (oblak = siva, dodana z mucko), vse barve trebuščka, tri barve oči, brez
--- vzorca. Vsak mejnik odklene eno možnost, v tem vrstnem redu (enak seznam
--- je v pet-art.js, UNLOCKS):
+-- vzorca. Mejniki odklepajo v tem vrstnem redu (enak seznam je v
+-- pet-art.js, UNLOCKS); pri katerem mejniku, pove _pet_unlock_at (UNLOCK_AT):
 create or replace function public._pet_unlocks()
 returns text[] language sql immutable as $$
   select array['malina', 'pike', 'sliva', 'proge', 'koral', 'zvezde',
                'polnoc', 'srcki', 'zlata', 'mavrica'];
+$$;
+create or replace function public._pet_unlock_at(p_val text)
+returns int language sql immutable as $$
+  select (array[1, 1, 2, 2, 3, 3, 4, 4, 5, 6])[array_position(_pet_unlocks(), p_val)];
 $$;
 create or replace function public._pet_allowed(p_kind text, p_val text, p_count int)
 returns boolean language sql immutable as $$
   select case p_kind
     when 'body'    then p_val in ('gozd', 'med', 'nebo', 'oblak')
                      or (p_val in ('malina', 'sliva', 'koral', 'polnoc', 'zlata')
-                         and array_position(_pet_unlocks(), p_val) <= p_count)
+                         and _pet_unlock_at(p_val) <= p_count)
     when 'belly'   then p_val in ('krema', 'breskev', 'meta', 'sivka')
     when 'eyes'    then p_val in ('rjave', 'zelene', 'modre')
-                     or (p_val = 'zvezde' and array_position(_pet_unlocks(), p_val) <= p_count)
+                     or (p_val = 'zvezde' and _pet_unlock_at(p_val) <= p_count)
     when 'pattern' then p_val = 'brez'
                      or (p_val in ('pike', 'proge', 'srcki', 'mavrica')
-                         and array_position(_pet_unlocks(), p_val) <= p_count)
+                         and _pet_unlock_at(p_val) <= p_count)
     else false end;
 $$;
 
@@ -213,8 +221,8 @@ update student_pets set species = 'macka' where species = 'jez';
 -- Stopnja rasti iz števila mejnikov.
 create or replace function public._pet_stage(p_count int)
 returns text language sql immutable as $$
-  select case when p_count >= 10 then 'koncna' when p_count >= 7 then 'odrasel'
-              when p_count >= 4 then 'mlad' when p_count >= 1 then 'mladicek' else 'jajce' end;
+  select case when p_count >= 6 then 'koncna' when p_count >= 5 then 'odrasel'
+              when p_count >= 3 then 'mlad' when p_count >= 1 then 'mladicek' else 'jajce' end;
 $$;
 
 -- ── 3b. Priboljški, trgovina, spremljevalec ──────────────────────────────
@@ -326,7 +334,7 @@ begin
                 'facts_done', pr.facts_done, 'facts_total', pr.facts_total,
                 'answers', pr.answers, 'correct', pr.correct,
                 'timed', pr.timed, 'fast', pr.fast) order by gi, oi)
-         from unnest(array['d10', 'p10', 'dv', 'b20', 'pr']) with ordinality g(g, gi),
+         from unnest(array['d10', 'b20', 'pr']) with ordinality g(g, gi),
               unnest(array['p', 'm']) with ordinality o(o, oi),
               lateral _pet_progress(p_student, g, o, s.starts, v_to) pr) end,
     -- zbirka: ljubljenčki preteklih sezon, s stopnjo, ki so jo dosegli

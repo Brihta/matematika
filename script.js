@@ -175,17 +175,19 @@ let subject  = 'post';
 /* Začetni zaslon ('home') s ploščicami ali vaja ('play'). Povezava
    učiteljice (prednastavitev v URL) gre naravnost v vajo. */
 let screen   = 'home';
-/* Računi do 20 so razdeljeni po korakih, kot jih uvaja pouk v 1. in 2.
-   razredu, ne po številih: učiteljica vklopi samo tisto, kar so že jemali.
-   Vsak račun je v natanko eni skupini (do20Group), sicer statistika ne bi
-   povedala, kje otrok res še računa na prste. */
+/* Računi do 20 so razdeljeni tako kot pri pouku v 1. in 2. razredu: do 10,
+   do 20 brez prehoda in do 20 s prehodom. Učiteljica vklopi samo tisto, kar
+   so že jemali. Vsak račun je v natanko eni skupini (do20Group), sicer
+   statistika ne bi povedala, kje otrok res še računa na prste.
+   (Do 20. 10. 2026 sta bili še skupini "prijatelji 10" in "dvojčki"; to sta
+   strategiji znotraj teh sklopov, ne ločena sklopa.) */
 const DO20_GROUPS = [
-  { key: 'd10', label: 'Do 10',         short: 'Do 10'   },
-  { key: 'p10', label: 'Prijatelji 10', short: 'Prij. 10' },
-  { key: 'dv',  label: 'Dvojčki',       short: 'Dvojčki' },
-  { key: 'b20', label: 'Do 20',         short: 'Do 20'   },
-  { key: 'pr',  label: 'Čez 10',        short: 'Čez 10'  }
+  { key: 'd10', label: 'Do 10',              short: 'Do 10'        },
+  { key: 'b20', label: 'Do 20 brez prehoda', short: 'Brez prehoda' },
+  { key: 'pr',  label: 'Do 20 s prehodom',   short: 'S prehodom'   }
 ];
+// stare povezave učiteljic (?g=p10,dv) še delujejo
+const DO20_OLD = { p10: ['d10'], dv: ['d10', 'pr'] };
 const DO20_KEYS = DO20_GROUPS.map(g => g.key);
 let groups   = new Set(DO20_KEYS);
 const MINUS  = '−';   // pravi minus, ne vezaj: na tabli in v zvezku je tak
@@ -274,7 +276,7 @@ function saveSettings() {
      op   x | d | both                       (vrsta računa)
      mode kviz | tipkovnica | tekmovanje | bitka
      v    do20 | postevanka                  (kaj se vadi)
-     g    d10,p10,dv,b20,pr ali "vse"        (skupine računov do 20)
+     g    d10,b20,pr ali "vse"               (do 10, do 20 brez prehoda, s prehodom)
    Pri Do 20 je op p (+), m (−) ali both.
    Applied after the saved settings, so a link always wins, and saved so the
    choice survives a refresh without the query string. */
@@ -305,7 +307,7 @@ function applyPresetFromURL() {
   if (graw === 'vse' || graw === 'all') {
     groups = new Set(DO20_KEYS);
   } else if (graw) {
-    const arr = graw.split(',').map(x => x.trim()).filter(x => DO20_KEYS.includes(x));
+    const arr = graw.split(',').map(x => x.trim()).flatMap(x => DO20_OLD[x] || [x]).filter(x => DO20_KEYS.includes(x));
     if (arr.length) groups = new Set(arr);
   }
 
@@ -409,25 +411,23 @@ function parseQuestion(q) {
   return null;
 }
 
-/* Skupina računa x + y (odštevanje s − y = x spada k x + y). Vrstni red
-   preverjanja je pomemben: 5 + 5 je prijatelj števila 10, ne dvojček, in
-   6 + 6 je dvojček, čeprav gre čez desetico. null = račun ni v nobeni
-   skupini (npr. 14 + 7, ki gre čez 20). */
+/* Skupina računa x + y (odštevanje s − y = x spada k x + y):
+   do 10 (7 + 3), do 20 brez prehoda (13 + 4, 12 + 8, 10 + 10) in do 20 s
+   prehodom (8 + 5, 6 + 6). null = račun ni v nobeni skupini (npr. 14 + 7,
+   ki gre čez 20). Ista pravila so v supabase_ljubljencek.sql (_do20_group). */
 function do20Group(x, y) {
   const s = x + y;
   if (x < 1 || y < 1 || s > 20) return null;
-  if (s === 10 && x <= 9 && y <= 9) return 'p10';
-  if (x === y && x <= 10) return 'dv';
-  if (s < 10) return 'd10';
+  if (s <= 10) return 'd10';
   const big = Math.max(x, y), small = Math.min(x, y);
-  if (big >= 10 && small <= 9 && big % 10 + small <= 10) return 'b20';
-  if (big <= 9 && small >= 2) return 'pr';
+  if (big >= 10 && big % 10 + small <= 10) return 'b20';
+  if (big <= 9) return 'pr';
   return null;
 }
 /* Kup računov do 20 se sestavi tukaj, ne v JSON: pravila skupin so tako na
    enem mestu. Seštevanje v obeh vrstnih redih (3 + 4 in 4 + 3), odštevanje
    kot obratni račun. Pri Do 20 samo odštevanje enice (17 − 4 = 13), ne
-   17 − 13: to je že odštevanje desetic, ki pride pozneje. */
+   17 − 13: to je že odštevanje desetic, ki pride pozneje. 20 − 10 ostane. */
 function buildDo20Cards() {
   const out = [];
   for (let x = 1; x <= 19; x++) {
@@ -436,7 +436,7 @@ function buildDo20Cards() {
       if (!g) continue;
       const s = x + y;
       out.push({ question: `${x} + ${y} =`, answer: String(s), g, op: 'add' });
-      if (g === 'b20' && y >= 10) continue;
+      if (g === 'b20' && y >= 10 && x < 10) continue;
       out.push({ question: `${s} ${MINUS} ${y} =`, answer: String(x), g, op: 'sub' });
     }
   }

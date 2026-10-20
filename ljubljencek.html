@@ -129,7 +129,7 @@ h2 { font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform:
 <script>
 const A = PetArt;
 const api = () => { try { return parent.petApi; } catch (e) { return null; } };
-const GROUPS = [['d10', 'Do 10'], ['p10', 'Prijatelji 10'], ['dv', 'Dvojčki'], ['b20', 'Do 20'], ['pr', 'Čez 10']];
+const GROUPS = [['d10', 'Do 10'], ['b20', 'Do 20 brez prehoda'], ['pr', 'Do 20 s prehodom']];
 const OPS = { p: '+', m: '−' };
 // privzeti videz novega jajčka po vrsti — samo proste barve
 const START = { zmaj: 'gozd', lisica: 'med', sova: 'nebo', macka: 'oblak' };
@@ -199,9 +199,9 @@ function render() {
         <div class="pet-name">${esc(draft.name) || `<span style="color:var(--muted)">${sp.name}</span>`}</div>
         <span class="pet-stage">${A.stageName(stage, draft.species)}</span>
         <div class="growth">
-          <div class="growth-bar"><div class="growth-fill" style="width:${count * 10}%"></div></div>
+          <div class="growth-bar"><div class="growth-fill" style="width:${count / A.MILESTONES * 100}%"></div></div>
           <div class="growth-marks">${A.STAGES.map(x => `<span class="${count >= x.from ? 'on' : ''}">${x.from ? x.from : W.icon}</span>`).join('')}</div>
-          <div class="growth-txt">${count} / 10 mejnikov${next
+          <div class="growth-txt">${count} / ${A.MILESTONES} mejnikov${next
             ? `<small>Še ${next.from - count} do stopnje »${next.name}«${count === 0 ? ` — ob prvem mejniku ${W.wait}!` : ''}</small>`
             : '<small>Končna oblika! Bravo, vse računi do 20 znaš na pamet.</small>'}</div>
         </div>

@@ -59,23 +59,27 @@
   };
   const FREE = { body: ['gozd', 'med', 'nebo', 'oblak'], belly: Object.keys(BELLY),
                  eyes: ['rjave', 'zelene', 'modre'], pattern: ['brez'] };
-  // vsak mejnik odklene eno možnost, v tem vrstnem redu (= _pet_unlocks)
+  /* 6 mejnikov = 3 sklopi (do 10, do 20 brez prehoda, s prehodom) × (+, −).
+     Odklepanje v tem vrstnem redu (= _pet_unlocks), UNLOCK_AT pove, pri
+     katerem mejniku (= _pet_unlock_at): prvi štirje po dve, zadnja dva po eno. */
+  const MILESTONES = 6;
   const UNLOCKS = ['malina', 'pike', 'sliva', 'proge', 'koral', 'zvezde', 'polnoc', 'srcki', 'zlata', 'mavrica'];
+  const UNLOCK_AT = [1, 1, 2, 2, 3, 3, 4, 4, 5, 6];
   const STAGES = [
     { id: 'jajce',    name: 'Jajce',         from: 0 },
     { id: 'mladicek', name: 'Mladiček',      from: 1 },
-    { id: 'mlad',     name: 'Mlad',          from: 4 },
-    { id: 'odrasel',  name: 'Odrasel',       from: 7 },
-    { id: 'koncna',   name: 'Končna oblika', from: 10 }
+    { id: 'mlad',     name: 'Mlad',          from: 3 },
+    { id: 'odrasel',  name: 'Odrasel',       from: 5 },
+    { id: 'koncna',   name: 'Končna oblika', from: 6 }
   ];
   const stageName = (id, species) => id === 'jajce' ? words(species).first : (STAGES.find(s => s.id === id) || {}).name;
   const stageOf = n => STAGES.slice().reverse().find(s => n >= s.from).id;
   function allowed(kind, val, count) {
     if (FREE[kind].includes(val)) return true;
     const i = UNLOCKS.indexOf(val);
-    return i >= 0 && i < count;
+    return i >= 0 && UNLOCK_AT[i] <= count;
   }
-  const unlockAt = val => UNLOCKS.indexOf(val) + 1;   // 0 = prosto
+  const unlockAt = val => UNLOCK_AT[UNLOCKS.indexOf(val)] || 0;   // 0 = prosto
 
   /* ── barvne pomožne ── */
   const hex = c => [1, 3, 5].map(i => parseInt(c.substr(i, 2), 16));
@@ -427,5 +431,5 @@
     return `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" class="pa-svg">${s}</svg>`;
   }
 
-  window.PetArt = { draw, hatches, startOf, words, stageName, SPECIES, BODY, BELLY, EYES, PATTERN, FREE, UNLOCKS, STAGES, ACC, SLOT_NAME, stageOf, allowed, unlockAt };
+  window.PetArt = { draw, hatches, startOf, words, stageName, SPECIES, BODY, BELLY, EYES, PATTERN, FREE, UNLOCKS, MILESTONES, STAGES, ACC, SLOT_NAME, stageOf, allowed, unlockAt };
 })();

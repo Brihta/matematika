@@ -1812,16 +1812,17 @@ body.bitka .comp-board-row.me {
 /* ══════════════════════════
    DO 20 — seštevanje in odštevanje
 ══════════════════════════ */
-/* Skupine imajo besedilo, ne številke, zato jih je pet v vrsti in vsaka
-   pokaže primer računa — tretješolec ne ve, kaj je "Čez 10", 8 + 5 pa pozna. */
-.group-row { grid-template-columns: repeat(5, 1fr); }
+/* Sklopi imajo besedilo, ne številke, zato so trije v vrsti (daljša imena
+   se lomijo) in vsak pokaže primer računa — tretješolec morda ne ve, kaj je
+   "s prehodom", 8 + 5 pa pozna. */
+.group-row { grid-template-columns: repeat(3, 1fr); }
 .group-btn {
   background: rgba(0,0,0,0.25); color: #777;
   border: 1px solid transparent; border-radius: 8px;
   padding: 6px 2px; font-size: .82rem; font-weight: 700; line-height: 1.15;
   font-family: inherit; cursor: pointer; transition: all .12s;
   display: flex; flex-direction: column; align-items: center; gap: 1px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  white-space: normal; text-align: center; min-width: 0;
 }
 .group-btn small { font-size: .7rem; font-weight: 600; opacity: .75; }
 .group-btn:hover:not(.active) { background: rgba(255,255,255,0.08); color: #ccc; }
@@ -1830,12 +1831,12 @@ body.bitka .comp-board-row.me {
   box-shadow: 0 1px 4px rgba(240,165,0,0.35);
 }
 @media (max-width: 420px) {
-  .group-row { grid-template-columns: repeat(5, 1fr); }
-  .group-btn { font-size: .66rem; }
+  .group-row { grid-template-columns: repeat(3, 1fr); }
+  .group-btn { font-size: .72rem; }
   .group-btn small { font-size: .62rem; }
 }
 @media (min-width: 900px) {
-  .group-row { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .group-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .group-btn { font-size: .95rem; padding: 7px 4px; }
 }
 /* Tekmovanje in bitka pri Do 20 ne obstajata */
@@ -2048,9 +2049,9 @@ body.competition #topbar > .summary-chip { display: none; }
 .pick-x { width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(255,255,255,.1); color: inherit; font-size: 1rem; cursor: pointer; }
 .pick-box .filter-row { grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .pick-box .table-btn { padding: 11px 0; font-size: 1.05rem; }
-.pick-box .group-row { grid-template-columns: 1fr 1fr; }
-.pick-box .group-btn { padding: 10px 8px; font-size: .95rem; align-items: flex-start; }
-@media (min-width: 600px) { .pick-box .filter-row { grid-template-columns: repeat(10, 1fr); } .pick-box .group-row { grid-template-columns: repeat(5, 1fr); } .pick-box .group-btn { align-items: center; } }
+.pick-box .group-row { grid-template-columns: repeat(3, 1fr); }
+.pick-box .group-btn { padding: 10px 6px; font-size: .95rem; }
+@media (min-width: 600px) { .pick-box .filter-row { grid-template-columns: repeat(10, 1fr); } .pick-box .group-row { grid-template-columns: repeat(3, 1fr); } }
 .pick-box #opBtnGroup .seg-btn { padding: 10px; font-size: 1.05rem; }
 .pick-start {
   border: 0; border-radius: 16px; padding: 14px; margin-top: 2px;
