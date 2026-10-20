@@ -40,6 +40,7 @@
   .al-note-box p { margin: 0 0 10px; line-height: 1.45; color: #4a4152; }
   .al-note-box button { margin-top: 6px; background: #f08c2e; color: #fff; border: 0; border-radius: 999px; padding: 10px 28px;
     font: 800 1rem inherit; font-family: inherit; cursor: pointer; }
+  .al-note-box button.later { background: none; color: #7a7184; padding: 6px 12px; font-weight: 700; font-size: .9rem; }
   @media (max-width: 600px) { .al-buddy.on { display: none; } }   /* na telefonu bi prekril namig pod tipkovnico */
   @media (max-width: 700px) { .al-buddy { width: 84px; height: 84px; } }
   </style>`);
@@ -144,14 +145,33 @@
   /* Enkratna obvestila iz baze (album_notices, supabase_spremljevalci.sql).
      Preverimo jih ob prvem stanju po prijavi, pokažemo, ko otrok ni sredi
      igre, in po "V redu" označimo kot prebrana. */
+  /* Vsako obvestilo: html(data); neobvezno when() → 'show' | 'wait' | 'skip'
+     (skip = brez prikaza označi kot prebrano) in go = { label, tab } za
+     gumb, ki odpre zavihek v oknu Moj svet. */
   const NOTICE = {
-    'spremljevalci-2026-10': d => {
-      const nm = { mucek: 'Mačko', lisicka: 'Lisičko' };
-      const what = (d.items || []).map(id => nm[id]).filter(Boolean).join(' in ');
-      const n = d.coins || 0, coin = W() && W().cek ? W().cek(n) : 'cekinov';
-      return `<div class="ico">🐾</div><h3>Spremljevalci so se preselili</h3>`
-        + `<p>V trgovini lika ni več spremljevalcev. Svojega spremljevalca si zdaj izbereš in vzgojiš pri vadbi <b>računov do 20</b> — to je tvoj ljubljenček, ki stoji ob tvojem liku.</p>`
-        + `<p>Zato smo ti vrnili <b>${n} ${coin}</b>${what ? ` za ${what}` : ''}.</p>`;
+    'spremljevalci-2026-10': {
+      html: d => {
+        const nm = { mucek: 'Mačko', lisicka: 'Lisičko' };
+        const what = (d.items || []).map(id => nm[id]).filter(Boolean).join(' in ');
+        const n = d.coins || 0, coin = W() && W().cek ? W().cek(n) : 'cekinov';
+        return `<div class="ico">🐾</div><h3>Spremljevalci so se preselili</h3>`
+          + `<p>V trgovini lika ni več spremljevalcev. Svojega spremljevalca si zdaj izbereš in vzgojiš pri vadbi <b>računov do 20</b> — to je tvoj ljubljenček, ki stoji ob tvojem liku.</p>`
+          + `<p>Zato smo ti vrnili <b>${n} ${coin}</b>${what ? ` za ${what}` : ''}.</p>`;
+      }
+    },
+    /* Ob odprtju ljubljenčka za vse (supabase_ljubljencek_obvestilo.sql).
+       Počaka, da pet.js naloži stanje; kdor si ga je medtem že izbral,
+       obvestila ne vidi. */
+    'ljubljencek-2026-10': {
+      when() {
+        const p = window.petApi;
+        if (!p || !p.loaded || !p.loaded()) return 'wait';
+        if (!Svet.has('pet')) return 'wait';
+        return p.hasPet() ? 'skip' : 'show';
+      },
+      html: () => `<div class="ico">🐣</div><h3>Novo: ljubljenček!</h3>`
+        + `<p>Izberi si svojega ljubljenčka — <b>zmajčka, lisičko, sovico ali muceka</b>. Raste, ko računaš <b>do 20</b> hitro in brez napak, in lahko stoji ob tvojem liku.</p>`,
+      go: { label: 'Izberi ljubljenčka', tab: 'pet' }
     }
   };
   let noticesChecked = false;
@@ -163,18 +183,22 @@
     if (!Array.isArray(list)) return;
     list.forEach(n => { if (NOTICE[n.code]) notices.push(n); });
   }
+  const seen = code => supabaseRPC('album_notice_seen', { p_student: profile.id, p_code: code });
   function showNotice() {
     const note = $('alNote');
     if (!notices.length || note.classList.contains('on') || busy() || Svet.isOpen()) return;
-    const n = notices[0];
-    $('alNoteBox').innerHTML = NOTICE[n.code](n.data || {}) + '<button type="button" id="alNoteOk">V redu</button>';
+    const n = notices[0], def = NOTICE[n.code];
+    const w = def.when ? def.when(n.data || {}) : 'show';
+    if (w === 'wait') return;
+    if (w === 'skip') { notices.shift(); seen(n.code); return; }
+    $('alNoteBox').innerHTML = def.html(n.data || {})
+      + (def.go ? `<button type="button" id="alNoteGo">${def.go.label}</button><br><button type="button" class="later" id="alNoteOk">Kasneje</button>`
+                : '<button type="button" id="alNoteOk">V redu</button>');
     if (document.activeElement) document.activeElement.blur();   // tipke naj ne tečejo v vajo za oknom
     note.classList.add('on');
-    $('alNoteOk').addEventListener('click', () => {
-      note.classList.remove('on');
-      notices.shift();
-      supabaseRPC('album_notice_seen', { p_student: profile.id, p_code: n.code });
-    });
+    const done = () => { note.classList.remove('on'); notices.shift(); seen(n.code); };
+    $('alNoteOk').addEventListener('click', done);
+    if (def.go) $('alNoteGo').addEventListener('click', () => { done(); Svet.open(def.go.tab); });
   }
 
   function render() {

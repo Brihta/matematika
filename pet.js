@@ -48,6 +48,9 @@
   window.petApi = {
     rpc: (fn, params) => supabaseRPC(fn, params),
     profile: () => profile,
+    // za obvestilo "Novo: ljubljenček" (album.js): je stanje naloženo, ima že ljubljenčka
+    loaded: () => !!state,
+    hasPet: () => !!(state && state.pet),
     /* "Vadi" pri mejniku: Do 20, samo ta skupina in operacija, na tipkovnici. */
     practice(g, op) {
       screen = 'play';
