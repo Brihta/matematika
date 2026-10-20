@@ -249,16 +249,16 @@
       + `<circle cx="100" cy="24" r="8" fill="#fdfcf3" stroke="${OL}" stroke-width="3"/>` + `</g>`;
     if (id === 'celada') {
       // lupina kot podkev okoli obraza (glava je x 46–154, oči na y 80)
-      const shell = 'M38 104 C32 52 62 14 100 14 C138 14 168 52 162 104 C162 110 156 112 148 110 L146 104 C146 72 128 56 100 56 C72 56 54 72 54 104 L52 110 C44 112 38 110 38 104 Z';
+      const shell = 'M40 90 C36 48 64 14 100 14 C136 14 164 48 160 90 C160 96 154 98 148 96 L146 90 C146 70 128 56 100 56 C72 56 54 70 54 90 L52 96 C46 98 40 96 40 90 Z';
       return shape(shell, '#e8504a',
           `<path d="M90 0 L110 0 L110 60 L90 60 Z" fill="#fff"/><path d="M84 0 L87 0 L87 60 L84 60 Z M113 0 L116 0 L116 60 L113 60 Z" fill="#fff" opacity=".7"/>`
-        + `<path d="M30 92 L170 92 L170 120 L30 120 Z" fill="#b83a36" opacity=".45"/>`
+        + `<path d="M30 80 L170 80 L170 110 L30 110 Z" fill="#b83a36" opacity=".45"/>`
         + `<ellipse cx="66" cy="34" rx="16" ry="7" fill="#fff" opacity=".55" transform="rotate(-30 66 34)"/>`, 4.2)
         // strela na boku, podloga ob obrazu, šilt in pašček pod brado
         + `<path d="M130 22 L121 37 L128 37 L123 52 L137 32 L130 32 L135 22 Z" fill="#f2c94a" stroke="${OL}" stroke-width="1.6" stroke-linejoin="round"/>`
-        + line('M54 102 C54 74 72 60 100 60 C128 60 146 74 146 102', 3, '#5b3c44')
+        + line('M54 90 C54 72 72 60 100 60 C128 60 146 72 146 90', 3, '#5b3c44')
         + shape('M64 60 C80 48 120 48 136 60 C130 66 70 66 64 60 Z', '#3a3550', `<path d="M60 50 L140 50 L140 56 L60 56 Z" fill="#fff" opacity=".25"/>`, 3.2)
-        + line('M50 108 C58 120 80 124 100 124 C120 124 142 120 150 108', 2.6, '#3a3550');
+        + line('M52 95 C58 106 76 112 100 112 C124 112 142 106 148 95', 2.6, '#3a3550');
     }
     if (id === 'cilinder') return `<g transform="rotate(-8 100 40)">`
       + shape('M80 40 L84 6 L116 6 L120 40 Z', '#2f2a36', `<path d="M80 30 L120 30 L120 36 L80 36 Z" fill="#c0392b"/>`, 3.5)
