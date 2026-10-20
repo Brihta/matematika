@@ -278,9 +278,9 @@ function companionCard(stage) {
       return `<div class="it${on ? ' on' : ''}">${A.draw(c, c.stage)}<div class="nm">${esc(c.name) || (A.SPECIES.find(x => x.id === c.species) || {}).name}
         <br><span style="color:var(--muted);font-weight:700">${esc(c.season_name)}</span></div>
         ${egg ? `<button class="wear" disabled>${A.words(c.species).still}</button>`
-              : `<button class="wear" data-comp="${on ? '' : c.season}">${on ? '✓ Gre s tabo' : 'Vzemi s seboj'}</button>`}</div>`;
+              : `<button class="wear" data-comp="${on ? '' : c.season}" title="${on ? 'Klikni, da ostane doma' : 'Klikni, da stoji ob tvojem liku'}">${on ? '✓ Gre s tabo' : 'Vzemi s seboj'}</button>`}</div>`;
     }).join('')}</div>
-    <div class="note">${cur ? 'Tvoj ljubljenček stoji ob tvojem liku namesto spremljevalca iz trgovine lika.' : `Ko ${A.words(draft.species).wait}, ga lahko vzameš s seboj — stal bo ob tvojem liku.`}</div></div>`;
+    <div class="note">Tvoj ljubljenček lahko stoji ob tvojem liku, če želiš.</div></div>`;
 }
 /* Nakup, oprema, spremljevalec: baza preveri in vrne novo stanje. */
 async function act(fn, params, okMsg) {
