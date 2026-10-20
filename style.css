@@ -2082,7 +2082,23 @@ body.home .toolbar { box-shadow: none; }
 .t-post .big { color: #f0a500; }
 .t-tek { background: linear-gradient(145deg, #4a2a7a, #2d1b4e); color: #fff; box-shadow: 0 6px 20px rgba(45,27,78,.3); }
 .t-bit { background: linear-gradient(135deg, #ffb23f, #ff7a1a); color: #2b1406; box-shadow: 0 6px 20px rgba(255,122,26,.3); }
-.home-pet { position: absolute; right: -6px; bottom: -8px; width: 96px; height: 96px; pointer-events: none; }
+/* Vzorci na ploščicah (vzorci/*.svg): nežna plast pod besedilom, vsaka s
+   svojo zgodbo — kocke za štetje (Do 20), zvezde in zobniki z × in ÷
+   (poštevanka), hitrostne črte, lovor in zastava (tekmovanje), zmajeve
+   luske (bitka). Plast je ::before, besedilo in ljubljenček sta nad njo. */
+.home-tile::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0; background-repeat: no-repeat; }
+.home-tile > span:not(.home-pet) { position: relative; z-index: 1; }
+.t-do20::before { background: url(vzorci/kocke.svg) 0 0 / 38px 66px repeat;
+  -webkit-mask-image: linear-gradient(105deg, rgba(0,0,0,.25) 25%, #000 75%); mask-image: linear-gradient(105deg, rgba(0,0,0,.25) 25%, #000 75%); }
+.t-post::before { background-image: url(vzorci/zobniki.svg), url(vzorci/zvezde.svg);
+  background-position: right -16px bottom -18px, center; background-size: 128px auto, cover; }
+.t-tek::before { background-image: url(vzorci/lovor.svg), url(vzorci/zastava.svg), url(vzorci/hitrost.svg);
+  background-position: left -10px bottom -12px, right 14px bottom 12px, center; background-size: 88px auto, 54px auto, cover; }
+/* ozke ploščice (telefon, dve v vrsti): zobniki manjši, da ne segajo do × ÷ */
+@media (max-width: 899px) { .t-post::before { background-size: 100px auto, cover; } }
+.t-bit::before { background: url(vzorci/luske.svg) 0 0 / 36px 32.4px repeat;
+  -webkit-mask-image: linear-gradient(115deg, rgba(0,0,0,.2) 30%, #000 80%); mask-image: linear-gradient(115deg, rgba(0,0,0,.2) 30%, #000 80%); }
+.home-pet { position: absolute; right: -6px; bottom: -8px; width: 96px; height: 96px; pointer-events: none; z-index: 2; }
 .home-pet svg { width: 100%; height: 100%; display: block; }
 .home-cont {
   width: 100%; margin-top: 16px; display: flex; align-items: center; gap: 12px; text-align: left;
