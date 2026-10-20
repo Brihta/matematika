@@ -1403,6 +1403,10 @@ function logoutTeacher() {
    izbiri. */
 const RAZREDI = ['1A','1B','2A','3A','4A','4B',
                  '5A','5B','6A','6B','7A','7B'];
+/* Starši, stari starši, prijatelji … Namesto razreda dobijo to oznako, da jih
+   aplikacija ne sprašuje več po razredu in da ne pridejo med učence. */
+const OBISK = 'OBISK';
+const razredLabel = r => r === OBISK ? 'Obiskovalec' : r;
 async function getStudentRazred(id) {
   return supabaseRPC('get_student_razred', { p_student: id });
 }
@@ -1443,6 +1447,8 @@ function openRazredPrompt(onDone) {
         <div class="razred-grid">
           ${RAZREDI.map(r => `<button class="razred-btn" data-r="${r}">${r}</button>`).join('')}
         </div>
+        <button class="razred-btn razred-obisk" data-r="${OBISK}">🏡 Nisem učenec/ka — sem samo na obisku
+          <span>(starš, prijatelj, drug sorodnik …)</span></button>
       </div>`;
     div.querySelectorAll('.razred-btn').forEach(b => {
       b.addEventListener('click', () => renderConfirm(b.dataset.r));
@@ -1452,12 +1458,15 @@ function openRazredPrompt(onDone) {
   /* A mis-tap here is worse than no answer: it quietly files the child in
      another teacher's class and nobody notices. Hence the confirm step. */
   function renderConfirm(r) {
+    const obisk = r === OBISK;
     div.innerHTML = `
       <div class="timed-overlay-box razred-box">
-        <div class="overlay-title" style="color:#f0a500">🏫 Je to pravi razred?</div>
+        <div class="overlay-title" style="color:#f0a500">${obisk ? '🏡 Si na obisku?' : '🏫 Je to pravi razred?'}</div>
         <div class="overlay-divider"></div>
-        <div class="razred-confirm">${esc(r)}</div>
-        <div class="auth-msg">Potrdi, da hodiš v razred <strong>${esc(r)}</strong>.</div>
+        <div class="razred-confirm${obisk ? ' razred-confirm-obisk' : ''}">${obisk ? '🏡 Obiskovalec' : esc(r)}</div>
+        <div class="auth-msg">${obisk
+          ? 'Potrdi, da nisi učenec/ka — Brihto igraš doma ali skupaj z otrokom.'
+          : `Potrdi, da hodiš v razred <strong>${esc(r)}</strong>.`}</div>
         <button class="overlay-btn overlay-btn-next" id="razredOk">✓ Potrdi</button>
         <button class="auth-switch auth-close" id="razredBack">← Nazaj</button>
       </div>`;
@@ -2378,7 +2387,9 @@ async function openTeacherDashboard() {
      which is exactly who a teacher is looking for mid-lesson. */
   function baseList() {
     const list = activeList();
-    return curRazred ? list.filter(s => razredMap[s.username] === curRazred) : list;
+    /* "Vsi razredi" so samo učenci; obiskovalci imajo svojo izbiro. */
+    return curRazred ? list.filter(s => razredMap[s.username] === curRazred)
+                     : list.filter(s => razredMap[s.username] !== OBISK);
   }
 
   const OP_SIGN = { x: '×', d: '÷' };
@@ -2553,7 +2564,7 @@ async function openTeacherDashboard() {
               title="Klikni za ponastavitev gesla">
           <span class="tl-dot ${idle ? 'off' : 'on'}"></span>
           ${esc(r.s.emoji || '🦉')} ${imeUcenca(r.s)}${
-            !curRazred && rz ? `<span class="td-razred">${rz}</span>` : ''}
+            !curRazred && rz ? `<span class="td-razred">${razredLabel(rz)}</span>` : ''}
         </span>
         ${ansCell(r)}
         ${bmCell(r.mastered)}
@@ -2658,7 +2669,7 @@ async function openTeacherDashboard() {
     head += '</div>';
     const body = filtered.map(s => {
       const rz = razredMap[s.username];
-      const rzTag = (!curRazred && rz) ? `<span class="td-razred">${rz}</span>` : '';
+      const rzTag = (!curRazred && rz) ? `<span class="td-razred">${razredLabel(rz)}</span>` : '';
       let row = `<div class="td-row"><span class="td-name" data-username="${esc(s.username)}"`
         + ` title="Klikni za ponastavitev gesla">${esc(s.emoji || '🦉')} ${imeUcenca(s)}${rzTag}</span>`
         + `<span class="td-ops"><span>+</span><span>${MINUS}</span></span>`;
@@ -2701,7 +2712,7 @@ async function openTeacherDashboard() {
     head += '</div>';
     const body = filtered.map(s => {
       const rz = razredMap[s.username];
-      const rzTag = (!curRazred && rz) ? `<span class="td-razred">${rz}</span>` : '';
+      const rzTag = (!curRazred && rz) ? `<span class="td-razred">${razredLabel(rz)}</span>` : '';
       let row = `<div class="td-row"><span class="td-name" data-username="${esc(s.username)}"`
         + ` title="Klikni za ponastavitev gesla">${esc(s.emoji || '🦉')} ${imeUcenca(s)}${rzTag}</span>`
         // Oznaka ob vsaki vrstici. Na tablici ni prehoda z miško, zato se
@@ -2779,7 +2790,7 @@ async function openTeacherDashboard() {
 
     const p = sloveniaParts();
     const datum = `${+p.day}. ${+p.month}. ${p.year}`;
-    const title = `${curRazred || 'Vsi razredi'} · ${WIN_LABEL[curWin]}`;
+    const title = `${razredLabel(curRazred) || 'Vsi razredi'} · ${WIN_LABEL[curWin]}`;
     const withRazred = !curRazred;
 
     const body = active.map(r => {
@@ -2803,7 +2814,7 @@ async function openTeacherDashboard() {
         `<span class="ps-modechip">${m.icon}${m.c}</span>`).join('');
       return `<tr>
         <td class="ps-name">${imeIzpis(r.s)}</td>
-        ${withRazred ? `<td>${esc(razredMap[r.s.username] || '')}</td>` : ''}
+        ${withRazred ? `<td>${esc(razredLabel(razredMap[r.s.username] || ''))}</td>` : ''}
         <td class="ps-num">${r.correct}</td>
         <td class="ps-num">${r.wrong}</td>
         <td class="ps-mode">${nacin}</td>
@@ -2855,7 +2866,7 @@ async function openTeacherDashboard() {
     const sortKey = s => (s.display_name || s.username || '');
     const byRazred = {};
     for (const s of baseList()) {
-      const rz = razredMap[s.username] || 'Brez razreda';
+      const rz = razredLabel(razredMap[s.username]) || 'Brez razreda';
       (byRazred[rz] = byRazred[rz] || []).push(s);
     }
     const order = RAZREDI.filter(r => byRazred[r]).concat(
@@ -2978,10 +2989,10 @@ async function openTeacherDashboard() {
   for (const r of asRows(razRows)) {
     if (r.razred) razredMap[r.username] = r.razred;
   }
-  const present = RAZREDI.filter(r => Object.values(razredMap).includes(r));
+  const present = RAZREDI.concat(OBISK).filter(r => Object.values(razredMap).includes(r));
   for (const r of present) {
     const opt = document.createElement('option');
-    opt.value = r; opt.textContent = r;
+    opt.value = r; opt.textContent = r === OBISK ? '🏡 Obiskovalci' : r;
     razSelect.appendChild(opt);
   }
 
@@ -3078,7 +3089,8 @@ function openResetPin(student, targets, razred) {
       <label class="auth-label">Razred</label>
       <select id="razredSelect" class="td-razred-select td-merge-select">
         ${razred ? '' : '<option value="">— ni izbran —</option>'}
-        ${RAZREDI.map(r => `<option value="${r}"${r === razred ? ' selected' : ''}>${r}</option>`).join('')}
+        ${RAZREDI.concat(OBISK).map(r => `<option value="${r}"${r === razred ? ' selected' : ''}>${
+          r === OBISK ? '🏡 Obiskovalec (ni učenec)' : r}</option>`).join('')}
       </select>
       <button class="overlay-btn overlay-btn-ghost" id="razredBtn">Premakni v izbrani razred ✓</button>
       <div class="auth-msg" id="razredMsg"></div>
@@ -3135,7 +3147,8 @@ function openResetPin(student, targets, razred) {
     const nov = div.querySelector('#razredSelect').value;
     const msg = div.querySelector('#razredMsg');
     if (!nov) { msg.textContent = 'Izberi razred.'; return; }
-    if (nov === razred) { msg.style.color = ''; msg.textContent = `Učenec je že v ${nov}.`; return; }
+    if (nov === razred) { msg.style.color = ''; msg.textContent = nov === OBISK
+      ? 'Račun je že med obiskovalci.' : `Učenec je že v ${nov}.`; return; }
     const btn = div.querySelector('#razredBtn');
     btn.disabled = true; btn.textContent = 'Premikam …';
     const res = await supabaseRPC('move_student_razred', {
@@ -3145,13 +3158,15 @@ function openResetPin(student, targets, razred) {
     if (res === 'OK') {
       razred = nov;
       msg.style.color = '#5fd97a';
-      msg.textContent = `✅ Premaknjen v ${nov}.`;
+      msg.textContent = nov === OBISK ? '✅ Premaknjen med obiskovalce.' : `✅ Premaknjen v ${nov}.`;
       return;
     }
     msg.style.color = '';
     msg.textContent = res === null
       ? '❌ V bazi še ni funkcije — zaženi supabase_premakni_razred.sql.'
-      : res === 'SLAB_RAZRED' ? '❌ Neveljaven razred.' : accountError(res);
+      : res === 'SLAB_RAZRED'
+        ? (nov === OBISK ? '❌ Zaženi supabase_obiskovalec.sql.' : '❌ Neveljaven razred.')
+        : accountError(res);
   });
 
   div.querySelector('#mergeBtn').addEventListener('click', async () => {
