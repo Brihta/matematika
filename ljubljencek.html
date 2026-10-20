@@ -329,7 +329,7 @@ function milestone(m) {
 
 function renderPick() {
   $('app').innerHTML = `
-    <h1>🐾 Izberi svojega ljubljenčka<small>Sezona ${esc(S.season.name)} · sovica se izvali iz jajca, zmajček, lisička in mucka pa spijo, dokler jih ne zbudiš</small></h1>
+    <h1>🐾 Izberi svojega ljubljenčka<small>Sezona ${esc(S.season.name)} · zmajček in sovica se izvalita iz jajca, lisička in mucka spita v košarici</small></h1>
     <div class="card pick" style="margin-top:16px">
       <div class="row">${A.SPECIES.map(x => `<button class="species-btn" data-new="${x.id}">
         ${A.draw({ species: x.id, body: START[x.id] }, 'jajce')}${x.name}</button>`).join('')}</div>
