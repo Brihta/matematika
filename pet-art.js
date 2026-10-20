@@ -226,6 +226,8 @@
     rozica:    { slot: 'glava', name: 'Rožica' },
     kapa:      { slot: 'glava', name: 'Kapa' },
     cilinder:  { slot: 'glava', name: 'Cilinder' },
+    // odprta motoristična čelada: obraz se vidi, ušesa in rogki so pod njo
+    celada:    { slot: 'glava', name: 'Motoristična čelada', hidesEars: true },
     ovratnica: { slot: 'vrat',  name: 'Ovratnica' },
     sal:       { slot: 'vrat',  name: 'Šal' },
     metuljcek: { slot: 'vrat',  name: 'Metuljček' },
@@ -245,6 +247,19 @@
         `<path d="M50 44 L150 44 L150 50 L50 50 Z" fill="#fdfcf3" opacity=".8"/><path d="M50 32 L150 32 L150 37 L50 37 Z" fill="#fdfcf3" opacity=".8"/>`, 3.5)
       + shape('M56 62 C80 52 120 52 144 62 L144 70 C120 60 80 60 56 70 Z', '#3b6aa3', '', 3)
       + `<circle cx="100" cy="24" r="8" fill="#fdfcf3" stroke="${OL}" stroke-width="3"/>` + `</g>`;
+    if (id === 'celada') {
+      // lupina kot podkev okoli obraza (glava je x 46–154, oči na y 80)
+      const shell = 'M38 104 C32 52 62 14 100 14 C138 14 168 52 162 104 C162 110 156 112 148 110 L146 104 C146 72 128 56 100 56 C72 56 54 72 54 104 L52 110 C44 112 38 110 38 104 Z';
+      return shape(shell, '#e8504a',
+          `<path d="M90 0 L110 0 L110 60 L90 60 Z" fill="#fff"/><path d="M84 0 L87 0 L87 60 L84 60 Z M113 0 L116 0 L116 60 L113 60 Z" fill="#fff" opacity=".7"/>`
+        + `<path d="M30 92 L170 92 L170 120 L30 120 Z" fill="#b83a36" opacity=".45"/>`
+        + `<ellipse cx="66" cy="34" rx="16" ry="7" fill="#fff" opacity=".55" transform="rotate(-30 66 34)"/>`, 4.2)
+        // strela na boku, podloga ob obrazu, šilt in pašček pod brado
+        + `<path d="M130 22 L121 37 L128 37 L123 52 L137 32 L130 32 L135 22 Z" fill="#f2c94a" stroke="${OL}" stroke-width="1.6" stroke-linejoin="round"/>`
+        + line('M54 102 C54 74 72 60 100 60 C128 60 146 74 146 102', 3, '#5b3c44')
+        + shape('M64 60 C80 48 120 48 136 60 C130 66 70 66 64 60 Z', '#3a3550', `<path d="M60 50 L140 50 L140 56 L60 56 Z" fill="#fff" opacity=".25"/>`, 3.2)
+        + line('M50 108 C58 120 80 124 100 124 C120 124 142 120 150 108', 2.6, '#3a3550');
+    }
     if (id === 'cilinder') return `<g transform="rotate(-8 100 40)">`
       + shape('M80 40 L84 6 L116 6 L120 40 Z', '#2f2a36', `<path d="M80 30 L120 30 L120 36 L80 36 Z" fill="#c0392b"/>`, 3.5)
       + shape('M68 40 C80 34 120 34 132 40 C120 46 80 46 68 40 Z', '#2f2a36', '', 3.5) + `</g>`;
@@ -278,10 +293,11 @@
     const legs = sp.legs === false ? '' : both('M64 156 C70 162 73 172 74 186', d => line(d, 3))
       + both('M84 134 C84 152 84 170 84 186', d => line(d, 3)) + line(`M100 ${sp.legs} L100 186`, 3);
     const eyeX = sp.eyeX || EYE_X, eyeY = sp.eyeY || 80, eyeR = sp.eyeR || 8;
-    const headS = shape(sp.headD || HEAD, c, patternFill(pet.pattern, c, 100, 66, 34) + (sp.headIn || ''), 4.4);
+    const eq = pet.equip || {}, noEars = ACC[eq.glava] && ACC[eq.glava].hidesEars;
+    // pod čelado ima sova okroglo glavo (čopki bi štrleli skozi)
+    const headS = shape(noEars && pet.species === 'sova' ? HEAD : sp.headD || HEAD, c, patternFill(pet.pattern, c, 100, 66, 34) + (sp.headIn || ''), 4.4);
     const cheeks = eyeX.map((x, i) => `<ellipse cx="${x + (i ? 12 : -12)}" cy="${eyeY + 12}" rx="8.5" ry="5" fill="#f7a1b2" opacity=".85"/>`).join('');
-    const eq = pet.equip || {};
-    const headAll = (sp.ears || '') + headS + cheeks + sp.face + eyes(pet.eyes, eyeX[0], eyeX[1], eyeY, eyeR)
+    const headAll = (noEars ? '' : sp.ears || '') + headS + cheeks + sp.face + eyes(pet.eyes, eyeX[0], eyeX[1], eyeY, eyeR)
       + accFace(eq.obraz, eyeY, 8) + accHead(eq.glava);
     // glavo povečamo okoli vratu (100, 110)
     const k = head || 1;
