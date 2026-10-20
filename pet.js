@@ -1,9 +1,10 @@
 /* Ljubljenček — povezava z aplikacijo (naloži se za album.js).
 
-   Samo pri Do 20, samo za prijavljene učence in samo, ko teče sezona.
-   - Zgoraj ob profilu: gumb z ljubljenčkom (namesto gumba z likom in
-     cekini, ki pri Do 20 ni smiseln — Do 20 cekinov ne daje).
-   - Klik odpre ljubljencek.html v oknu čez aplikacijo.
+   Samo za prijavljene učence in samo, ko teče sezona.
+   - Ljubljenček je zavihek "Ljubljenček" v oknu Moj svet (svet.js):
+     ljubljencek.html je tam, gumb zgoraj pokaže ljubljenčka v kotu glave
+     lika in število priboljškov. Klik na ljubljenčka na ploščici Do 20
+     odpre ta zavihek.
    - Med vajo: ljubljenček spodaj levo poskoči ob pravilnem odgovoru.
    - Po vaji baza preveri mejnike; nov mejnik → obvestilo spodaj.
    Kaj je doseženo, odloča baza (pet_state), ne ta datoteka. */
@@ -13,24 +14,6 @@
   const OPS = { p: '+', m: '−' };
 
   document.head.insertAdjacentHTML('beforeend', `<style>
-  .pt-chip { order: 3; flex-shrink: 0; display: none; align-items: center; gap: 6px; background: #fdfcf3;
-    border: 1px solid #ecd9bc; border-radius: 20px; padding: 2px 12px 2px 2px; color: #05270b;
-    font: 800 .78rem/1 system-ui, sans-serif; cursor: pointer; white-space: nowrap; position: relative; }
-  .pt-chip.on { display: flex; }
-  .pt-chip:hover { border-color: #9ac334; background: #fff; }
-  .pt-face { width: 32px; height: 32px; border-radius: 50%; background: #f6e5cd; overflow: hidden; }
-  .pt-face svg { width: 100%; height: 100%; display: block; }
-  .pt-badge { position: absolute; top: -6px; right: -6px; background: #9ac334; color: #05270b; border-radius: 999px;
-    min-width: 18px; height: 18px; display: none; place-items: center; font-size: .68rem; font-weight: 900; padding: 0 5px; }
-  .pt-badge.on { display: grid; }
-  body.do20 .al-chip { display: none !important; }
-  .pt-overlay { position: fixed; inset: 0; z-index: 900; background: rgba(5,39,11,.35); display: none; padding: 18px; }
-  .pt-overlay.on { display: flex; }
-  .pt-frame { position: relative; flex: 1; max-width: 1160px; margin: 0 auto; border-radius: 22px; overflow: hidden;
-    box-shadow: 0 20px 60px rgba(5,39,11,.35); background: #fdfcf3; }
-  .pt-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
-  .pt-close { position: absolute; top: 12px; right: 14px; z-index: 2; width: 38px; height: 38px; border-radius: 50%; border: 0;
-    background: #05270b; color: #fdfcf3; font-size: 1.05rem; cursor: pointer; box-shadow: 0 4px 12px rgba(5,39,11,.3); }
   .pt-buddy { position: fixed; left: 12px; bottom: 6px; width: 130px; height: 130px; z-index: 50; pointer-events: none; display: none; }
   .pt-buddy.on { display: block; }
   .pt-buddy svg { width: 100%; height: 100%; display: block; }
@@ -44,22 +27,17 @@
   .pt-toast .pic svg { width: 100%; height: 100%; }
   .pt-toast small { display: block; font-weight: 600; color: #5d6b52; }
   @media (max-width: 600px) { .pt-buddy.on { display: none; } }
-  @media (max-width: 700px) { .pt-chip .pt-txt { display: none; } .pt-chip { padding: 2px; } .pt-overlay { padding: 0; } .pt-frame { border-radius: 0; } }
+  /* ljubljenček na ploščici Do 20: klik odpre njegov zavihek (ostala ploščica začne vajo) */
+  .home-pet { pointer-events: auto !important; cursor: pointer; transition: transform .15s; }
+  .home-pet:hover { transform: scale(1.08) rotate(-3deg); }
   </style>`);
 
   document.body.insertAdjacentHTML('beforeend', `
-    <div class="pt-overlay" id="ptOverlay"><div class="pt-frame" id="ptFrameBox"><button class="pt-close" id="ptClose" title="Zapri">✕</button></div></div>
     <div class="pt-buddy" id="ptBuddy"></div>
     <div class="pt-toast" id="ptToast"></div>`);
 
-  const chip = document.createElement('button');
-  chip.className = 'pt-chip'; chip.id = 'ptChip'; chip.type = 'button'; chip.title = 'Moj ljubljenček';
-  chip.innerHTML = `<span class="pt-face" id="ptFace"></span><span class="pt-txt" id="ptTxt">Ljubljenček</span><span class="pt-badge" id="ptBadge"></span>`;
-  const profileBtn = document.getElementById('profileBtn');
-  profileBtn.parentNode.insertBefore(chip, profileBtn);
-
   const $ = id => document.getElementById(id);
-  const overlay = $('ptOverlay'), buddy = $('ptBuddy');
+  const buddy = $('ptBuddy');
   let frame = null, state = null, lastSync = 0, syncing = false, quizHinted = false, loadedFor = null;
 
   const isPupil = () => !!profile && !teacherSession;
@@ -79,7 +57,7 @@
       mode = 'keypad';
       saveSettings();
       applyUIFromState(); showPanel(mode); updateControlLock();
-      close();
+      Svet.close();
       triggerRestart();
     }
   };
@@ -88,7 +66,7 @@
   window.petChanged = function (st) {
     apply(st, false);
     // lik v albumu (lik.html) naj takoj pokaže novega spremljevalca
-    const lik = document.querySelector('#alFrameBox iframe');
+    const lik = Svet.pane('lik') && Svet.pane('lik').querySelector('iframe');
     try { if (lik && lik.contentWindow.petCompanion) lik.contentWindow.petCompanion(st && st.companion); } catch (e) {}
   };
 
@@ -110,16 +88,14 @@
   }
 
   function render() {
-    const on = !!active() && (inDo20() || screen === 'home');
-    chip.classList.toggle('on', on);
-    if (!active()) { buddy.classList.remove('on'); const hp = $('homePet'); if (hp) hp.innerHTML = ''; return; }
+    if (!active()) { buddy.classList.remove('on'); const hp = $('homePet'); if (hp) hp.innerHTML = ''; Svet.update(); return; }
     const pet = state.pet || { species: 'zmaj' };
     const stage = state.pet ? state.stage : 'jajce';
-    $('ptFace').innerHTML = PetArt.draw(pet, stage, { viewBox: PetArt.faceBox(stage) });
-    $('ptTxt').textContent = state.pet && state.pet.name ? state.pet.name : 'Ljubljenček';
-    const b = $('ptBadge');
-    b.textContent = state.pet ? '' : '!';      // še nima ljubljenčka: povabi ga
-    b.classList.toggle('on', !state.pet);
+    Svet.chip('pet', {
+      face: PetArt.draw(pet, stage, { viewBox: PetArt.faceBox(stage) }),
+      treats: (state.treats || {}).balance || 0,
+      badge: state.pet ? '' : '!'       // še nima ljubljenčka: povabi ga
+    });
     buddy.innerHTML = state.pet ? PetArt.draw(state.pet, state.stage) : '';
     // ljubljenček pokuka iz ploščice Do 20 na začetnem zaslonu
     const hp = $('homePet');
@@ -137,31 +113,30 @@
     t.innerHTML = html; t.classList.add('on');
     clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), ms);
   }
-  $('ptToast').addEventListener('click', () => { $('ptToast').classList.remove('on'); if (active()) open(); });
+  $('ptToast').addEventListener('click', () => { $('ptToast').classList.remove('on'); if (active()) Svet.open('pet'); });
 
-  function open() {
-    if (!isPupil()) return;
-    if (!frame) {
-      frame = document.createElement('iframe');
-      frame.src = 'ljubljencek.html';
-      frame.title = 'Moj ljubljenček';
-      $('ptFrameBox').appendChild(frame);
-    } else {
-      try { frame.contentWindow.petReload(); } catch (e) {}
-    }
-    if (document.activeElement) document.activeElement.blur();   // tipke naj ne tečejo v vajo za oknom
-    overlay.classList.add('on');
-  }
-  function close() { overlay.classList.remove('on'); render(); }
-  chip.addEventListener('click', open);
-  $('ptClose').addEventListener('click', close);
-  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.contains('on')) close(); });
+  Svet.register('pet', {
+    label: 'Ljubljenček', theme: 'light', available: () => !!active(),
+    onShow() {
+      if (!frame) {
+        frame = document.createElement('iframe');
+        frame.src = 'ljubljencek.html';
+        frame.title = 'Moj ljubljenček';
+        Svet.pane('pet').appendChild(frame);
+      } else {
+        try { frame.contentWindow.petReload(); } catch (e) {}
+      }
+    },
+    onHide() { render(); }
+  });
+  // ljubljenček na ploščici Do 20 odpre svoj zavihek, ne vaje
+  const hp0 = $('homePet');
+  if (hp0) hp0.addEventListener('click', e => { if (!active()) return; e.stopPropagation(); Svet.open('pet'); });
 
   /* Po vaji Do 20 (ko so odgovori zapisani) naj baza preveri mejnike. */
   let syncTimer = null;
   function syncSoon() {
-    if (!active() || !inDo20() || overlay.classList.contains('on')) return;
+    if (!active() || !inDo20() || Svet.isOpen()) return;
     const wait = lastSync + SYNC_MIN_MS - Date.now();
     if (syncing || wait > 0) { if (!syncTimer) syncTimer = setTimeout(() => { syncTimer = null; syncSoon(); }, Math.max(wait, 1000)); return; }
     syncing = true; lastSync = Date.now();
@@ -199,11 +174,10 @@
     return origRecord.apply(this, arguments);
   };
 
-  /* Gumb in ljubljenček med vajo sledita stikalu Poštevanka | Do 20. */
+  /* Ljubljenček med vajo sledi stikalu Poštevanka | Do 20. */
   const panels = ['quizPanel', 'keypadPanel'].map(id => $(id));
   setInterval(() => {
-    chip.classList.toggle('on', !!active() && (inDo20() || screen === 'home'));
-    buddy.classList.toggle('on', !!active() && inDo20() && !!state.pet && !overlay.classList.contains('on')
+    buddy.classList.toggle('on', !!active() && inDo20() && !!state.pet && !Svet.isOpen()
       && panels.some(p => p && p.style.display !== 'none'));
   }, 500);
 

@@ -2008,13 +2008,13 @@ body.do20 .hud-medal-next { color: var(--g-muted) !important; }
    utrjuješ (začetni zaslon s ploščicami), med vajo pa ni nastavitev —
    ena vrstica zgoraj, gumb "kaj utrjujem" odpre okno z izbiro.
 ══════════════════════════════════════════════════════════ */
-/* zgornja vrstica: logotip · nazaj · kaj utrjujem · … · lik/ljubljenček · profil */
+/* zgornja vrstica: logotip · nazaj · kaj utrjujem · … · Moj svet (svet.js) · profil */
 #topbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 #topbar > .brand { order: 1; }
 #topbar > .back-btn { order: 2; }
 #topbar > .summary-chip { order: 3; }
 #topbar > .topbar-sp { order: 4; flex: 1; }
-#topbar > .al-chip, #topbar > .pt-chip { order: 5; }
+#topbar > .sv-chip { order: 5; }
 #topbar > .profile-btn { order: 6; margin-left: 0; }
 .back-btn {
   width: 36px; height: 36px; flex-shrink: 0; border-radius: 12px;
@@ -2094,7 +2094,6 @@ body.home .toolbar { box-shadow: none; }
 .home-cont b { display: block; font-weight: 900; }
 .home-cont small { color: #5d6b52; font-weight: 700; font-size: .78rem; }
 .home-cont .go { margin-left: auto; font-size: 1.4rem; font-weight: 900; }
-body.home.do20 .al-chip.on { display: flex !important; }   /* na začetku sta vidna oba: lik in ljubljenček */
 
 /* tanka vrstica rezultata (namesto velikega okvirja) */
 .score-hud { padding: 6px 14px; gap: 14px; margin-top: 10px; }

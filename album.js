@@ -1,8 +1,8 @@
 /* Album, cekini in lik — povezava z aplikacijo (naloži se za battle.js).
 
    Samo za prijavljene učence in samo, ko teče sezona (supabase_album.sql).
-   - Zgoraj ob profilu: gumb z glavo lika, cekini in številom novih sličic.
-   - Klik odpre lik.html v oknu čez aplikacijo (album, oprema, videz, liki).
+   - Lik je zavihek "Moj lik" v oknu Moj svet (svet.js): lik.html je tam,
+     gumb zgoraj pokaže glavo lika, cekine in število novih sličic.
    - Med vadbo: lik spodaj levo poskoči ob pravilnem odgovoru.
    - Po vadbi baza preveri pogoje; nova sličica → obvestilo spodaj.
    Kaj je zasluženo, odloča baza (album_sync), ne ta datoteka.
@@ -13,25 +13,6 @@
   const SYNC_MIN_MS = 30000;   // po vadbi baze ne sprašuj pogosteje
 
   document.head.insertAdjacentHTML('beforeend', `<style>
-  .al-chip { order: 3; flex-shrink: 0; display: none; align-items: center; gap: 6px; background: rgba(240,165,0,.10);
-    border: 1px solid rgba(240,165,0,.45); border-radius: 20px; padding: 3px 12px 3px 3px; color: #ffd27a;
-    font: 600 .78rem/1 inherit; cursor: pointer; white-space: nowrap; position: relative; font-family: inherit; }
-  .al-chip.on { display: flex; }
-  .al-chip:hover { background: rgba(240,165,0,.18); }
-  .al-face { width: 30px; height: 30px; border-radius: 50%; overflow: hidden; background: #f6dcbc; }
-  .al-face svg { width: 100%; height: 100%; display: block; }
-  .al-coin { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff3b0, #f4c542 60%, #d89936);
-    box-shadow: inset 0 0 0 1.5px #d89936, inset 0 0 0 3px #f4c542, inset 0 0 0 4px #d89936; }
-  .al-badge { position: absolute; top: -6px; right: -6px; background: #f08c2e; color: #fff; border-radius: 999px; min-width: 18px; height: 18px;
-    display: none; place-items: center; font-size: .68rem; font-weight: 800; padding: 0 5px; animation: alPulse 1.4s infinite; }
-  .al-badge.on { display: grid; }
-  @keyframes alPulse { 50% { transform: scale(1.15); } }
-  .al-overlay { position: fixed; inset: 0; z-index: 900; background: rgba(10,8,16,.6); display: none; padding: 18px; }
-  .al-overlay.on { display: flex; }
-  .al-frame { position: relative; flex: 1; max-width: 1260px; margin: 0 auto; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.5); background: #1c1a22; }
-  .al-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
-  .al-close { position: absolute; top: 10px; right: 12px; z-index: 2; width: 38px; height: 38px; border-radius: 50%; border: 0;
-    background: #2b2233; color: #fff; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
   .al-buddy { position: fixed; left: 12px; bottom: 8px; width: 120px; height: 120px; z-index: 50; pointer-events: none; display: none; }
   .al-buddy.on { display: block; }
   .al-buddy svg { width: 100%; height: 100%; display: block; }
@@ -49,17 +30,6 @@
   .al-voj small { display: block; color: rgba(255,255,255,.65); font-weight: 600; }
   .al-voj .ico { font-size: 1.7rem; }
   @keyframes alVoj { from { transform: scale(.6); opacity: 0; } }
-  /* Široka vrstica se ne lomi (style.css, min-width 900px): beseda "cekinov"
-     bi do ~1180 px potisnila Prijavo čez rob. */
-  @media (max-width: 1180px) { .al-chip .al-txt { display: none; } }
-  /* 900–1000 px: tam je vrstica načinov skoraj čez celo širino — samo glava
-     lika in značka; uporabniško ime na Prijavi se skrije (ikona ostane). */
-  @media (min-width: 900px) and (max-width: 1000px) {
-    .al-chip { padding: 3px; gap: 0; }
-    .al-chip .al-coin, .al-chip #alCoins { display: none; }
-    .al-chip.on ~ .profile-btn .profile-name { display: none; }
-    .topbar:has(.al-chip.on) { gap: 12px; }
-  }
   /* Enkratno obvestilo (album_notices): okno sredi zaslona, gumb V redu */
   .al-note { position: fixed; inset: 0; z-index: 5200; background: rgba(10,8,16,.55); display: none; align-items: center; justify-content: center; padding: 18px; }
   .al-note.on { display: flex; }
@@ -71,26 +41,17 @@
   .al-note-box button { margin-top: 6px; background: #f08c2e; color: #fff; border: 0; border-radius: 999px; padding: 10px 28px;
     font: 800 1rem inherit; font-family: inherit; cursor: pointer; }
   @media (max-width: 600px) { .al-buddy.on { display: none; } }   /* na telefonu bi prekril namig pod tipkovnico */
-  /* Med tekmovanjem sta logotip in profil v prvi vrsti, način pod njima. */
-  body.competition .al-chip { order: 2; margin-left: auto; }
-  body.competition .al-chip.on + .profile-btn { margin-left: 0; }
-  @media (max-width: 700px) { .al-chip .al-txt { display: none; } .al-buddy { width: 84px; height: 84px; } .al-overlay { padding: 0; } .al-frame { border-radius: 0; } }
+  @media (max-width: 700px) { .al-buddy { width: 84px; height: 84px; } }
   </style>`);
 
   document.body.insertAdjacentHTML('beforeend', `
-    <div class="al-overlay" id="alOverlay"><div class="al-frame" id="alFrameBox"><button class="al-close" id="alClose" title="Zapri">✕</button></div></div>
     <div class="al-buddy" id="alBuddy"></div>
     <div class="al-toast" id="alToast"></div>
     <div class="al-note" id="alNote"><div class="al-note-box" id="alNoteBox"></div></div>`);
 
-  const chip = document.createElement('button');
-  chip.className = 'al-chip'; chip.id = 'alChip'; chip.title = 'Moj lik in album'; chip.type = 'button';
-  chip.innerHTML = `<span class="al-face" id="alFace"></span><span class="al-coin"></span><span id="alCoins"></span><span class="al-txt" id="alCek"></span><span class="al-badge" id="alBadge"></span>`;
-  const profileBtn = document.getElementById('profileBtn');
-  profileBtn.parentNode.insertBefore(chip, profileBtn);
-
   const $ = id => document.getElementById(id);
-  const overlay = $('alOverlay'), buddy = $('alBuddy');
+  const buddy = $('alBuddy');
+  const shownLik = () => Svet.isOpen('lik');   // je zavihek z likom odprt
   let frame = null, state = null, lastSync = 0, syncing = false, quizHinted = false;
 
   const isPupil = () => !!profile && !teacherSession;
@@ -105,7 +66,7 @@
     frame = document.createElement('iframe');
     frame.src = 'lik.html';
     frame.title = 'Moj lik';
-    $('alFrameBox').appendChild(frame);
+    Svet.pane('lik').appendChild(frame);
   }
   function dropFrame() {
     if (frame) frame.remove();
@@ -140,10 +101,10 @@
     /* Ko otrok ni sredi igre, se ovojnica odpre sama (autoEnvelope); obvestilo samo med igro. */
     if (fresh.length && !busy()) return;
     if (fresh.length) toast(`<span style="font-size:1.6rem">✉</span><div>Nova sličica: <b>${label(fresh[0].id)}</b>!${fresh.length > 1 ? ` (in še ${fresh.length - 1})` : ''}<small>Tapni in jo prilepi v album · +20 ${coin}</small></div>`);
-    else if (gold.length && !overlay.classList.contains('on')) toast(`<span style="font-size:1.6rem">⭐</span><div>Zlata sličica: <b>${label(gold[0].id)}</b>!<small>Znaš jo tudi po 14 dneh · +20 ${coin}</small></div>`);
-    else if (prev.vojska && !prev.vojska.open && st.vojska && st.vojska.open && !overlay.classList.contains('on'))
+    else if (gold.length && !Svet.isOpen()) toast(`<span style="font-size:1.6rem">⭐</span><div>Zlata sličica: <b>${label(gold[0].id)}</b>!<small>Znaš jo tudi po 14 dneh · +20 ${coin}</small></div>`);
+    else if (prev.vojska && !prev.vojska.open && st.vojska && st.vojska.open && !Svet.isOpen())
       toast(`<span style="font-size:1.6rem">🎖️</span><div>Poklican${st.avatar && st.avatar.form === 'f' ? 'a' : ''} si v <b>vojaško službo</b>!<small>Tapni in poglej, kaj to pomeni.</small></div>`, 8000);
-    else if (!overlay.classList.contains('on')) {
+    else if (!Svet.isOpen()) {
       /* Bitko oceni baza ob koncu bitke — izid vidimo šele ob naslednjem stanju. */
       const nv = st.vojska, top = nv && nv.recent && nv.recent[0];
       if (top && top.kind === 'bit' && !((prev.vojska && prev.vojska.recent) || []).some(x => x.kind === 'bit' && x.ref === top.ref))
@@ -204,7 +165,7 @@
   }
   function showNotice() {
     const note = $('alNote');
-    if (!notices.length || note.classList.contains('on') || busy() || overlay.classList.contains('on')) return;
+    if (!notices.length || note.classList.contains('on') || busy() || Svet.isOpen()) return;
     const n = notices[0];
     $('alNoteBox').innerHTML = NOTICE[n.code](n.data || {}) + '<button type="button" id="alNoteOk">V redu</button>';
     if (document.activeElement) document.activeElement.blur();   // tipke naj ne tečejo v vajo za oknom
@@ -217,19 +178,16 @@
   }
 
   function render() {
-    const on = active();
-    chip.classList.toggle('on', !!on);
-    if (!on) { buddy.classList.remove('on'); return; }
-    $('alCoins').textContent = state.coins;
+    if (!active()) { buddy.classList.remove('on'); Svet.update(); return; }
     const w = ready() ? W() : null;
-    $('alCek').textContent = w ? w.cek(state.coins) : 'cekinov';
-    const pend = (state.stickers || []).filter(s => s.state === 'pending').length, b = $('alBadge');
-    b.textContent = pend ? `✉${pend}` : ''; b.classList.toggle('on', !!pend);
+    const pend = (state.stickers || []).filter(s => s.state === 'pending').length;
+    let face = '';
     if (w) {
       const S = w.S, eq = (S.equip && S.equip[S.active]) || {};
-      $('alFace').innerHTML = w.hero(S.look, eq, '150 40 212 212', true);
+      face = w.hero(S.look, eq, '150 40 212 212', true);
       buddy.innerHTML = w.hero(S.look, eq, '0 0 512 512', true);
     }
+    Svet.chip('lik', { face, coins: state.coins, cek: w ? w.cek(state.coins) : 'cekinov', badge: pend ? `✉${pend}` : '' });
   }
 
   function toast(html, ms = 5000) {
@@ -239,16 +197,14 @@
   }
   $('alToast').addEventListener('click', () => { $('alToast').classList.remove('on'); if (active()) open(); });
 
-  function open() {
-    ensureFrame();
-    overlay.classList.add('on');
-    if (ready() && W().albumReload) W().albumReload();
-  }
-  function close() {
-    /* Zaprl je, ne da bi prilepil: teh sličic ne odpiramo več sami, ostanejo v ovojnici (značka). */
-    (state && state.stickers || []).forEach(s => { if (s.state === 'pending') shown.add(s.id); });
-    overlay.classList.remove('on'); render();
-  }
+  const open = () => Svet.open('lik');
+  Svet.register('lik', {
+    label: 'Moj lik', theme: 'dark', available: () => !!active(),
+    onShow() { ensureFrame(); if (ready() && W().albumReload) W().albumReload(); },
+    /* Zaprl ali preklopil je, ne da bi prilepil: teh sličic ne odpiramo več
+       sami, ostanejo v ovojnici (značka). */
+    onHide() { (state && state.stickers || []).forEach(s => { if (s.state === 'pending') shown.add(s.id); }); render(); }
+  });
 
   /* Nova sličica (ali grad za cilj razreda): okno se odpre samo — ne med tekmovanjem ali bitko
      in ne, dokler je odprto okno konca igre (najprej rezultat, potem sličica).
@@ -261,26 +217,19 @@
     if (!active() || !ready() || busy() || subject === 'do20') return;
     const w = W(), next = (state.stickers || []).find(s => s.state === 'pending' && !shown.has(s.id));
     if ((!next && !w.S.classWin) || Date.now() < (w.S.calmUntil || 0)) return;
-    if (!overlay.classList.contains('on')) {
-      if (document.activeElement) document.activeElement.blur();   // tipke naj ne tečejo v vajo za oknom
-      overlay.classList.add('on');
-      frame.focus();
-    }
+    if (Svet.isOpen() && !shownLik()) return;   // otrok je pri ljubljenčku — ne preklapljamo mu
+    if (!Svet.isOpen()) { Svet.open('lik'); frame.focus(); }
     /* Novinca okno najprej vpraša, kdo bo (vitez/vitezinja) — ovojnica pride za tem. */
     if (w.document.getElementById('modal').classList.contains('on')) return;
     if (w.S.classWin) return w.classReward();   // razred je dosegel cilj: grad
     shown.add(next.id);
     w.openEnvelope();
   }
-  chip.addEventListener('click', open);
-  $('alClose').addEventListener('click', close);
-  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.contains('on')) close(); });
 
   /* Po vadbi (ko so odgovori zapisani v bazo) naj baza preveri nove sličice. */
   let syncTimer = null;
   function syncSoon() {
-    if (!active() || !ready() || overlay.classList.contains('on')) return;
+    if (!active() || !ready() || Svet.isOpen()) return;
     const wait = lastSync + SYNC_MIN_MS - Date.now();
     /* Prepogosto: ne izpusti, ampak preveri malo kasneje — sicer bi otrok,
        ki je ravno končal vajo, za novo sličico izvedel šele naslednji dan. */
@@ -318,7 +267,7 @@
   /* Lik spodaj levo je viden samo med vadbo. */
   const panels = ['quizPanel', 'keypadPanel', 'tekmovanjePanel', 'bitkaPanel'].map(id => $(id));
   setInterval(() => {
-    buddy.classList.toggle('on', !!active() && subject !== 'do20' && !overlay.classList.contains('on') && panels.some(p => p && p.style.display !== 'none'));
+    buddy.classList.toggle('on', !!active() && subject !== 'do20' && !Svet.isOpen() && panels.some(p => p && p.style.display !== 'none'));
     autoEnvelope();
     showNotice();
   }, 500);

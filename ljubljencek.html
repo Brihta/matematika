@@ -62,6 +62,8 @@ h2 { font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform:
 .pick .species-btn { flex: 1 1 160px; padding: 12px 8px 14px; font-size: 1rem; }
 .pick .species-btn svg { width: 150px; height: 150px; }
 .note { font-size: .8rem; color: var(--muted); font-weight: 600; margin-top: 6px; }
+/* bližnjica v zavihek Moj lik (svet.js) */
+.to-lik { margin-top: 8px; background: none; border: 0; padding: 0; font: 800 .85rem inherit; font-family: inherit; color: var(--forest); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 
 .sw { position: relative; width: 46px; height: 46px; border-radius: 14px; border: 3px solid #fff; box-shadow: 0 0 0 2px var(--sand-2); cursor: pointer; transition: transform .12s, box-shadow .12s; }
 .sw:hover:not(.locked) { transform: translateY(-2px); }
@@ -129,6 +131,8 @@ h2 { font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform:
 <script>
 const A = PetArt;
 const api = () => { try { return parent.petApi; } catch (e) { return null; } };
+// je v oknu Moj svet tudi zavihek z likom (svet.js)
+const hasLik = () => { try { return !!(parent.Svet && parent.Svet.has('lik')); } catch (e) { return false; } };
 const GROUPS = [['d10', 'Do 10'], ['b20', 'Do 20 brez prehoda'], ['pr', 'Do 20 s prehodom']];
 const OPS = { p: '+', m: '−' };
 // privzeti videz novega jajčka po vrsti — samo proste barve
@@ -280,7 +284,8 @@ function companionCard(stage) {
         ${egg ? `<button class="wear" disabled>${A.words(c.species).still}</button>`
               : `<button class="wear" data-comp="${on ? '' : c.season}" title="${on ? 'Klikni, da ostane doma' : 'Klikni, da stoji ob tvojem liku'}">${on ? '✓ Gre s tabo' : 'Vzemi s seboj'}</button>`}</div>`;
     }).join('')}</div>
-    <div class="note">Tvoj ljubljenček lahko stoji ob tvojem liku, če želiš.</div></div>`;
+    <div class="note">Tvoj ljubljenček lahko stoji ob tvojem liku, če želiš.</div>
+    ${hasLik() ? '<button class="to-lik" id="toLik" type="button">Poglej svoj lik ›</button>' : ''}</div>`;
 }
 /* Nakup, oprema, spremljevalec: baza preveri in vrne novo stanje. */
 async function act(fn, params, okMsg) {
@@ -365,6 +370,8 @@ function wire() {
     const on = (draft.equip || {})[b.dataset.slot] === b.dataset.wear;
     act('pet_equip', { p_slot: b.dataset.slot, p_item: on ? null : b.dataset.wear });
   }));
+  const tl = $('toLik');
+  if (tl) tl.addEventListener('click', () => parent.Svet.open('lik'));
   document.querySelectorAll('[data-comp]').forEach(b => b.addEventListener('click', () => {
     const v = b.dataset.comp;
     act('pet_set_companion', { p_season: v ? +v : null }, v ? 'Zdaj gre s tvojim likom! 🛡️' : 'Ostane doma.');
