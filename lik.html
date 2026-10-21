@@ -1098,7 +1098,7 @@ let saveTimer = null;
 function saveAvatar() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
-    const st = await rpc('album_set_avatar', { p_avatar: { ...S.look, active_char: S.active, equip: S.equip } });
+    const st = await rpc('album_set_avatar', { p_avatar: { ...S.look, form_chosen: true, active_char: S.active, equip: S.equip } });
     if (st && !st.unreachable) apply(st);
   }, 400);
 }
@@ -1439,12 +1439,14 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
 /* Prvi obisk: otrok izbere, kako se lik imenuje (vitez / vitezinja). Vpraša se
-   enkrat na napravo; izbiro lahko kadarkoli spremeni v "Moj videz". */
+   enkrat: ne, če je lik že shranjen v bazi; izbiro lahko kadarkoli spremeni v "Moj videz". */
 const formKey = () => 'brihta_lik_oblika_' + ((api() && api().profile() && api().profile().id) || '');
 function markFormChosen() { try { localStorage.setItem(formKey(), '1'); } catch (e) {} }
 function askFormOnce() {
   let asked = false; try { asked = !!localStorage.getItem(formKey()); } catch (e) {}
   if (asked || !S.srv || !S.srv.season) return;
+  // izbiral je že na drugi napravi ali v drugem brskalniku
+  if (S.srv.avatar && S.srv.avatar.form_chosen) return markFormChosen();
   const ch = S.seasonChar;
   openModal(`<h3>Kdo boš to ${(S.srv.season.name || '').toLowerCase() === 'jesen' ? 'jesen' : 'sezono'}?</h3><p>Izberi ime svojega lika. Spremeniš ga lahko kadarkoli v "Moj videz".</p>
     <div class="choose">${['m', 'f'].map((v, i) => `<div class="opt"><div class="pic">${hero(S.look, EQ())}</div><b>${CHARS[ch].names[i]}</b><button class="btn ${i ? 'btn-purple' : 'btn-main'}" data-do="form" data-val="${v}">Sem ${CHARS[ch].names[i].toLowerCase()}</button></div>`).join('')}</div>`, true);

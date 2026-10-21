@@ -214,6 +214,13 @@ alter table student_avatar drop constraint if exists student_avatar_style_check;
 alter table student_avatar add constraint student_avatar_style_check
   check (style in ('kratki', 'dolgi', 'kitke', 'cop', 'irokeza', 'viking'));
 
+-- Ali je otrok sam izbral vitez / vitezinja (okno ob prvem obisku se ne ponavlja
+-- na novih napravah). Za stare zapise: kdor je spremenil videz, je izbiral.
+alter table student_avatar add column if not exists form_chosen boolean not null default false;
+update student_avatar set form_chosen = true
+ where not form_chosen and (form = 'f' or skin <> '#f7d2b4' or hair <> '#5a3a24'
+                            or eye <> '#4a8a3c' or style <> 'kratki');
+
 -- Pogum: najtežja poštevanka, izbrana enkrat na sezono (album_sync). Ostane
 -- ista vso sezono, da se trud sešteva. base_* = odgovori v sezoni ob izbiri;
 -- napredek šteje samo odgovore po izbiri.
@@ -642,7 +649,8 @@ begin
     'chars', coalesce((select json_agg(distinct char_id) from student_season_char where student_id = p_student), '[]'::json),
     'items', coalesce((select json_agg(item_id) from student_items where student_id = p_student), '[]'::json),
     'avatar', (select json_build_object('form', form, 'skin', skin, 'hair', hair, 'eye', eye,
-                       'style', style, 'active_char', active_char, 'equip', equip)
+                       'style', style, 'active_char', active_char, 'equip', equip,
+                       'form_chosen', form_chosen)
                  from student_avatar where student_id = p_student),
     -- napredek po predalih v sezoni (za obročke in "še vadiš")
     'tables', case when s.id is null then '[]'::json else coalesce((
@@ -922,6 +930,7 @@ begin
 
   update student_avatar a set
     form  = case when p_avatar->>'form' in ('m', 'f') then p_avatar->>'form' else a.form end,
+    form_chosen = a.form_chosen or coalesce((p_avatar->>'form_chosen')::boolean, false),
     skin  = case when p_avatar->>'skin' ~ '^#[0-9a-fA-F]{6}$' then p_avatar->>'skin' else a.skin end,
     hair  = case when p_avatar->>'hair' ~ '^#[0-9a-fA-F]{6}$' then p_avatar->>'hair' else a.hair end,
     eye   = case when p_avatar->>'eye'  ~ '^#[0-9a-fA-F]{6}$' then p_avatar->>'eye'  else a.eye  end,
