@@ -1,4 +1,6 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
+/* No double-tap zoom on iPhone: quick repeated taps (11, 22, ⌫⌫) stay taps. Pinch zoom still works. */
+html { touch-action: manipulation; }
 
 body {
   font-family: system-ui, sans-serif;
