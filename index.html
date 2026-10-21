@@ -106,10 +106,15 @@
 
   <!-- ZAČETNI ZASLON: kaj utrjujem danes (ploščice namesto nastavitev) -->
   <div id="homeScreen" class="home-screen" style="display:none">
-    <div class="home-hi">
-      <h1>Vaja dela mojstra!</h1>
-      <p>Izberi in pokaži, kaj znaš!</p>
-    </div>
+    <!-- pozdrav kot na portalu sola: datum, ime učenca (script.js renderHomeHi) -->
+    <section class="home-hi">
+      <div>
+        <div class="hi-date" id="hiDate"></div>
+        <h1 id="hiTitle">Živjo! 👋</h1>
+        <p>Vaja dela mojstra!<br>Izberi in pokaži, kaj znaš!</p>
+      </div>
+      <img class="hi-owl" src="Brihta.png" width="256" height="256" alt="">
+    </section>
     <div class="home-tiles">
       <button class="home-tile t-do20" data-home="do20" type="button">
         <span><small>Računi</small><b>Do 20</b></span><span class="big">+ −</span>

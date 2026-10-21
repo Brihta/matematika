@@ -2104,8 +2104,22 @@ body.competition #topbar > .summary-chip { display: none; }
 /* začetni zaslon */
 body.home .toolbar { box-shadow: none; }
 .home-screen { padding: 20px 2px 30px; }
-.home-hi h1 { font-size: 1.7rem; font-weight: 900; letter-spacing: -.01em; }
-.home-hi p { font-weight: 600; font-size: .95rem; margin-top: 2px; opacity: .75; }
+/* pozdravna kartica, kot na portalu sola, v Brihtini zeleni */
+.home-hi {
+  position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center;
+  background: linear-gradient(120deg, #05270b 0%, #2f6b1f 55%, #7fae2a 100%); color: #fff;
+  border-radius: 26px; padding: 24px 28px; box-shadow: 0 10px 30px rgba(5,39,11,.25);
+}
+.home-hi::before, .home-hi::after { content: ''; position: absolute; border-radius: 50%; pointer-events: none; }
+.home-hi::before { width: 260px; height: 260px; right: -60px; top: -120px; background: radial-gradient(circle, rgba(255,196,64,.5), transparent 70%); }
+.home-hi::after { width: 220px; height: 220px; left: 30%; bottom: -150px; background: radial-gradient(circle, rgba(169,207,69,.5), transparent 70%); }
+.home-hi > * { position: relative; }
+.hi-date { font-weight: 800; text-transform: uppercase; letter-spacing: .08em; font-size: .75rem; opacity: .8; }
+.home-hi h1 { font-size: clamp(1.6rem, 4.5vw, 2.4rem); font-weight: 900; letter-spacing: -.01em; margin: 2px 0 6px; }
+.home-hi p { font-weight: 600; font-size: 1rem; opacity: .92; }
+.hi-owl { width: 104px; height: 104px; filter: drop-shadow(0 10px 18px rgba(0,0,0,.3)); animation: hiBob 4s ease-in-out infinite; }
+@keyframes hiBob { 50% { transform: translateY(-6px) rotate(2deg); } }
+@media (max-width: 599px) { .home-hi { grid-template-columns: minmax(0, 1fr); padding: 20px 20px; } .hi-owl { display: none; } }
 .home-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
 @media (min-width: 900px) { .home-tiles { grid-template-columns: repeat(4, 1fr); gap: 16px; } .home-tile { min-height: 200px; } }
 .home-tile {
@@ -2191,4 +2205,3 @@ body.do20 .pick-box { background: #fffef8; color: #05270b; }
 body.do20 .pick-x { background: #f6e5cd; }
 body.do20 .pick-start { background: #05270b; color: #fdfcf3; }
 body.do20 .mode-switch button { border-color: #ecd9bc; color: #5d6b52; }
-body.home .home-hi p { color: #5d6b52; opacity: 1; }

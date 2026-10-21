@@ -709,7 +709,7 @@ function showPanel(m) {
   document.body.classList.toggle('bitka', !home && m==='bitka');
   document.body.classList.toggle('home', home);
   document.body.classList.toggle('do20', subject === 'do20' || home);
-  if (home) { collapseToolbar(); renderHomeCont(); }
+  if (home) { collapseToolbar(); renderHomeCont(); renderHomeHi(); }
 }
 
 /* Napis na gumbu "kaj utrjujem": kratko, kar je izbrano. */
@@ -738,6 +738,19 @@ function updateSummary() {
 const LAST_KEY = 'brihta_last_v1';
 function rememberLast() {
   try { localStorage.setItem(LAST_KEY, JSON.stringify({ subject })); } catch(e) {}
+}
+/* Pozdrav na začetnem zaslonu: datum in ime, kot na portalu sola. */
+function renderHomeHi() {
+  const t = document.getElementById('hiTitle');
+  if (!t) return;
+  const HI_DNI = ['nedelja', 'ponedeljek', 'torek', 'sreda', 'četrtek', 'petek', 'sobota'];
+  const HI_MESECI = ['januar', 'februar', 'marec', 'april', 'maj', 'junij', 'julij', 'avgust', 'september', 'oktober', 'november', 'december'];
+  const d = new Date(), h = d.getHours();
+  document.getElementById('hiDate').textContent = `${HI_DNI[d.getDay()]}, ${d.getDate()}. ${HI_MESECI[d.getMonth()]}`;
+  const ime = teacherSession ? teacherSession.username
+    : profile ? (velikaZacetnica(profile.display_name) || profile.username) : '';
+  const pozdrav = h < 10 ? 'Dobro jutro' : h < 18 ? 'Živjo' : 'Dober večer';
+  t.textContent = `${pozdrav}${ime ? ', ' + ime : ''}! 👋`;
 }
 function renderHomeCont() {
   const btn = document.getElementById('homeCont');
@@ -1710,6 +1723,7 @@ function updateProfileButton() {
       + `<span class="profile-name">Prijava</span>`;
     btn.classList.remove('logged-in');
   }
+  renderHomeHi();
   // battle.js se naloži za tem skriptom, ob prvem klicu ga še ni
   if (typeof battleAccessChanged === 'function') battleAccessChanged();
   showPersonalBest();   // drug učenec na isti napravi: njegov rekord, ne prejšnjega
