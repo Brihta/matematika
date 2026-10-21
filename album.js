@@ -209,12 +209,22 @@
     let face = '';
     if (w) {
       const S = w.S, eq = (S.equip && S.equip[S.active]) || {};
-      face = w.hero(S.look, eq, '150 40 212 212', true);
+      /* Pokrivala (krona, klobuk, čelade) segajo skoraj do vrha risbe, glava
+         brez njih pa se začne pri y≈30 — zato je izrez s pokrivalom višji,
+         sicer odreže krono. */
+      const hat = !!eq.glava;
+      face = w.hero(S.look, eq, hat ? '132 -6 248 248' : '150 40 212 212', true);
       buddy.innerHTML = w.hero(S.look, eq, '0 0 512 512', true);
       /* Lik na ploščici Poštevanka: z vajo poštevanke zbira cekine, kot
-         ljubljenček na ploščici Do 20 raste z Do 20. Brez ljubljenčka (ta je
-         že na sosednji ploščici) in brez ozadja. */
-      if (hh) { hh.innerHTML = w.hero(S.look, eq, '96 56 320 448', true, null); hh.parentNode.classList.add('has-hero'); }
+         ljubljenček na ploščici Do 20 raste z Do 20. Brez ozadja in brez
+         spremljevalca: ljubljenček je že na sosednji ploščici, sova in drugi
+         spremljevalci pa stojijo levo ob liku, izven obreza, in jih je
+         odrezalo na pol. */
+      if (hh) {
+        const { spremljevalec, ...brez } = eq;
+        hh.innerHTML = w.hero(S.look, brez, hat ? '76 -6 360 504' : '86 24 340 476', true, null);
+        hh.parentNode.classList.add('has-hero');
+      }
     }
     Svet.chip('lik', { face, coins: state.coins, cek: w ? w.cek(state.coins) : 'cekinov', badge: pend ? `✉${pend}` : '' });
   }

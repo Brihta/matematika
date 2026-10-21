@@ -2141,7 +2141,7 @@ body.home .toolbar { box-shadow: none; }
 .home-pet svg { width: 100%; height: 100%; display: block; }
 /* Lik na ploščici Poštevanka (album.js). Svetel sij za njim, da se temen
    oklep ne zlije s temno modro. Ko je lik tu, zobnik z × umakne. */
-.home-hero { position: absolute; right: 2px; bottom: -4px; width: 80px; height: 112px; pointer-events: none; z-index: 2;
+.home-hero { position: absolute; right: 2px; bottom: -4px; width: 86px; height: 120px; pointer-events: none; z-index: 2;
   background: radial-gradient(closest-side, rgba(255,214,120,.38), rgba(255,214,120,0) 85%) center 60% / 100% 80% no-repeat; }
 .home-hero:empty { display: none; }
 /* ozke ploščice: manjši, da krona ne seže do naslova */
