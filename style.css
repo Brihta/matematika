@@ -2126,7 +2126,7 @@ body.home .toolbar { box-shadow: none; }
    (poštevanka), hitrostne črte, lovor in zastava (tekmovanje), zmajeve
    luske (bitka). Plast je ::before, besedilo in ljubljenček sta nad njo. */
 .home-tile::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0; background-repeat: no-repeat; }
-.home-tile > span:not(.home-pet) { position: relative; z-index: 1; }
+.home-tile > span:not(.home-pet):not(.home-hero) { position: relative; z-index: 1; }
 .t-do20::before { background: url(vzorci/kocke.svg) 0 0 / 38px 66px repeat;
   -webkit-mask-image: linear-gradient(105deg, rgba(0,0,0,.25) 25%, #000 75%); mask-image: linear-gradient(105deg, rgba(0,0,0,.25) 25%, #000 75%); }
 .t-post::before { background-image: url(vzorci/zobniki.svg), url(vzorci/zvezde.svg);
@@ -2139,6 +2139,15 @@ body.home .toolbar { box-shadow: none; }
   -webkit-mask-image: linear-gradient(115deg, rgba(0,0,0,.2) 30%, #000 80%); mask-image: linear-gradient(115deg, rgba(0,0,0,.2) 30%, #000 80%); }
 .home-pet { position: absolute; right: -6px; bottom: -8px; width: 96px; height: 96px; pointer-events: none; z-index: 2; }
 .home-pet svg { width: 100%; height: 100%; display: block; }
+/* Lik na ploščici Poštevanka (album.js). Svetel sij za njim, da se temen
+   oklep ne zlije s temno modro. Ko je lik tu, zobnik z × umakne. */
+.home-hero { position: absolute; right: 2px; bottom: -4px; width: 80px; height: 112px; pointer-events: none; z-index: 2;
+  background: radial-gradient(closest-side, rgba(255,214,120,.38), rgba(255,214,120,0) 85%) center 60% / 100% 80% no-repeat; }
+.home-hero:empty { display: none; }
+/* ozke ploščice: manjši, da krona ne seže do naslova */
+@media (max-width: 899px) { .home-hero { width: 62px; height: 88px; right: 0; } }
+.home-hero svg { width: 100%; height: 100%; display: block; }
+.t-post.has-hero::before { background-image: url(vzorci/zvezde.svg); background-position: center; background-size: cover; }
 .home-cont {
   width: 100%; margin-top: 16px; display: flex; align-items: center; gap: 12px; text-align: left;
   background: #fffef8; border: 1px solid #ecd9bc; border-radius: 18px; padding: 12px 14px;

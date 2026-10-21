@@ -202,7 +202,8 @@
   }
 
   function render() {
-    if (!active()) { buddy.classList.remove('on'); Svet.update(); return; }
+    const hh = $('homeHero');
+    if (!active()) { buddy.classList.remove('on'); if (hh) { hh.innerHTML = ''; hh.parentNode.classList.remove('has-hero'); } Svet.update(); return; }
     const w = ready() ? W() : null;
     const pend = (state.stickers || []).filter(s => s.state === 'pending').length;
     let face = '';
@@ -210,6 +211,10 @@
       const S = w.S, eq = (S.equip && S.equip[S.active]) || {};
       face = w.hero(S.look, eq, '150 40 212 212', true);
       buddy.innerHTML = w.hero(S.look, eq, '0 0 512 512', true);
+      /* Lik na ploščici Poštevanka: z vajo poštevanke zbira cekine, kot
+         ljubljenček na ploščici Do 20 raste z Do 20. Brez ljubljenčka (ta je
+         že na sosednji ploščici) in brez ozadja. */
+      if (hh) { hh.innerHTML = w.hero(S.look, eq, '96 56 320 448', true, null); hh.parentNode.classList.add('has-hero'); }
     }
     Svet.chip('lik', { face, coins: state.coins, cek: w ? w.cek(state.coins) : 'cekinov', badge: pend ? `✉${pend}` : '' });
   }
