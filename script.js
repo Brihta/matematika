@@ -1835,7 +1835,7 @@ function renderAuthView(view) {
       if (ok === RPC_UNREACHABLE) {
         btn.disabled = false; btn.textContent = 'Prijava ✓';
         msg.textContent = OFFLINE_MSG;
-      } else if (ok) { removeOverlay(); ensureRazred(openStatsOverlay); }
+      } else if (ok) { removeOverlay(); ensureRazred(); }   // po prijavi na začetni zaslon, statistika je pod gumbom s profilom
       else {
         btn.disabled = false; btn.textContent = 'Prijava ✓';
         msg.textContent = '❌ Napačno uporabniško ime ali geslo.';
@@ -2028,7 +2028,7 @@ function renderAuthView(view) {
         <button class="overlay-btn overlay-btn-next" id="regDoneBtn">Naprej ➡️</button>`;
       box.querySelector('#regDoneBtn').addEventListener('click', () => {
         removeOverlay();
-        ensureRazred(openStatsOverlay);
+        ensureRazred();
       });
     } else {
       btn.disabled = false; btn.textContent = 'Ustvari račun ✓';
