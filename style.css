@@ -895,6 +895,13 @@ body.competition {
 }
 .td-controls { display: flex; gap: 8px; width: 100%; flex-wrap: wrap; align-items: stretch; }
 .td-controls .ptable-toggle { flex: 1; min-width: 150px; }
+/* Telefon: trije pogledi zasedejo celo vrstico; razred in imena gresta pod
+   njih. Prej se je izbirnik razreda prekril z gumbom "Do 20". Mora stati za
+   zgornjim pravilom, sicer ga to povozi. */
+@media (max-width: 700px) {
+  .td-controls .ptable-toggle { flex: 1 1 100%; min-width: 0; }
+  .td-controls .td-razred-select, .td-controls .td-names-btn { flex: 1 1 0; min-width: 0; padding: 8px 10px; }
+}
 .td-razred-select {
   flex: 0 0 auto; min-width: 130px;
   background: rgba(0,0,0,0.25); color: #eee;
@@ -946,9 +953,9 @@ body.competition {
    modal, so tighten them and let the headers wrap instead of truncating. */
 @media (max-width: 600px) {
   .tl-row {
-    /* Skupaj 156px — pol piksla manj, kot so zasedli stari trije stolpci,
-       zato imena niso nič bolj odrezana kot prej. */
-    grid-template-columns: minmax(0,1fr) 62px 50px 44px;
+    /* Odgovori dobijo 92px, da gredo ikone načinov v eno vrstico. Uporabniška
+       imena so kratka, zato jim ostane dovolj prostora tudi na 375px. */
+    grid-template-columns: minmax(0,1fr) 92px 50px 44px;
     gap: 6px; padding: 8px 10px;
   }
   .tl-head { font-size: 0.55rem; }
@@ -960,8 +967,8 @@ body.competition {
   /* Ozko: pri oknu "ves čas" je skupno število lahko štirimestno, zato mora
      "1024/✔987" ostati znotraj 62px in ne zlesti v sosednji stolpec. */
   .tl-ans-line { font-size: 0.7rem; }
-  /* Tako majhne, da gresta dve ikoni v vrstico; tretja se prelomi navzdol
-     namesto da bi jo odrezalo. */
+  /* Tako majhne, da gredo tri ikone v vrstico — prej sta šli le dve in je
+     vrstica z vsemi načini zrasla na štiri vrstice. Četrta se prelomi. */
   .tl-mode { font-size: 0.58rem; padding: 0 3px; }
   .tl-modes { gap: 3px; }
   .tl-bm-max { font-size: 0.6rem; }
@@ -1466,7 +1473,9 @@ body.competition {
   background: rgba(240,165,0,0.12); border: 1px solid rgba(240,165,0,0.4);
   border-radius: 8px; padding: 7px 10px; color: #ffd27a;
 }
-.td-dupwarn-how { opacity: 0.85; font-size: 0.75rem; }
+.td-dupwarn-how { display: block; margin-top: 4px; opacity: 0.85; font-size: 0.75rem; }
+.td-dupwarn summary { cursor: pointer; }
+@media (max-width: 700px) { .td-dupwarn { font-size: 0.74rem; padding: 6px 10px; } }
 
 /* Tekmovanje: samodejno ime prijavljenega učenca, opomba pod lestvico */
 .comp-name-auto { font-size: 1.3rem; font-weight: 800; color: #fff; margin: 4px 0 12px; }

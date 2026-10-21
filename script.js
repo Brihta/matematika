@@ -2623,9 +2623,12 @@ async function openTeacherDashboard() {
       : `${dups.length} ${[, 'ime se ponovi', 'imeni se ponovita', 'imena se ponovijo',
           'imena se ponovijo'][dups.length] || 'imen se ponovi'}`
         + ` — pokaži imena za podrobnosti`;
-    el.innerHTML = `⚠️ Enako ime v razredu: ${what}.<br>`
+    /* Zložljivo: na telefonu je navodilo zasedlo pol zaslona nad seznamom.
+       Odprto/zaprto ostane med osveževanjem (vsakih nekaj sekund). */
+    const open = el.querySelector('details')?.open ? ' open' : '';
+    el.innerHTML = `<details${open}><summary>⚠️ Enako ime v razredu: ${what}.</summary>`
       + `<span class="td-dupwarn-how">Klikni ime: <b>dva otroka</b> → dodaj začetnico priimka `
-      + `(Eva K.) · <b>en otrok, več računov</b> → 🔗 Združi.</span>`;
+      + `(Eva K.) · <b>en otrok, več računov</b> → 🔗 Združi.</span></details>`;
   }
 
   function renderGrid() {
@@ -2942,8 +2945,12 @@ async function openTeacherDashboard() {
   });
 
   const razSelect = div.querySelector('#tdRazredSelect');
+  /* Učiteljica skoraj vedno gleda svoj razred — na telefonu je vsakič znova
+     izbirati iz 17 razredov odveč. Zapomni si izbiro na tej napravi. */
+  const RAZ_KEY = 'brihta-td-razred-' + teacherSession.id;
   razSelect.addEventListener('change', () => {
     curRazred = razSelect.value; showIdle = false; renderGrid();
+    try { localStorage.setItem(RAZ_KEY, curRazred); } catch (e) {}
   });
   const namesBtn = div.querySelector('#tdNames');
   namesBtn.addEventListener('click', () => {
@@ -2996,6 +3003,9 @@ async function openTeacherDashboard() {
     opt.value = r; opt.textContent = r === OBISK ? '🏡 Obiskovalci' : r;
     razSelect.appendChild(opt);
   }
+  let saved = '';
+  try { saved = localStorage.getItem(RAZ_KEY) || ''; } catch (e) {}
+  if (present.includes(saved)) { curRazred = saved; razSelect.value = saved; }
 
   await switchWindow('today');
 }
