@@ -2137,11 +2137,11 @@ body.home .toolbar { box-shadow: none; }
 @media (max-width: 899px) { .t-post::before { background-size: 100px auto, cover; } }
 .t-bit::before { background: url(vzorci/luske.svg) 0 0 / 36px 32.4px repeat;
   -webkit-mask-image: linear-gradient(115deg, rgba(0,0,0,.2) 30%, #000 80%); mask-image: linear-gradient(115deg, rgba(0,0,0,.2) 30%, #000 80%); }
-.home-pet { position: absolute; right: -6px; bottom: -8px; width: 96px; height: 96px; pointer-events: none; z-index: 2; }
+.home-pet { position: absolute; right: -6px; bottom: 2px; width: 96px; height: 96px; pointer-events: none; z-index: 2; }
 .home-pet svg { width: 100%; height: 100%; display: block; }
 /* Lik na ploščici Poštevanka (album.js). Svetel sij za njim, da se temen
    oklep ne zlije s temno modro. Ko je lik tu, zobnik z × umakne. */
-.home-hero { position: absolute; right: 2px; bottom: -4px; width: 86px; height: 120px; pointer-events: none; z-index: 2;
+.home-hero { position: absolute; right: 2px; bottom: 6px; width: 86px; height: 120px; pointer-events: none; z-index: 2;
   background: radial-gradient(closest-side, rgba(255,214,120,.38), rgba(255,214,120,0) 85%) center 60% / 100% 80% no-repeat; }
 .home-hero:empty { display: none; }
 /* ozke ploščice: manjši, da krona ne seže do naslova */
