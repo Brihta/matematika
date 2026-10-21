@@ -2852,12 +2852,36 @@ async function openTeacherDashboard() {
         (manj kot ${PRINT_MIN} računov ali napačnih vsaj toliko kot pravilnih)</p>`;
     printNode(sheet);
   }
+  /* List se pokaže kot predogled z gumbom Natisni in ostane, dokler ga ne
+     zapreš. Prej se je odstranil ob 'afterprint' — na iPhonu ta dogodek
+     pride takoj, še preden brskalnik list zajame, in tiskanje ni delalo. */
   function printNode(sheet) {
     const old = document.getElementById('printSheet');
     if (old) old.remove();
+    const paper = document.createElement('div');
+    paper.className = 'ps-paper';
+    while (sheet.firstChild) paper.appendChild(sheet.firstChild);
+    sheet.className = 'ps-preview';
+    sheet.innerHTML = `<div class="ps-toolbar">
+        <button class="overlay-btn overlay-btn-next" data-ps="print">🖨️ Natisni</button>
+        <button class="overlay-btn overlay-btn-ghost" data-ps="close">✕ Zapri</button>
+      </div>`;
+    sheet.appendChild(paper);
     document.body.appendChild(sheet);
-    window.addEventListener('afterprint', () => sheet.remove(), { once: true });
-    window.print();
+    /* A4 je širši od telefona: pomanjšaj list, da se vidi cel. */
+    const fit = () => {
+      const w = paper.offsetWidth / (parseFloat(paper.style.zoom) || 1);
+      paper.style.zoom = Math.min(1, (sheet.clientWidth - 16) / w);
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    sheet.querySelector('[data-ps="print"]').addEventListener('click', () => window.print());
+    sheet.querySelector('[data-ps="close"]').addEventListener('click', () => {
+      window.removeEventListener('resize', fit);
+      sheet.remove();
+    });
+    /* Na računalniku se okno za tiskanje odpre takoj, kot prej. */
+    if (matchMedia('(hover: hover) and (pointer: fine)').matches) window.print();
   }
 
   /* ── Seznam imen in uporabniških imen ──

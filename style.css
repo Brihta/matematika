@@ -1412,55 +1412,79 @@ body.competition {
 
 /* ══════════════════════════
    IZPIS ZA RAZRED (A4)
-   Na zaslonu ga ni; ob tiskanju je edino, kar je na papirju.
+   Ob tiskanju je edino, kar je na papirju. Na zaslonu se pokaže kot
+   predogled lista z gumbom Natisni: na telefonu (iOS) window.print() včasih
+   ne odpre ničesar ali pa natisne prazen list, ker se je list odstranil,
+   preden ga je brskalnik zajel. Predogled ostane, dokler ga ne zapreš.
 ══════════════════════════ */
 #printSheet { display: none; }
+@media screen {
+  #printSheet.ps-preview {
+    display: block; position: fixed; inset: 0; z-index: 10000;
+    overflow: auto; background: #4a4458; padding: 64px 8px 24px;
+  }
+  .ps-paper {
+    background: #fff; color: #000; width: 210mm; min-height: 297mm;
+    margin: 0 auto; padding: 12mm; box-sizing: border-box;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.45);
+  }
+  .ps-toolbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 1;
+    display: flex; gap: 8px; justify-content: center;
+    padding: 10px; background: #2a2342; box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+  }
+  .ps-toolbar .overlay-btn { flex: 0 1 220px; margin: 0; }
+}
 @media print {
   @page { size: A4 portrait; margin: 12mm; }
   body { background: #fff !important; color: #000; min-height: 0; }
   body > *:not(#printSheet) { display: none !important; }
-  #printSheet {
-    display: block; font-family: system-ui, sans-serif; font-size: 10.5pt; color: #000;
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
-  }
-  .ps-head {
-    display: flex; justify-content: space-between; align-items: baseline;
-    border-bottom: 2px solid #000; padding-bottom: 2mm; margin-bottom: 3mm;
-  }
-  .ps-title { font-size: 15pt; font-weight: 700; }
-  .ps-date  { font-size: 11pt; }
-  .ps-table { width: 100%; border-collapse: collapse; }
-  .ps-table th {
-    text-align: left; font-size: 9pt; font-weight: 600;
-    border-bottom: 1px solid #000; padding: 1mm 1.5mm;
-  }
-  .ps-table td { padding: 1.2mm 1.5mm; border-bottom: 0.5px solid #bbb; vertical-align: middle; }
-  .ps-table tr { break-inside: avoid; }
-  .ps-table thead { display: table-header-group; }
-  .ps-name { width: 26%; }
-  .ps-num  { text-align: right; width: 8%; font-variant-numeric: tabular-nums; }
-  .ps-op   { text-align: center; white-space: nowrap; }
-  .ps-mode { font-size: 9.5pt; white-space: nowrap; }
-  .ps-modechip { margin-right: 2.5mm; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .ps-table th.ps-num { text-align: right; }
-  .ps-table .ps-mode { padding-left: 7mm; }
-  .ps-boxes { white-space: nowrap; }
-  .ps-box {
-    display: inline-block; width: 5.2mm; height: 5.2mm; line-height: 5.2mm;
-    margin-right: 0.8mm; text-align: center; font-size: 7.5pt;
-    border: 0.5px solid #999; border-radius: 1mm; color: #999;
-  }
-  .ps-box.on { background: #000; border-color: #000; color: #fff; font-weight: 700; }
-  .ps-box.few { background: #bbb; border-color: #888; color: #000; }
-  .ps-uname  { font-size: 8pt; color: #555; }
-  .ps-page + .ps-page { break-before: page; }
-  .ps-names td { font-size: 12pt; padding: 1.8mm 1.5mm; }
-  .ps-names th:nth-child(2) { width: 55%; }
-  .ps-rownum { width: 8mm; color: #777; font-size: 9pt !important; text-align: right; }
-  .ps-login { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; }
-  .ps-idle   { margin-top: 4mm; font-size: 9.5pt; }
-  .ps-legend { margin-top: 3mm; font-size: 8.5pt; color: #444; }
+  #printSheet { display: block; position: static; padding: 0; background: none; }
+  .ps-toolbar { display: none !important; }
+  .ps-paper { zoom: 1 !important; }
 }
+#printSheet {
+  font-family: system-ui, sans-serif; font-size: 10.5pt; color: #000;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.ps-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  border-bottom: 2px solid #000; padding-bottom: 2mm; margin-bottom: 3mm;
+}
+.ps-title { font-size: 15pt; font-weight: 700; }
+.ps-date  { font-size: 11pt; }
+.ps-table { width: 100%; border-collapse: collapse; }
+.ps-table th {
+  text-align: left; font-size: 9pt; font-weight: 600;
+  border-bottom: 1px solid #000; padding: 1mm 1.5mm;
+}
+.ps-table td { padding: 1.2mm 1.5mm; border-bottom: 0.5px solid #bbb; vertical-align: middle; }
+.ps-table tr { break-inside: avoid; }
+.ps-table thead { display: table-header-group; }
+.ps-name { width: 26%; }
+.ps-num  { text-align: right; width: 8%; font-variant-numeric: tabular-nums; }
+.ps-op   { text-align: center; white-space: nowrap; }
+.ps-mode { font-size: 9.5pt; white-space: nowrap; }
+.ps-modechip { margin-right: 2.5mm; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ps-table th.ps-num { text-align: right; }
+.ps-table .ps-mode { padding-left: 7mm; }
+.ps-boxes { white-space: nowrap; }
+.ps-box {
+  display: inline-block; width: 5.2mm; height: 5.2mm; line-height: 5.2mm;
+  margin-right: 0.8mm; text-align: center; font-size: 7.5pt;
+  border: 0.5px solid #999; border-radius: 1mm; color: #999;
+}
+.ps-box.on { background: #000; border-color: #000; color: #fff; font-weight: 700; }
+.ps-box.few { background: #bbb; border-color: #888; color: #000; }
+.ps-uname  { font-size: 8pt; color: #555; }
+.ps-page + .ps-page { break-before: page; }
+.ps-names td { font-size: 12pt; padding: 1.8mm 1.5mm; }
+.ps-names th:nth-child(2) { width: 55%; }
+.ps-rownum { width: 8mm; color: #777; font-size: 9pt !important; text-align: right; }
+.ps-login { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; }
+.ps-idle   { margin-top: 4mm; font-size: 9.5pt; }
+.ps-legend { margin-top: 3mm; font-size: 8.5pt; color: #444; }
+
 
 /* Združi / izbriši račun (okno učenca v učiteljskem pregledu) */
 .td-merge-help { font-size: 0.78rem; opacity: 0.75; margin: -2px 0 8px; line-height: 1.35; }
