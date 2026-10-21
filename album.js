@@ -30,6 +30,9 @@
   .al-voj small { display: block; color: rgba(255,255,255,.65); font-weight: 600; }
   .al-voj .ico { font-size: 1.7rem; }
   @keyframes alVoj { from { transform: scale(.6); opacity: 0; } }
+  /* lik na ploščici Poštevanka: klik odpre Moj lik (ostala ploščica začne vajo), kot ljubljenček na Do 20 */
+  .home-hero { pointer-events: auto !important; cursor: pointer; transition: transform .15s; }
+  .home-hero:hover { transform: scale(1.08) rotate(-3deg); }
   /* Enkratno obvestilo (album_notices): okno sredi zaslona, gumb V redu */
   .al-note { position: fixed; inset: 0; z-index: 5200; background: rgba(10,8,16,.55); display: none; align-items: center; justify-content: center; padding: 18px; }
   .al-note.on { display: flex; }
@@ -237,6 +240,8 @@
   $('alToast').addEventListener('click', () => { $('alToast').classList.remove('on'); if (active()) open(); });
 
   const open = () => Svet.open('lik');
+  const hh0 = $('homeHero');
+  if (hh0) hh0.addEventListener('click', e => { if (!active()) return; e.stopPropagation(); open(); });
   Svet.register('lik', {
     label: 'Moj lik', theme: 'dark', available: () => !!active(),
     onShow() { ensureFrame(); if (ready() && W().albumReload) W().albumReload(); },
