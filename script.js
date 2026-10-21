@@ -3722,7 +3722,9 @@ function hallFigure(w, r) {
     try {
       const look = { ...w.S.look };
       ['form', 'skin', 'hair', 'eye', 'style'].forEach(k => { if (a[k]) look[k] = a[k]; });
-      return w.hero(look, a.equip || {}, '0 0 512 512', false);
+      /* Ljubljenček, ki ga je učenec izbral za spremljevalca — kot v Moj svet. */
+      const pet = a.pet && a.pet.stage !== 'jajce' ? a.pet : null;
+      return w.hero(look, a.equip || {}, '0 0 512 512', false, pet);
     } catch (e) {}
   }
   return `<span class="hall-emoji">${esc(r.emoji || '🦉')}</span>`;   // še nima lika

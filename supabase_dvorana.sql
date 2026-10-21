@@ -23,6 +23,8 @@
 -- avatar: lik, kot ga je učenec sam opremil v albumu (null, če ga še nima).
 -- Nariše ga script.js z risbo iz lik.html. Barve in predmete je ob shranjevanju
 -- že preveril album_set_avatar.
+-- avatar.pet: ljubljenček, ki ga je izbral za spremljevalca (null, če ga ni)
+-- — v dvorani stoji ob liku kot v Moj svet. Zahteva supabase_ljubljencek.sql.
 drop function if exists public.get_hall_of_fame();
 create or replace function public.get_hall_of_fame()
 returns table(username text, emoji text, score int, day date, avatar json)
@@ -31,7 +33,9 @@ language sql stable security definer set search_path = public as $$
          (select json_build_object('form', a.form, 'skin', a.skin, 'hair', a.hair, 'eye', a.eye,
                    'style', a.style, 'equip', coalesce(a.equip -> coalesce(a.active_char,
                      (select sc.char_id from student_season_char sc
-                       where sc.student_id = b.student_id order by sc.season desc limit 1), 'vitez'), '{}'::jsonb))
+                       where sc.student_id = b.student_id order by sc.season desc limit 1), 'vitez'), '{}'::jsonb),
+                   'pet', (select public._pet_json(b.student_id, c.season)
+                             from pet_companion c where c.student_id = b.student_id))
             from student_avatar a where a.student_id = b.student_id)
     from (select distinct on (student_id) student_id, score, day, created_at
             from comp_rounds

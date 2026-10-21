@@ -832,7 +832,8 @@ const cname = ch => CHARS[ch].names[F() ? 1 : 0];
 /* Ljubljenček, ki spremlja lik (pet_state.companion) — samo za prijavljenega
    učenca; pri risanju drugih (samo-risanje) ostane null. */
 let PET_COMP = null;
-function hero(look, eq, viewBox = '0 0 512 512', noBg) {
+/* pet: ljubljenček drugega učenca (dvorana slavnih); privzeto lasten. */
+function hero(look, eq, viewBox = '0 0 512 512', noBg, pet = PET_COMP) {
   const it = s => eq[s] ? ITEMS[eq[s]] : null;
   const out = it('obleka') || ITEMS.oproda, hat = it('glava'), hide = (hat && hat.hidesHair) || out.hidesHair;
   let s = !noBg && it('ozadje') ? it('ozadje').draw() : '';
@@ -865,7 +866,7 @@ function hero(look, eq, viewBox = '0 0 512 512', noBg) {
   /* Ljubljenček iz Do 20 (pet.js, supabase_ljubljencek.sql) stoji na mestu
      spremljevalca iz trgovine — razen ko otrok v trgovini preizkuša
      spremljevalca (__item), da ga sploh vidi. */
-  if (PET_COMP && !eq.__item && window.PetArt) s += `<svg x="18" y="346" width="150" height="150" viewBox="0 0 200 200">${PetArt.draw(PET_COMP, PET_COMP.stage, { inner: true })}</svg>`;
+  if (pet && !eq.__item && window.PetArt) s += `<svg x="18" y="346" width="150" height="150" viewBox="0 0 200 200">${PetArt.draw(pet, pet.stage, { inner: true })}</svg>`;
   else if (it('spremljevalec')) s += it('spremljevalec').draw();
   return `<svg viewBox="${viewBox}" aria-hidden="true">${s}</svg>`;
 }
