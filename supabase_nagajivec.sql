@@ -3,7 +3,7 @@
 -- KAKO DELUJE (po zgledu Bitke, supabase_bitka.sql):
 --   1. Prijavljen učenec z ljubljenčkom ustvari boj in dobi 4-mestno kodo.
 --      Prijatelji se pridružijo (1–8 igralcev, igra se lahko tudi sam).
---   2. V čakalnici vsak glasuje za nagajivca (Kujavka, Bahač, Sluzko) in
+--   2. V čakalnici vsak glasuje za nagajivca (Godrnjava Greta, Bahač, Sluzko) in
 --      vidi svojo raven računov. Raven določi baza iz mejnikov: prva
 --      skupina, ki je še ne obvlada (+ in −). Lažjo lahko izbere, težje ne.
 --   3. Gostitelj začne: zmaga nagajivec z največ glasovi (izenačeno =

@@ -1,7 +1,7 @@
 /* Nagajivci — risbe za boj z ljubljenčki (Do 20).
 
    Trije nagajivci po slikah, ki jih je učitelj naredil v Geminiju (23. 10.
-   2026): Kujavka (jezna punčka s čopki), Bahač (velik, plešast, nos v
+   2026): Godrnjava Greta (jezna punčka s čopki; v bazi 'kujavka'), Bahač (velik, plešast, nos v
    zraku) in Sluzko (zelena sluzasta pošast). Imena niso prava imena, da se
    noben sošolec ne bi počutil, kot da je on nagajivec.
 
@@ -219,7 +219,7 @@
   };
 
   const BOSSES = [
-    { id: 'kujavka', name: 'Kujavka', art: kujavka, hint: 'jezna in trmasta' },
+    { id: 'kujavka', name: 'Godrnjava Greta', art: kujavka, hint: 'jezna in trmasta' },
     { id: 'bahac',   name: 'Bahač',   art: bahac,   hint: 'velik in bahav' },
     { id: 'sluzko',  name: 'Sluzko',  art: sluzko,  hint: 'sluzast in gnusen' }
   ];
