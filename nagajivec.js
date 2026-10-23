@@ -29,7 +29,7 @@
   .ng-card h2 { font-size: 1.5rem; font-weight: 900; margin: 4px 0; }
   .ng-card h3 { font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--g-muted, #5d6b52); margin: 16px 0 8px; }
   .ng-rules { color: var(--g-muted, #5d6b52); font-weight: 600; font-size: .9rem; line-height: 1.45; margin: 6px 0 14px; }
-  .ng-hero { display: flex; justify-content: center; gap: 4px; height: 110px; }
+  .ng-hero { display: flex; justify-content: center; height: 140px; }
   .ng-hero svg { height: 100%; width: auto; }
   .ng-btn { display: block; width: 100%; border: 0; border-radius: 16px; padding: 14px; font: 900 1.05rem inherit; font-family: inherit; cursor: pointer;
     background: linear-gradient(135deg, #ff9a7a, #f2647e); color: #fff; box-shadow: 0 6px 18px rgba(242,100,126,.35); margin-top: 8px; }
@@ -118,12 +118,8 @@
   .t-nag::before { background: url(vzorci/sluz.svg) 0 0 / 56px 56px repeat;
     -webkit-mask-image: linear-gradient(115deg, rgba(0,0,0,.25) 30%, #000 80%); mask-image: linear-gradient(115deg, rgba(0,0,0,.25) 30%, #000 80%); }
   /* vsi trije nagajivci; selektor mora premagati .home-tile > span:not(...) */
-  .home-tiles .home-tile.t-nag > span.home-boss { position: absolute; right: -2px; bottom: -4px; width: 150px; height: 100px; pointer-events: none; z-index: 2; }
-  .home-boss > span { position: absolute; bottom: 0; }
-  .home-boss svg { height: 100%; width: auto; display: block; }
-  .home-boss .hb-bahac { left: 36px; height: 100%; }
-  .home-boss .hb-kujavka { left: -4px; height: 86%; }
-  .home-boss .hb-sluzko { right: -6px; height: 90%; }
+  .home-tiles .home-tile.t-nag > span.home-boss { position: absolute; right: -4px; bottom: -4px; width: 176px; height: 93px; pointer-events: none; z-index: 2; }
+  .home-boss svg { width: 100%; height: 100%; display: block; }
   @media (max-width: 899px) { .home-tiles .t-nag { grid-column: 1 / -1; min-height: 120px; } }
   @media (min-width: 900px) { .home-tiles { grid-template-columns: repeat(5, 1fr) !important; } }
   </style>`);
@@ -152,7 +148,7 @@
 
   const ERR = {
     login: 'Za boj z nagajivcem se prijavi.',
-    closed: 'Nagajivec še ni odprt. Kmalu! 👾',
+    closed: 'Igra še ni odprta. Kmalu! 👾',
     no_pet: 'Najprej si izberi ljubljenčka — on bo streljal na nagajivca!',
     not_found: 'Boja s to kodo ni. Preveri številke. 🔍',
     started: 'Ta boj se je že začel. Počakaj na naslednjega ali ustvari svojega.',
@@ -205,14 +201,14 @@
   function renderStart(msg) {
     view = 'start'; st = null; overlayOff();
     const a = area(); if (!a) return;
-    const hero = `<div class="ng-hero">${BossArt.BOSSES.map(b => BossArt.draw(b.id, 'walk')).join('')}</div>`;
+    const hero = `<div class="ng-hero">${BossArt.group()}</div>`;
     if (!profile || !window.bossAllowed) {
-      a.innerHTML = `<div class="ng-card">${hero}<h2>Nagajivec</h2>
+      a.innerHTML = `<div class="ng-card">${hero}<h2>Odženi nagajivce!</h2>
         <p class="ng-rules">Ljubljenčki skupaj premagajo nagajivca — vsak pravilen račun je strel.</p>
         <div class="ng-msg">${profile ? ERR.closed : ERR.login}</div></div>`;
       return;
     }
-    a.innerHTML = `<div class="ng-card">${hero}<h2>Nagajivec</h2>
+    a.innerHTML = `<div class="ng-card">${hero}<h2>Odženi nagajivce!</h2>
       <p class="ng-rules">60 sekund · 1–${MAX} igralcev · vsak računa na svoji ravni.<br>
         Vsak pravilen račun je strel tvojega ljubljenčka. Napačen vzame srček.<br>
         Premagajte nagajivca, preden pride do vas!</p>
@@ -331,7 +327,7 @@
     view = 'lobby';
     area().innerHTML = `<div class="ng-card">
       <div class="ng-hint">Koda boja</div><div class="ng-code">${esc(st.code)}</div>
-      <div class="ng-hint">Povej jo prijateljem — vpišejo jo pod 👾 Nagajivec</div>
+      <div class="ng-hint">Povej jo prijateljem — vpišejo jo pod »Odženi nagajivce!«</div>
       <h3>Koga gremo premagat?</h3><div class="ng-bosses" id="ngBosses"></div>
       <h3>Tvoji računi</h3><div class="ng-levels" id="ngLevels"></div>
       <h3 id="ngTeamH">Ekipa</h3><div class="ng-team" id="ngTeam"></div>
@@ -654,7 +650,7 @@
 
   /* Vsi trije nagajivci na ploščici na začetnem zaslonu. */
   const hb = $('homeBoss');
-  if (hb) hb.innerHTML = ['bahac', 'kujavka', 'sluzko'].map(id => `<span class="hb-${id}">${BossArt.draw(id, 'walk')}</span>`).join('');
+  if (hb) hb.innerHTML = BossArt.group();
 
   /* Kdo nagajivca vidi, odloči baza (boss_access: stikalo boss_config.open
      ali preizkuševalec). Brez odgovora ostane skrit. */
