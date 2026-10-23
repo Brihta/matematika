@@ -14,9 +14,15 @@
 --      poštevanki). Samo TIPKOVNICA: v kvizu lahko otrok odgovor ugane.
 --      Račun je PAR števil {x, y}, x ≤ y: 3 + 4, 4 + 3, 7 − 3 in 7 − 4 so
 --      vsi par {3, 4} — ista "družina" računov, ločeno za + in −.
---   2. Pravilo mejnika (_pet_mastered) — enako strogo kot sličica pri
---      poštevanki: vsi pari skupine vsaj enkrat pravilno, vsaj 20 odgovorov,
---      vsaj 90 % pravilnih, vsaj 80 % pravilnih hitreje kot v 3 s.
+--   2. Izvalitev in mejniki (od 23. 10. 2026):
+--      - Jajce se izvali (ljubljenček v košarici se zbudi) od TRUDA: vsakih
+--        10 pravilnih odgovorov Do 20 (kviz ali tipkovnica) je ena razpoka,
+--        pri 40 se izvali. Mlajši učenci so pred tem čakali na prvi mejnik.
+--      - Mejnik (_pet_mastered): vsi pari skupine vsaj enkrat pravilno in v
+--        zadnjih 3 dneh vaje te skupine vsaj 20 odgovorov, vsaj 85 %
+--        pravilnih in vsaj pet_config.fast_share (75 %) hitrih. Hiter je
+--        odgovor pod 5 s (do 10), 6 s (brez prehoda), 7 s (s prehodom) —
+--        to odloči aplikacija (DO20_FAST v script.js). Dosežen mejnik ostane.
 --   3. student_pets, pet_state, pet_save — ljubljenček in njegov videz.
 --      Kaj je odklenjeno, odloča baza; aplikacija samo riše.
 --   3b. Priboljški in trgovina za ljubljenčka, spremljevalec ob liku.
@@ -106,32 +112,76 @@ begin
          fast    = do20_facts.fast    + excluded.fast;
 end; $$;
 
--- ── 2. Mejnik ─────────────────────────────────────────────────────────────
--- Napredek ene skupine v obdobju — za mejnik in za "še ti manjka" na strani.
+-- ── 2. Izvalitev in mejnik ───────────────────────────────────────────────
+-- Stikalo: ena vrstica, privzeto zaprto. Ponoven zagon datoteke stikala ne
+-- prestavi (on conflict do nothing).
+create table if not exists pet_config (
+  id   int     primary key default 1 check (id = 1),
+  open boolean not null default false
+);
+insert into pet_config (id, open) values (1, false) on conflict (id) do nothing;
+alter table pet_config enable row level security;
+
+-- Delež hitrih odgovorov za mejnik. Nastavljivo brez nove različice
+-- aplikacije:  update pet_config set fast_share = 0.7;
+alter table pet_config add column if not exists fast_share numeric not null default 0.75
+  check (fast_share > 0 and fast_share <= 1);
+
+create or replace function public._pet_fast_share()
+returns numeric language sql stable security definer set search_path = public as $$
+  select coalesce((select fast_share from pet_config where id = 1), 0.75);
+$$;
+
+-- Trud: pravilni odgovori Do 20 v obdobju (kviz in tipkovnica).
+create or replace function public._pet_hatch_at() returns int language sql immutable as $$ select 40 $$;
+create or replace function public._pet_crack_every() returns int language sql immutable as $$ select 10 $$;
+create or replace function public._pet_effort(p_student uuid, p_from date, p_to date)
+returns int language sql stable security definer set search_path = public as $$
+  select coalesce(sum(correct), 0)::int from do20_stats
+   where student_id = p_student and day between p_from and p_to;
+$$;
+-- Izvaljen: dovolj truda ali že kak mejnik (iz časa pred tem pravilom).
+create or replace function public._pet_hatched(p_effort int, p_count int)
+returns boolean language sql immutable as $$
+  select p_effort >= _pet_hatch_at() or p_count > 0;
+$$;
+
+-- Napredek ene skupine za stran ("še ti manjka"): pokritost računov v
+-- vsem obdobju, odgovori in hitrost samo v zadnjih 3 dneh vaje skupine.
 create or replace function public._pet_progress(
   p_student uuid, p_grp text, p_op text, p_from date, p_to date)
 returns table(facts_done int, facts_total int, answers int, correct int, timed int, fast int)
 language sql stable security definer set search_path = public as $$
-  select (count(distinct (x, y)) filter (where correct > 0))::int,
+  with f as (select day, x, y, correct, wrong, timed, fast from do20_facts
+              where student_id = p_student and grp = p_grp and op = p_op
+                and day between p_from and p_to),
+       w as (select distinct day from f order by day desc limit 3)
+  select (select count(distinct (x, y)) from f where correct > 0)::int,
          _do20_fact_count(p_grp),
          coalesce(sum(correct + wrong), 0)::int, coalesce(sum(correct), 0)::int,
          coalesce(sum(timed), 0)::int,           coalesce(sum(fast), 0)::int
-    from (select x, y, sum(correct) correct, sum(wrong) wrong, sum(timed) timed, sum(fast) fast
-            from do20_facts
-           where student_id = p_student and grp = p_grp and op = p_op
-             and day between p_from and p_to
-           group by x, y) f;
+    from f where day in (select day from w);
 $$;
 
+-- Mejnik je dosežen, če je bilo pravilo izpolnjeno ob KATEREMKOLI dnevu
+-- vaje (okno = ta dan in dva prejšnja dneva vaje). Tako mejnik ne izgine,
+-- če otrok kasneje en dan slabše računa.
 create or replace function public._pet_mastered(
   p_student uuid, p_grp text, p_op text, p_from date, p_to date)
 returns boolean language sql stable security definer set search_path = public as $$
-  select facts_done >= facts_total
-     and answers >= 20
-     and correct >= 0.9 * answers
-     and timed > 0
-     and fast >= 0.8 * timed
-    from _pet_progress(p_student, p_grp, p_op, p_from, p_to);
+  with d as (select day, sum(correct + wrong) a, sum(correct) c, sum(timed) n, sum(fast) f
+               from do20_facts
+              where student_id = p_student and grp = p_grp and op = p_op
+                and day between p_from and p_to
+              group by day),
+       w as (select day, sum(a) over k a, sum(c) over k c, sum(n) over k n, sum(f) over k f
+               from d window k as (order by day rows between 2 preceding and current row))
+  select coalesce(bool_or(
+           w.a >= 20 and w.c >= 0.85 * w.a and w.n > 0 and w.f >= _pet_fast_share() * w.n
+           and (select count(distinct (x, y)) from do20_facts
+                 where student_id = p_student and grp = p_grp and op = p_op and correct > 0
+                   and day between p_from and w.day) >= _do20_fact_count(p_grp)), false)
+    from w;
 $$;
 
 -- Koliko mejnikov je učenec dosegel v obdobju (0–6).
@@ -143,14 +193,7 @@ returns int language sql stable security definer set search_path = public as $$
 $$;
 
 -- ── 3. Ljubljenček ────────────────────────────────────────────────────────
--- Stikalo: ena vrstica, privzeto zaprto. Ponoven zagon datoteke stikala ne
--- prestavi (on conflict do nothing).
-create table if not exists pet_config (
-  id   int     primary key default 1 check (id = 1),
-  open boolean not null default false
-);
-insert into pet_config (id, open) values (1, false) on conflict (id) do nothing;
-alter table pet_config enable row level security;
+-- Stikalo pet_config je ustvarjeno zgoraj (2), ker ga rabi pravilo mejnika.
 
 create table if not exists pet_testers (
   student_id uuid primary key references students(id) on delete cascade,
@@ -218,11 +261,13 @@ alter table student_pets add column if not exists equip jsonb not null default '
 -- 19. 10. 2026: ježka je zamenjala mucka (pet-art.js riše stare ježke kot mucke)
 update student_pets set species = 'macka' where species = 'jez';
 
--- Stopnja rasti iz števila mejnikov.
-create or replace function public._pet_stage(p_count int)
+-- Stopnja rasti: jajce do izvalitve (trud), potem po mejnikih 0/2/4/6.
+drop function if exists public._pet_stage(int);
+create or replace function public._pet_stage(p_count int, p_effort int)
 returns text language sql immutable as $$
-  select case when p_count >= 6 then 'koncna' when p_count >= 5 then 'odrasel'
-              when p_count >= 3 then 'mlad' when p_count >= 1 then 'mladicek' else 'jajce' end;
+  select case when not _pet_hatched(p_effort, p_count) then 'jajce'
+              when p_count >= 6 then 'koncna' when p_count >= 4 then 'odrasel'
+              when p_count >= 2 then 'mlad' else 'mladicek' end;
 $$;
 
 -- ── 3b. Priboljški, trgovina, spremljevalec ──────────────────────────────
@@ -290,8 +335,8 @@ returns json language sql stable security definer set search_path = public as $$
            'season', p.season, 'season_name', se.name,
            'species', p.species, 'name', p.name, 'body', p.body, 'belly', p.belly,
            'eyes', p.eyes, 'pattern', p.pattern, 'equip', p.equip,
-           'stage', _pet_stage(_pet_count(p_student, coalesce(se.starts, _album_today()),
-                                          least(se.ends, _album_today()))))
+           'stage', _pet_stage(_pet_count(p_student, coalesce(se.starts, _album_today()), least(se.ends, _album_today())),
+                               _pet_effort(p_student, coalesce(se.starts, _album_today()), least(se.ends, _album_today()))))
     from student_pets p join seasons se on se.id = p.season
    where p.student_id = p_student and p.season = p_season;
 $$;
@@ -299,7 +344,7 @@ $$;
 -- Vse, kar potrebuje stran ljubljenčka.
 create or replace function public.pet_state(p_student uuid)
 returns json language plpgsql stable security definer set search_path = public as $$
-declare s seasons; v_to date; v_count int;
+declare s seasons; v_to date; v_count int; v_effort int;
 begin
   if not exists (select 1 from students where id = p_student) then return null; end if;
   -- zaprto: kot da sezone ni — aplikacija gumba ne pokaže
@@ -307,14 +352,24 @@ begin
   s := _album_season_for(p_student);
   v_to := _album_today();
 
-  if s.id is not null then v_count := _pet_count(p_student, s.starts, v_to); end if;
+  if s.id is not null then
+    v_count := _pet_count(p_student, s.starts, v_to);
+    v_effort := _pet_effort(p_student, s.starts, v_to);
+  end if;
+  v_count := coalesce(v_count, 0); v_effort := coalesce(v_effort, 0);
 
   return json_build_object(
     'season', case when s.id is null then null
                    else json_build_object('id', s.id, 'name', s.name, 'from', s.starts, 'to', s.ends) end,
     'species', case when s.id is null then '[]'::json else to_json(_pet_species(s.id)) end,
-    'count', coalesce(v_count, 0),
-    'stage', _pet_stage(coalesce(v_count, 0)),
+    'count', v_count,
+    'stage', _pet_stage(v_count, v_effort),
+    'hatched', _pet_hatched(v_effort, v_count),
+    -- jajce: razpoke 0–3 po _pet_crack_every pravilnih, izvali se pri _pet_hatch_at
+    'effort', json_build_object('correct', v_effort, 'hatch_at', _pet_hatch_at(),
+                                'crack_every', _pet_crack_every(),
+                                'cracks', least(3, v_effort / _pet_crack_every())),
+    'fast_share', _pet_fast_share(),
     'unlocks', to_json(_pet_unlocks()),
     'pet', (select json_build_object('species', species, 'name', name, 'body', body, 'belly', belly,
                                      'eyes', eyes, 'pattern', pattern, 'equip', equip)
@@ -347,7 +402,7 @@ begin
 end; $$;
 
 -- Shrani videz. Vrsto je mogoče zamenjati samo, dokler je ljubljenček še
--- jajce; ko se izvali, ostane. Vrne pet_state ali {"error": ...}.
+-- jajce (_pet_hatched); ko se izvali, ostane. Vrne pet_state ali {"error": ...}.
 create or replace function public.pet_save(
   p_student uuid, p_species text, p_name text,
   p_body text, p_belly text, p_eyes text, p_pattern text)
@@ -372,7 +427,8 @@ begin
   end if;
 
   select species into v_old from student_pets where student_id = p_student and season = s.id;
-  if v_old is not null and v_old <> p_species and v_count > 0 then
+  if v_old is not null and v_old <> p_species
+     and _pet_hatched(_pet_effort(p_student, s.starts, _album_today()), v_count) then
     return json_build_object('error', 'IZVALJEN');
   end if;
 

@@ -43,6 +43,9 @@ h2 { font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform:
 .pet-big svg { width: 100%; height: 100%; display: block; }
 .pet-big .pa-egg { transform-origin: 100px 182px; animation: wob 2.6s ease-in-out infinite; }
 @keyframes wob { 0%, 70%, 100% { transform: rotate(0); } 76% { transform: rotate(-5deg); } 84% { transform: rotate(5deg); } 92% { transform: rotate(-3deg); } }
+/* več razpok → jajce se ziblje pogosteje */
+.pet-big .pa-egg.c2 { animation-duration: 1.9s; }
+.pet-big .pa-egg.c3 { animation-duration: 1.2s; }
 .pet-big.pop { animation: pop .5s cubic-bezier(.34,1.56,.64,1); }
 @keyframes pop { from { transform: scale(.85); } }
 .pet-name { font-size: 1.4rem; font-weight: 900; margin-top: 4px; min-height: 1.6rem; }
@@ -53,6 +56,10 @@ h2 { font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform:
 .growth-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--lime), var(--leaf)); border-radius: 999px; transition: width .6s; }
 .growth-marks { display: flex; justify-content: space-between; margin-top: 6px; font-size: .68rem; font-weight: 700; color: var(--muted); }
 .growth-marks span.on { color: var(--forest); }
+/* jajce: oznake razpok na pravem mestu črte (10, 20, 30 od 40) */
+.growth-marks.at { position: relative; height: 1.1em; }
+.growth-marks.at span { position: absolute; transform: translateX(-50%); }
+.growth-marks.at span:last-child { transform: translateX(-100%); }
 .growth-txt { font-size: .85rem; font-weight: 700; margin-top: 8px; }
 .growth-txt small { display: block; color: var(--muted); font-weight: 600; margin-top: 2px; }
 
@@ -197,23 +204,29 @@ async function save(next, okMsg) {
 function render() {
   if (!S) return;
   if (!draft) return renderPick();
-  const count = S.count, stage = S.stage;
+  const count = S.count, stage = S.stage, hatched = !!S.hatched;
+  const ef = S.effort || { correct: 0, hatch_at: 40, crack_every: 10, cracks: 0 };
   const next = A.STAGES.find(x => x.from > count), W = A.words(draft.species);
   const sp = A.SPECIES.find(x => x.id === draft.species) || A.SPECIES[0];
   $('app').innerHTML = `
     <h1>🐣 Moj ljubljenček<small>Sezona ${esc(S.season.name)} · raste, ko računaš do 20 hitro in brez napak</small></h1>
     <div class="grid">
       <div class="card stage-card">
-        <div class="pet-big">${A.draw(draft, stage)}</div>
+        <div class="pet-big">${A.draw(draft, stage, { cracks: ef.cracks })}</div>
         <div class="pet-name">${esc(draft.name) || `<span style="color:var(--muted)">${sp.name}</span>`}</div>
         <span class="pet-stage">${A.stageName(stage, draft.species)}</span>
-        <div class="growth">
+        ${hatched ? `<div class="growth">
           <div class="growth-bar"><div class="growth-fill" style="width:${count / A.MILESTONES * 100}%"></div></div>
-          <div class="growth-marks">${A.STAGES.map(x => `<span class="${count >= x.from ? 'on' : ''}">${x.from ? x.from : W.icon}</span>`).join('')}</div>
+          <div class="growth-marks">${A.STAGES.map(x => `<span class="${count >= x.from ? 'on' : ''}">${x.from ? x.from : '🐣'}</span>`).join('')}</div>
           <div class="growth-txt">${count} / ${A.MILESTONES} mejnikov${next
-            ? `<small>Še ${next.from - count} do stopnje »${next.name}«${count === 0 ? ` — ob prvem mejniku ${W.wait}!` : ''}</small>`
+            ? `<small>Še ${next.from - count} do stopnje »${next.name}«</small>`
             : '<small>Končna oblika! Bravo, vse računi do 20 znaš na pamet.</small>'}</div>
-        </div>
+        </div>` : `<div class="growth">
+          <div class="growth-bar"><div class="growth-fill" style="width:${Math.min(100, ef.correct / ef.hatch_at * 100)}%"></div></div>
+          <div class="growth-marks at">${[1, 2, 3].map(i => `<span class="${ef.cracks >= i ? 'on' : ''}" style="left:${i * ef.crack_every / ef.hatch_at * 100}%">${i * ef.crack_every}</span>`).join('')}<span style="left:100%">${ef.hatch_at} ${W.icon}</span></div>
+          <div class="growth-txt">${ef.correct} / ${ef.hatch_at} pravilnih
+            <small>Še ${Math.max(0, ef.hatch_at - ef.correct)}, pa ${W.wait}! Šteje kviz in tipkovnica.</small></div>
+        </div>`}
         ${treatsBox()}
       </div>
       <div>
@@ -222,9 +235,9 @@ function render() {
           <input class="name-in" id="nameIn" maxlength="14" placeholder="Kako mu bo ime?" value="${esc(draft.name)}">
           <div class="msg" id="nameMsg"></div>
           <h2 style="margin-top:12px">Vrsta</h2>
-          <div class="row">${A.SPECIES.map(x => `<button class="species-btn${x.id === draft.species ? ' on' : ''}" data-sp="${x.id}" ${count > 0 && x.id !== draft.species ? 'disabled' : ''}>
-              ${A.draw({ ...draft, species: x.id }, count > 0 ? 'odrasel' : 'jajce')}${x.name}</button>`).join('')}</div>
-          <div class="note">${count > 0 ? `Ljubljenček ${W.waitPast}, zato vrsta ostane ista vso sezono.` : 'Dokler spi, lahko vrsto še zamenjaš.'}</div>
+          <div class="row">${A.SPECIES.map(x => `<button class="species-btn${x.id === draft.species ? ' on' : ''}" data-sp="${x.id}" ${hatched && x.id !== draft.species ? 'disabled' : ''}>
+              ${A.draw({ ...draft, species: x.id }, hatched ? 'odrasel' : 'jajce')}${x.name}</button>`).join('')}</div>
+          <div class="note">${hatched ? `Ljubljenček ${W.waitPast}, zato vrsta ostane ista vso sezono.` : 'Dokler spi, lahko vrsto še zamenjaš.'}</div>
         </div>
         <div class="card section">
           <h2>Barva</h2>
@@ -240,9 +253,10 @@ function render() {
         <div class="card section">
           <h2>Mejniki</h2>
           <div class="ms">${(S.milestones || []).map(milestone).join('')}</div>
-          <div class="rule">Mejnik dosežeš, ko v skupini vsak račun vsaj enkrat rešiš pravilno, imaš vsaj 20 odgovorov,
-            vsaj 90 % pravilnih in skoraj vse (80 %) hitreje kot v 3 sekundah. Šteje samo <b>tipkovnica</b> —
-            v kvizu lahko odgovor uganeš.</div>
+          <div class="rule">Mejnik dosežeš, ko v skupini vsak račun vsaj enkrat rešiš pravilno, v zadnjih treh dneh vaje
+            pa imaš vsaj 20 odgovorov, vsaj 85 % pravilnih in vsaj ${fastPct()} % hitrih (do 10: hitreje kot 5 s,
+            do 20 brez prehoda: 6 s, s prehodom: 7 s). Šteje samo <b>tipkovnica</b> — v kvizu lahko odgovor uganeš.
+            Dosežen mejnik ostane.</div>
         </div>
         ${shopCard(stage)}
         ${companionCard(stage)}
@@ -321,6 +335,7 @@ function chips(kind, list, count) {
     return `<button class="chip${on ? ' on' : ''}${ok ? '' : ' locked'}" data-k="${kind}" data-v="${k}">${v.name}${ok ? '' : `<span class="lock">🔒${A.unlockAt(k)}</span>`}</button>`;
   }).join('');
 }
+const fastPct = () => Math.round((S && S.fast_share || .75) * 100);
 function milestone(m) {
   const name = (GROUPS.find(g => g[0] === m.g) || [, m.g])[1] + ' ' + OPS[m.op];
   if (m.done) return `<div class="m done"><div class="m-ico">✓</div><div class="m-body"><div class="m-t">${name}</div><div class="m-s">Obvladaš!</div></div></div>`;
@@ -330,8 +345,8 @@ function milestone(m) {
   const sub = m.answers
     ? [bit(`računi <b>${m.facts_done}/${m.facts_total}</b>`, m.facts_done >= m.facts_total),
        bit(`odgovori <b>${m.answers}</b>/20`, m.answers >= 20),
-       bit(`pravilno <b>${acc} %</b>`, acc >= 90),
-       bit(`hitro <b>${fast === null ? '—' : fast + ' %'}</b>`, fast !== null && fast >= 80)].join(' · ')
+       bit(`pravilno <b>${acc} %</b>`, acc >= 85),
+       bit(`hitro <b>${fast === null ? '—' : fast + ' %'}</b>`, fast !== null && fast >= fastPct())].join(' · ')
     : `Še brez vaje · ${m.facts_total} računov`;
   return `<div class="m"><div class="m-ico">${OPS[m.op]}</div><div class="m-body"><div class="m-t">${name}</div><div class="m-s">${sub}</div></div>
     <button class="m-go" data-g="${m.g}" data-op="${m.op}">Vadi</button></div>`;
@@ -343,7 +358,7 @@ function renderPick() {
     <div class="card pick" style="margin-top:16px">
       <div class="row">${A.SPECIES.map(x => `<button class="species-btn" data-new="${x.id}">
         ${A.draw({ species: x.id, body: START[x.id] }, 'jajce')}${x.name}</button>`).join('')}</div>
-      <div class="note">Ko rešiš prvi mejnik pri računih do 20, se jajce izvali ali se ljubljenček zbudi. Potem raste z vsakim novim mejnikom.</div>
+      <div class="note">Vsakih 10 pravilnih računov do 20 jajce poči (ljubljenček v košarici se prebuja). Pri 40 se izvali ali zbudi, potem raste z mejniki.</div>
     </div>`;
   document.querySelectorAll('[data-new]').forEach(b => b.addEventListener('click', () => {
     const sp = b.dataset.new;

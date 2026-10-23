@@ -67,15 +67,16 @@
   const MILESTONES = 6;
   const UNLOCKS = ['malina', 'pike', 'sliva', 'proge', 'koral', 'zvezde', 'polnoc', 'srcki', 'zlata', 'mavrica'];
   const UNLOCK_AT = [1, 1, 2, 2, 3, 3, 4, 4, 5, 6];
+  /* Rast (= _pet_stage, od 23. 10. 2026): jajce, dokler se ne izvali od
+     truda (40 pravilnih, baza pošlje effort), potem stopnje po mejnikih. */
   const STAGES = [
-    { id: 'jajce',    name: 'Jajce',         from: 0 },
-    { id: 'mladicek', name: 'Mladiček',      from: 1 },
-    { id: 'mlad',     name: 'Mlad',          from: 3 },
-    { id: 'odrasel',  name: 'Odrasel',       from: 5 },
+    { id: 'mladicek', name: 'Mladiček',      from: 0 },
+    { id: 'mlad',     name: 'Mlad',          from: 2 },
+    { id: 'odrasel',  name: 'Odrasel',       from: 4 },
     { id: 'koncna',   name: 'Končna oblika', from: 6 }
   ];
   const stageName = (id, species) => id === 'jajce' ? words(species).first : (STAGES.find(s => s.id === id) || {}).name;
-  const stageOf = n => STAGES.slice().reverse().find(s => n >= s.from).id;
+  const stageOf = (n, hatched = true) => hatched ? STAGES.slice().reverse().find(s => n >= s.from).id : 'jajce';
   function allowed(kind, val, count) {
     if (FREE[kind].includes(val)) return true;
     const i = UNLOCKS.indexOf(val);
@@ -311,7 +312,12 @@
   const zzz = (x, y) => [[0, 0, 13], [12, -14, 10], [21, -26, 8]].map(([dx, dy, f]) =>
     `<text x="${x + dx}" y="${y + dy}" font-size="${f}" font-weight="900" font-family="system-ui, sans-serif" fill="#7a6f9a">z</text>`).join('');
   const sleepEye = (x, y, w = 6) => line(`M${x - w} ${y} Q${x} ${y + w * .8} ${x + w} ${y}`, 2.8);
-  function egg(pet) {
+  /* Razpoke (0–3): vsakih 10 pravilnih ena. Narisane znotraj lupine. */
+  const CRACKS = ['M120 52 L113 66 L123 74 L114 88 L119 96',
+                  'M50 112 L62 110 L59 122 L72 126 L67 140',
+                  'M76 64 L86 72 L95 63 L104 74 L114 66 L126 76 L132 70'];
+  const cracks = n => CRACKS.slice(0, n).map(d => line(d, 3.6) + line(d, 1.4, '#fffaf0')).join('');
+  function egg(pet, n = 0) {
     const c = (BODY[pet.body] || BODY.gozd).c, b = (BELLY[pet.belly] || BELLY.krema).c;
     let inner;
     if (pet.species === 'zmaj') {
@@ -329,7 +335,8 @@
         + leaf(66, 156, -30) + leaf(136, 152, 30) + leaf(124, 170, 50)
         + `<ellipse cx="62" cy="104" rx="5" ry="11" fill="#fff" opacity=".7" transform="rotate(14 62 104)"/>`;
     }
-    return shape(EGG, '#fff', inner, 4.4) + (pet.species === 'zmaj' ? zzz(140, 70) : '');
+    return shape(EGG, '#fff', inner + cracks(n), 4.4) + (pet.species === 'zmaj' && n < 3 ? zzz(140, 70) : '')
+      + (n >= 3 ? sparkle(160, 64, 8) + sparkle(40, 90, 6) : '');
   }
 
   /* Košarica z ročajem: zadnji del (ročaj, notranjost, blazina v barvi
@@ -363,7 +370,9 @@
   }
   /* Spanček v košarici (lisička, mucek): zvit klobčič, glava na boku,
      rep ovit naokoli. */
-  function sleeper(pet) {
+  const openEye = (x, y) => `<ellipse cx="${x}" cy="${y}" rx="4.4" ry="5.4" fill="${OL}"/><circle cx="${x + 1.4}" cy="${y - 2}" r="1.6" fill="#fff"/>`;
+  /* n = koliko se je že prebudil (0–3), enako kot razpoke na jajcu. */
+  function sleeper(pet, n = 0) {
     const c = (BODY[pet.body] || BODY.gozd).c, b = (BELLY[pet.belly] || BELLY.krema).c;
     const fox = pet.species === 'lisica';
     const body = shape('M70 120 C70 100 92 94 116 96 C140 98 152 110 152 124 C152 136 140 142 116 142 C92 142 70 138 70 120 Z', c,
@@ -378,7 +387,7 @@
     const head = shape('M46 118 C46 98 60 88 78 88 C96 88 110 98 110 116 C110 134 96 142 78 142 C60 142 46 134 46 118 Z', c,
         patternFill(pet.pattern, c, 78, 112, 18)
       + (fox ? `<path d="M36 120 C52 122 66 120 78 128 C90 120 104 122 120 120 L120 150 L36 150 Z" fill="${b}"/>` : ''), 4.2);
-    const face = sleepEye(66, 118, 6) + sleepEye(90, 118, 6)
+    const face = (n >= 3 ? openEye(66, 117) : sleepEye(66, 118, 6)) + (n >= 2 ? openEye(90, 117) : sleepEye(90, 118, 6))
       + `<ellipse cx="57" cy="128" rx="6" ry="3.6" fill="#f7a1b2"/><ellipse cx="99" cy="128" rx="6" ry="3.6" fill="#f7a1b2"/>`
       + (fox ? `<ellipse cx="78" cy="126" rx="3.6" ry="2.6" fill="${OL}"/>` : `<path d="M75 125 C75 123.5 81 123.5 81 125 C81 126.5 79.5 128 78 128 C76.5 128 75 126.5 75 125 Z" fill="${OL}"/>`)
       + line('M72 131 Q75 134 78 131 Q81 134 84 131', 2)
@@ -386,7 +395,9 @@
     // rep ovit spredaj, konica pod brado
     const tail = shape('M150 122 C162 138 140 150 110 150 C92 150 74 150 62 144 C66 136 82 140 100 139 C124 138 144 136 150 122 Z', c,
         fox ? `<ellipse cx="62" cy="144" rx="16" ry="10" fill="${b}"/>` : '', 3.8);
-    return basketBack(0, pet) + body + ears + head + face + tail + basketFront(0, pet) + zzz(122, 82);
+    const z = n === 0 ? zzz(122, 82) : n === 1 ? `<text x="124" y="80" font-size="11" font-weight="900" font-family="system-ui, sans-serif" fill="#7a6f9a">z</text>`
+      : n >= 3 ? sparkle(130, 74, 7) + sparkle(36, 96, 5) : '';
+    return basketBack(0, pet) + body + ears + head + face + tail + basketFront(0, pet) + z;
   }
 
   /* Zmajček spi zvit (v jajcu): glava na tačkah, rep ovit spredaj z
@@ -435,13 +446,17 @@
                      odrasel: '32 4 136 136', koncna: '32 0 136 136' };
   const faceBox = stage => FACE_BOX[stage] || FACE_BOX.odrasel;
 
-  /* Glavna risba. stage: jajce | mladicek | mlad | odrasel | koncna */
+  /* Glavna risba. stage: jajce | mladicek | mlad | odrasel | koncna
+     o.cracks: pri jajcu razpoke / prebujanje v košarici (0–3). */
   function draw(pet, stage, o = {}) {
     pet = Object.assign({ species: 'zmaj', body: 'gozd', belly: 'krema', eyes: 'rjave', pattern: 'brez' }, pet || {});
     const vb = o.viewBox || '0 0 200 200';
     let s = `<ellipse cx="100" cy="188" rx="${stage === 'jajce' ? 46 : 52}" ry="7" fill="#05270b" opacity=".12"/>`;
     const st0 = startOf(pet.species), bas = st0 === 'kosara';
-    if (stage === 'jajce') s += `<g class="pa-egg">${bas ? sleeper(pet) : egg(pet)}</g>`;
+    if (stage === 'jajce') {
+      const n = Math.max(0, Math.min(3, o.cracks | 0));
+      s += `<g class="pa-egg c${n}">${bas ? sleeper(pet, n) : egg(pet, n)}</g>`;
+    }
     else if (stage === 'mladicek') s += (bas ? basketBack(10, pet) : '')
       + `<g transform="translate(100 192) scale(.66) translate(-100 -186)">${creature(pet, 1.22)}</g>`
       + (st0 === 'jajce' ? shell() : bas ? basketFront(10, pet) : '');

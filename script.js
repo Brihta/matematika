@@ -236,6 +236,10 @@ const FAST_SECONDS = 3;
 const FAST_SHARE   = 0.8;
 const MIN_TIMED    = 5;
 const SPEED_IGNORE = 30;
+/* Do 20 ima blažjo mejo kot poštevanka (23. 10. 2026): mlajši učenci še
+   štejejo; računi s prehodom so težji. Delež hitrih za mejnik ljubljenčka
+   določi baza (pet_config.fast_share). */
+const DO20_FAST = { d10: 5, b20: 6, pr: 7 };
 
 /* 12 animal icons — the password is a sequence of 4 of these (order matters) */
 const ANIMALS = ['🐘','🦁','🦊','🐊','🐬','🦉','🐸','🐢','🦒','🐧','🐝','🐙'];
@@ -1558,7 +1562,7 @@ function recordDo20Stat(p, isCorrect) {
   const e = pendingDo20[key] || (pendingDo20[key] = { g, op, c: 0, w: 0, n: 0, f: 0 });
   if (isCorrect) e.c++; else e.w++;
   const sec = isCorrect && questionShownTs ? (Date.now() - questionShownTs) / 1000 : null;
-  const timed = sec !== null && sec <= SPEED_IGNORE, fast = timed && sec < FAST_SECONDS;
+  const timed = sec !== null && sec <= SPEED_IGNORE, fast = timed && sec < DO20_FAST[g];
   if (timed) { e.n++; if (fast) e.f++; }
   /* Po računih za ljubljenčka (mejniki). Kot pri poštevanki samo tipkovnica:
      v kvizu lahko otrok odgovor ugane med štirimi. Račun je par {x, y}, zato

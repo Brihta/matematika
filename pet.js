@@ -6,7 +6,7 @@
      lika in število priboljškov. Klik na ljubljenčka na ploščici Do 20
      odpre ta zavihek.
    - Med vajo: ljubljenček spodaj levo poskoči ob pravilnem odgovoru.
-   - Po vaji baza preveri mejnike; nov mejnik → obvestilo spodaj.
+   - Po vaji baza preveri razpoke, izvalitev in mejnike → obvestilo spodaj.
    Kaj je doseženo, odloča baza (pet_state), ne ta datoteka. */
 (function () {
   const SYNC_MIN_MS = 20000;
@@ -73,15 +73,30 @@
     try { if (lik && lik.contentWindow.petCompanion) lik.contentWindow.petCompanion(st && st.companion); } catch (e) {}
   };
 
+  const cracksOf = st => (st && st.effort && st.effort.cracks) || 0;
+  const drawPet = (st, o = {}) => PetArt.draw(st.pet, st.stage, { ...o, cracks: cracksOf(st) });
+
   function apply(st, announce) {
     const prev = state;
     state = st && st.season ? st : null;
     render();
-    if (!announce || !prev || !state) return;
+    if (!announce || !prev || !state || !state.pet) return;
+    const W = PetArt.words(state.pet.species), ef = state.effort || {};
+    // izvalil se je od truda (mejnik ima svoje obvestilo spodaj)
+    if (prev.stage === 'jajce' && state.stage !== 'jajce' && state.count === prev.count) {
+      toast(`<span class="pic">${drawPet(state)}</span><div>${W.born}<small>Zdaj raste z mejniki · tapni in poglej</small></div>`, 8000);
+      return;
+    }
+    if (state.stage === 'jajce' && cracksOf(state) > cracksOf(prev)) {
+      const left = Math.max(0, ef.hatch_at - ef.correct);
+      const head = PetArt.hatches(state.pet.species) ? 'Jajce je počilo! 🥚' : 'Ljubljenček se prebuja … 🥱';
+      toast(`<span class="pic">${drawPet(state)}</span><div>${head}<small>Še ${left} pravilnih, pa ${W.wait}!</small></div>`, 6000);
+      return;
+    }
     const was = new Set((prev.milestones || []).filter(m => m.done).map(m => m.g + m.op));
     const fresh = (state.milestones || []).filter(m => m.done && !was.has(m.g + m.op));
     if (!fresh.length) return;
-    const m = fresh[0], pic = state.pet ? PetArt.draw(state.pet, state.stage) : '';
+    const m = fresh[0], pic = drawPet(state);
     const all = { ...PetArt.BODY, ...PetArt.EYES, ...PetArt.PATTERN };
     const what = PetArt.UNLOCKS.filter(v => PetArt.unlockAt(v) === state.count).map(v => (all[v] || {}).name).join(', ') || null;
     const head = prev.stage === 'jajce' && state.stage !== 'jajce' ? PetArt.words(state.pet && state.pet.species).born
@@ -95,14 +110,14 @@
     const pet = state.pet || { species: 'zmaj' };
     const stage = state.pet ? state.stage : 'jajce';
     Svet.chip('pet', {
-      face: PetArt.draw(pet, stage, { viewBox: PetArt.faceBox(stage) }),
+      face: PetArt.draw(pet, stage, { viewBox: PetArt.faceBox(stage), cracks: cracksOf(state) }),
       treats: (state.treats || {}).balance || 0,
       badge: state.pet ? '' : '!'       // še nima ljubljenčka: povabi ga
     });
-    buddy.innerHTML = state.pet ? PetArt.draw(state.pet, state.stage) : '';
+    buddy.innerHTML = state.pet ? drawPet(state) : '';
     // ljubljenček pokuka iz ploščice Do 20 na začetnem zaslonu
     const hp = $('homePet');
-    if (hp) hp.innerHTML = state.pet ? PetArt.draw(state.pet, state.stage) : '';
+    if (hp) hp.innerHTML = state.pet ? drawPet(state) : '';
   }
 
   async function fetchState(announce) {
@@ -171,7 +186,7 @@
       if (isCorrect) { buddy.classList.remove('hop'); void buddy.offsetWidth; buddy.classList.add('hop'); }
       if (mode === 'quiz' && !quizHinted) {
         quizHinted = true;
-        toast(`<span style="font-size:1.5rem">⌨️</span><div>Ljubljenček raste na <b>tipkovnici</b><small>V kvizu lahko odgovor uganeš, zato za mejnike ne šteje.</small></div>`, 6000);
+        toast(`<span style="font-size:1.5rem">⌨️</span><div>Mejniki štejejo samo na <b>tipkovnici</b><small>Jajcu pomaga tudi kviz, za rast pa vadi na tipkovnici.</small></div>`, 6000);
       }
     }
     return origRecord.apply(this, arguments);
