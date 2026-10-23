@@ -154,7 +154,8 @@
   /* Po vaji Do 20 (ko so odgovori zapisani) naj baza preveri mejnike. */
   let syncTimer = null;
   function syncSoon() {
-    if (!active() || !inDo20() || Svet.isOpen()) return;
+    // med bojem z nagajivcem obvestila ne smejo prekriti tipkovnice
+    if (!active() || !inDo20() || Svet.isOpen() || mode === 'nagajivec') return;
     const wait = lastSync + SYNC_MIN_MS - Date.now();
     if (syncing || wait > 0) { if (!syncTimer) syncTimer = setTimeout(() => { syncTimer = null; syncSoon(); }, Math.max(wait, 1000)); return; }
     syncing = true; lastSync = Date.now();

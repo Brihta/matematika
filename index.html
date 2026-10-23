@@ -49,6 +49,7 @@
             <button class="seg-btn active" data-mode="quiz">Kviz</button>
             <button class="seg-btn" data-mode="tekmovanje">Tekmovanje</button>
             <button class="seg-btn" data-mode="bitka">Bitka</button>
+            <button class="seg-btn" data-mode="nagajivec" style="display:none">👾 Nagajivec</button>
           </div>
         </div>
       </div>
@@ -130,6 +131,10 @@
       <button class="home-tile t-bit" data-home="bitka" type="button">
         <span><small>S prijatelji</small><b>Bitka</b></span><span class="big">⚔️</span>
       </button>
+      <button class="home-tile t-nag" data-home="nagajivec" type="button">
+        <span><small>Do 20 · z ljubljenčki</small><b>Nagajivec</b></span><span class="big"></span>
+        <span class="home-boss" id="homeBoss"></span>
+      </button>
     </div>
     <button class="home-cont" id="homeCont" type="button" style="display:none">
       <span class="ic" id="homeContIc">+</span>
@@ -199,6 +204,11 @@
     </div>
   </div>
 
+  <!-- NAGAJIVEC PANEL (nagajivec.js) -->
+  <div id="nagajivecPanel" class="tekmovanje-panel" style="display:none">
+    <div id="nagajivecArea" class="tekmovanje-area"></div>
+  </div>
+
   </div><!-- /stage -->
 
 </div>
@@ -219,5 +229,7 @@
 <script src="album.js"></script>
 <script src="pet-art.js"></script>
 <script src="pet.js"></script>
+<script src="boss-art.js"></script>
+<script src="nagajivec.js"></script>
 </body>
 </html>

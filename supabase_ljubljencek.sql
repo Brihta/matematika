@@ -276,19 +276,33 @@ $$;
 --   na dan: 1 za vsakih 10 pravilnih na tipkovnici (do20_facts),
 --           1 za vsakih 20 pravilnih v kvizu (do20_stats minus tipkovnica),
 --           +5, če je bilo tisti dan vsaj 10 pravilnih (dan vadbe),
+--           +3 za vsako zmago proti nagajivcu (boss_wins, supabase_nagajivec.sql),
 --           skupaj največ 20 na dan — nagrajuje vračanje, ne garanja.
 -- Stanje = vsi zasluženi − cene kupljenega. Kupljeno ostane za vedno in
 -- ga lahko nosi vsak ljubljenček (tudi iz prejšnjih sezon).
+-- Zmage proti nagajivcu: zapiše jih baza ob koncu boja (supabase_nagajivec.sql).
+create table if not exists boss_wins (
+  student_id uuid not null references students(id) on delete cascade,
+  day        date not null,
+  game_id    uuid not null,
+  round      int  not null,
+  primary key (student_id, game_id, round)
+);
+alter table boss_wins enable row level security;
+
 create or replace function public._pet_treats_by_day(p_student uuid)
 returns table(day date, treats int)
 language sql stable security definer set search_path = public as $$
   select d.day,
          least(20, (coalesce(k.c, 0) / 10) + (greatest(d.c - coalesce(k.c, 0), 0) / 20)
-                   + case when d.c >= 10 then 5 else 0 end)::int
+                   + case when d.c >= 10 then 5 else 0 end
+                   + 3 * coalesce(w.n, 0))::int
     from (select day, sum(correct)::int c from do20_stats
            where student_id = p_student group by day) d
     left join (select day, sum(correct)::int c from do20_facts
-                where student_id = p_student group by day) k using (day);
+                where student_id = p_student group by day) k using (day)
+    left join (select day, count(*)::int n from boss_wins
+                where student_id = p_student group by day) w using (day);
 $$;
 
 create table if not exists pet_shop (
@@ -620,6 +634,9 @@ begin
     on conflict do nothing;
     insert into pet_companion (student_id, season)
     select v_into, season from pet_companion where student_id = v_from
+    on conflict do nothing;
+    insert into boss_wins (student_id, day, game_id, round)
+    select v_into, day, game_id, round from boss_wins where student_id = v_from
     on conflict do nothing;
 
     -- Ime in razred: če jih ciljni račun nima, jih vzemi od starega

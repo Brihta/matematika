@@ -333,8 +333,9 @@ function applyPresetFromURL() {
   if (askedForContent && !modeMap[m] && (mode === 'tekmovanje' || mode === 'bitka')) {
     mode = 'quiz'; touched = true;
   }
-  // tekmovanje in bitka sta samo za poštevanko
+  // tekmovanje in bitka sta samo za poštevanko, nagajivec samo za Do 20
   if (subject === 'do20' && (mode === 'tekmovanje' || mode === 'bitka')) mode = 'quiz';
+  if (subject !== 'do20' && mode === 'nagajivec') mode = 'quiz';
   if (touched) saveSettings();
   return touched;
 }
@@ -572,7 +573,7 @@ document.querySelectorAll('#modeBtnGroup .seg-btn').forEach(btn => {
 
 /* Lock the op / tables controls in Tekmovanje and Bitka (fixed settings there) */
 function updateControlLock() {
-  const lock = (mode === 'tekmovanje' || mode === 'bitka');
+  const lock = (mode === 'tekmovanje' || mode === 'bitka' || mode === 'nagajivec');
   document.querySelectorAll('#opBtnGroup .seg-btn, .table-btn, #selAll, #selNone')
     .forEach(b => { b.disabled = lock; });
   document.getElementById('opBtnGroup').classList.toggle('locked', lock);
@@ -585,6 +586,8 @@ function updateControlLock() {
     b.disabled = do20 && race;
     b.classList.toggle('mode-off', do20 && race);
     b.title = do20 && race ? 'Tekmovanje in bitka sta samo za poštevanko' : '';
+    // nagajivec (nagajivec.js) je samo za Do 20
+    if (b.dataset.mode === 'nagajivec') b.style.display = do20 ? '' : 'none';
   });
 }
 
@@ -619,7 +622,8 @@ document.querySelectorAll('#subjectBtnGroup .seg-btn').forEach(btn => {
   btn.addEventListener('click', function() {
     if (this.dataset.subject === subject) return;
     subject = this.dataset.subject;
-    if (subject === 'do20' && (mode === 'tekmovanje' || mode === 'bitka')) {
+    if ((subject === 'do20' && (mode === 'tekmovanje' || mode === 'bitka'))
+        || (subject !== 'do20' && mode === 'nagajivec')) {
       mode = 'quiz';
       applyUIFromState();
       showPanel(mode);
@@ -703,9 +707,10 @@ function showPanel(m) {
   show('keypadPanel',     !home && m==='keypad');
   show('tekmovanjePanel', !home && m==='tekmovanje');
   show('bitkaPanel',      !home && m==='bitka');
+  show('nagajivecPanel',  !home && m==='nagajivec');
   const race = m === 'tekmovanje' || m === 'bitka';
-  show('scoreHUD',   !home && !race, 'flex');
-  show('modeSwitch', !home && !race);
+  show('scoreHUD',   !home && !race && m !== 'nagajivec', 'flex');
+  show('modeSwitch', !home && !race && m !== 'nagajivec');
   const msb = document.getElementById('modeSwitchBtn');
   if (msb) msb.textContent = m === 'quiz' ? '⌨️ Vtipkaj odgovor' : '🎯 Pokaži izbirne odgovore';
   // bitka si deli postavitev tekmovanja, le barva je svoja
@@ -796,6 +801,7 @@ const practiceMode = () => (mode === 'quiz' ? 'quiz' : 'keypad');
 document.querySelectorAll('[data-home]').forEach(b => b.addEventListener('click', () => {
   const h = b.dataset.home;
   if (h === 'do20' || h === 'post') enterPlay(h, practiceMode(), true);
+  else if (h === 'nagajivec') enterPlay('do20', 'nagajivec', false);
   else enterPlay('post', h, false);     // tekmovanje in bitka sta za poštevanko
 }));
 (function () {
@@ -829,6 +835,7 @@ function doRestart() {
   if (cAdvanceTimer) { clearTimeout(cAdvanceTimer); cAdvanceTimer = null; }
   cActive = false;
   if (mode !== 'bitka' || screen === 'home') battleLeave();   // preklop drugam = odhod iz bitke
+  if ((mode !== 'nagajivec' || screen === 'home') && window.bossLeave) bossLeave();
   flushStats();          // persist any answers from the mode we are leaving
   lastAnswerTs = 0;
   removeOverlay();
@@ -837,6 +844,7 @@ function doRestart() {
   if      (mode === 'quiz')   startQuiz();
   else if (mode === 'keypad') startKeypad();
   else if (mode === 'bitka')  showBattlePanel();
+  else if (mode === 'nagajivec') { if (window.showBossPanel) showBossPanel(); }
   else                        showTekmovanjePanel();
 }
 
@@ -3861,6 +3869,7 @@ loadData(() => {
   if      (mode === 'quiz')   startQuiz();
   else if (mode === 'keypad') startKeypad();
   else if (mode === 'bitka')  showBattlePanel();
+  else if (mode === 'nagajivec') { if (window.showBossPanel) showBossPanel(); }
   else                        showTekmovanjePanel();
 });
 collapseToolbar();
