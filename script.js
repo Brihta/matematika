@@ -195,6 +195,26 @@ const MINUS  = '−';   // pravi minus, ne vezaj: na tabli in v zvezku je tak
 let qQueue = [], qIdx = 0, qOk = 0, qNo = 0, qStreak = 0, qTimer = null;
 
 let kQueue = [], kIdx = 0, kOk = 0, kNo = 0, kStreak = 0;
+
+/* Števec za medaljo (✔ ✘ 🔥) velja za celo vajo: ostane ob menjavi kviza in
+   tipkovnice, druge snovi, poštevank ali skupin, ob obisku trgovine in tudi
+   ob osvežitvi strani. Ničli se šele po SESSION_IDLE_MIN minutah brez
+   odgovora ali ko se na isti napravi prijavi drug učenec. (Otroci so bili
+   žalostni, ker je preklop zbrisal skoraj osvojeno srebrno medaljo.) */
+const SESSION_KEY = 'brihta_seja_v1';
+const SESSION_IDLE_MIN = 15;
+function sessionWho() { return profile ? profile.id : 'gost'; }
+function loadSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+    if (s && s.who === sessionWho() && Date.now() - s.ts < SESSION_IDLE_MIN * 60000)
+      return { ok: s.ok | 0, no: s.no | 0, streak: s.streak | 0 };
+  } catch (e) {}
+  return { ok: 0, no: 0, streak: 0 };
+}
+function saveSession(ok, no, streak) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ who: sessionWho(), ok, no, streak, ts: Date.now() })); } catch (e) {}
+}
 let kInput = '', kAnswered = false, kTimer = null;
 
 /* Competition (Tekmovanje) state */
@@ -963,8 +983,9 @@ function emptyPickMsg() {
                             : 'Izberi vsaj eno poštevanko (gumb zgoraj).';
 }
 function startQuiz() {
-  qQueue = shuffle(cards); qIdx = 0; qOk = 0; qNo = 0; qStreak = 0;
-  updateScoreHUD(0,0,0);
+  const ses = loadSession();
+  qQueue = shuffle(cards); qIdx = 0; qOk = ses.ok; qNo = ses.no; qStreak = ses.streak;
+  updateScoreHUD(qOk, qNo, qStreak);
   renderQuizQ();
 }
 function renderQuizQ() {
@@ -1010,6 +1031,7 @@ function renderQuizQ() {
       recordTableStat(cur.question, isCorrect);
       recordStat('quiz', isCorrect?1:0, isCorrect?0:1, isCorrect?1:0, answerSeconds());
       updateScoreHUD(qOk, qNo, qStreak);
+      saveSession(qOk, qNo, qStreak);
       const wrap = document.getElementById('advWrap'), bar = document.getElementById('advBar');
       if (wrap && bar) {
         wrap.style.display = 'block';
@@ -1032,9 +1054,10 @@ function renderQuizQ() {
    KEYPAD MODE
 ══════════════════════════ */
 function startKeypad() {
-  kQueue = shuffle(cards); kIdx = 0; kOk = 0; kNo = 0; kStreak = 0;
+  const ses = loadSession();
+  kQueue = shuffle(cards); kIdx = 0; kOk = ses.ok; kNo = ses.no; kStreak = ses.streak;
   kInput = ''; kAnswered = false;
-  updateScoreHUD(0,0,0);
+  updateScoreHUD(kOk, kNo, kStreak);
   renderKeypadQ();
 }
 function renderKeypadQ() {
@@ -1127,6 +1150,7 @@ function checkKeypadAnswer() {
   recordTableStat(cur.question, isCorrect);
   recordStat('keypad', isCorrect?1:0, isCorrect?0:1, isCorrect?1:0, answerSeconds());
   updateScoreHUD(kOk, kNo, kStreak);
+  saveSession(kOk, kNo, kStreak);
 
   document.querySelectorAll('.keypad-btn').forEach(b => b.disabled = true);
 
