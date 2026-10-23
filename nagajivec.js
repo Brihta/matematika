@@ -120,8 +120,10 @@
   /* vsi trije nagajivci; selektor mora premagati .home-tile > span:not(...) */
   .home-tiles .home-tile.t-nag > span.home-boss { position: absolute; right: -4px; bottom: -4px; width: 176px; height: 93px; pointer-events: none; z-index: 2; }
   .home-boss svg { width: 100%; height: 100%; display: block; }
-  @media (max-width: 899px) { .home-tiles .t-nag { grid-column: 1 / -1; min-height: 120px; } }
-  @media (min-width: 900px) { .home-tiles { grid-template-columns: repeat(5, 1fr) !important; } }
+  /* s ploščico je ploščic pet: na računalniku pet stolpcev, na telefonu gre
+     Bitka (zadnja) čez celo širino. Brez nje ostane mreža kot prej. */
+  @media (max-width: 899px) { .home-tiles.has-nag .t-bit { grid-column: 1 / -1; min-height: 120px; } }
+  @media (min-width: 900px) { .home-tiles.has-nag { grid-template-columns: repeat(5, 1fr); } }
   </style>`);
 
   let ng = null;            // { code, token }
@@ -660,6 +662,8 @@
     window.bossAllowed = !!on;
     const tile = document.querySelector('.home-tile.t-nag');
     if (tile) tile.style.display = on ? '' : 'none';
+    const tiles = document.querySelector('.home-tiles');
+    if (tiles) tiles.classList.toggle('has-nag', !!on);
     if (typeof updateControlLock === 'function') updateControlLock();
     if (active() && view === 'start') renderStart();
   }
