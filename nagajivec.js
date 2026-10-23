@@ -431,6 +431,9 @@
           answered: false, dizzyUntil: 0, active: true, ended: null, tick: null, next: null };
     seen = {};
     st.players.forEach(p => { seen[p.id] = { c: p.correct, w: p.wrong }; });
+    // današnji priboljški pred bojem: na koncu pokažemo, koliko jih je res prinesel
+    const g0 = G;
+    petTreats().then(t => { if (t && G === g0) g0.treatsBefore = t.today; });
     const n = st.players.length;
     const pets = st.players.map((p, i) => {
       const q = petPos(i, n);
@@ -610,6 +613,27 @@
     poll();
   }
 
+  /* Stanje ljubljenčka iz baze; osveži tudi 🍎 zgoraj (pet.js med bojem ne
+     osvežuje, da obvestila ne prekrijejo tipkovnice). Vrne {today, cap}. */
+  async function petTreats() {
+    if (!profile) return null;
+    const ps = await supabaseRPC('pet_state', { p_student: profile.id });
+    if (!ps || ps.unreachable || !ps.treats) return null;
+    try { if (window.petChanged) window.petChanged(ps); } catch (e) {}
+    return ps.treats;
+  }
+  const tw = n => n === 1 ? 'priboljšek' : n === 2 ? 'priboljška' : n <= 4 ? 'priboljški' : 'priboljškov';
+  /* Koliko priboljškov je zmaga res prinesla — dnevna meja je 20. */
+  async function showTreats(win, before) {
+    const t = await petTreats(), el = $('ngTreat');
+    if (!el || !win) return;
+    if (!t) { el.textContent = '🍎 +3 priboljški'; return; }
+    const got = before == null ? null : Math.max(0, t.today - before), full = t.today >= t.cap;
+    el.textContent = got === null ? (full ? `🍎 Danes je dnevna meja ${t.cap} priboljškov polna` : '🍎 +3 priboljški')
+      : got > 0 ? `🍎 +${got} ${tw(got)}${full ? ` · dnevna meja ${t.cap} je polna` : ''}`
+      : `🍎 Danes je dnevna meja ${t.cap} priboljškov že polna`;
+  }
+
   /* ═══ REZULTAT ═══ */
   function result() {
     view = 'result'; stop(); overlayOff();
@@ -622,10 +646,11 @@
       <p class="ng-rules">${win ? `${nm} je premagan${FEM[b] ? 'a' : ''}! Skupaj ste zadeli ${t}-krat.`
         : `Zadeli ste ${t} od ${st.hp}. Manjkalo je še ${Math.max(0, st.hp - t)} — poskusite še enkrat!`}</p>
       <div class="ng-team">${st.players.map(p => `<div class="ng-mate${p.id === st.me ? ' me' : ''}">${petSvg(p.pet)}${esc(p.name)}</div>`).join('')}</div>
-      ${win ? '<div class="ng-treat">🍎 +3 priboljški za vsakega ljubljenčka</div>' : ''}
+      ${win ? '<div class="ng-treat" id="ngTreat">🍎 …</div>' : ''}
       <div id="ngResAct"></div></div></div>`);
     (win ? SFX.victory : SFX.click)();
     resultButtons();
+    showTreats(win, G && G.treatsBefore);
   }
   function resultButtons() {
     const box = $('ngResAct'); if (!box) return;
