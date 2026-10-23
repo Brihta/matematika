@@ -123,7 +123,12 @@
   /* s ploščico je ploščic pet: na računalniku pet stolpcev, na telefonu gre
      Bitka (zadnja) čez celo širino. Brez nje ostane mreža kot prej. */
   @media (max-width: 899px) { .home-tiles.has-nag .t-bit { grid-column: 1 / -1; min-height: 120px; } }
-  @media (min-width: 900px) { .home-tiles.has-nag { grid-template-columns: repeat(5, 1fr); } }
+  @media (min-width: 900px) {
+    .home-tiles.has-nag { grid-template-columns: repeat(5, 1fr); }
+    /* pet ožjih ploščic: lik in ljubljenček manjša, da ne segata v naslov */
+    .home-tiles.has-nag .home-hero { width: 64px; height: 92px; }
+    .home-tiles.has-nag .home-pet { width: 80px; height: 80px; }
+  }
   </style>`);
 
   let ng = null;            // { code, token }
