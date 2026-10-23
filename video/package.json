@@ -1,0 +1,15 @@
+{
+  "name": "brihta-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prijava": "node 01-prijava.mjs",
+    "ljubljencek": "node 02-ljubljencek.mjs",
+    "vitez": "node 03-vitez.mjs",
+    "vaja": "node 04-vaja.mjs",
+    "bitka": "node 05-bitka.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.48.2"
+  }
+}

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snemalnica</title>
+<style>
+  :root { --cream:#fdfcf3; --sand:#f6e5cd; --leaf:#9ac334; --forest:#05270b; --muted:#5d6b52; --rec:#d93a2b; --line:#e8dcc4; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--cream); color: var(--forest); font: 16px/1.45 system-ui, -apple-system, sans-serif; }
+  .app { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
+  aside { border-right: 1px solid var(--line); padding: 18px 14px; overflow-y: auto; max-height: 100vh; position: sticky; top: 0; background: #fffef8; }
+  aside h1 { font-size: 1.1rem; margin: 0 0 4px; }
+  aside .sum { color: var(--muted); font-size: .85rem; margin-bottom: 14px; }
+  .pog { margin-bottom: 14px; }
+  .pog h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 6px; }
+  .st { display: flex; gap: 8px; align-items: flex-start; width: 100%; text-align: left; border: 0; background: none; padding: 6px 8px;
+        border-radius: 10px; cursor: pointer; font: inherit; font-size: .85rem; color: var(--forest); }
+  .st:hover { background: var(--sand); }
+  .st.on { background: var(--forest); color: #fff; }
+  .st .dot { flex: 0 0 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); margin-top: 4px; }
+  .st.ok .dot { background: var(--leaf); border-color: var(--leaf); }
+  .st span:last-child { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  main { padding: 40px 48px; display: flex; flex-direction: column; gap: 26px; max-width: 980px; }
+  .where { color: var(--muted); font-weight: 700; }
+  .text { font-size: clamp(1.8rem, 3.4vw, 2.6rem); line-height: 1.35; font-weight: 700; min-height: 7em; }
+  .controls { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  button.b { border: 2px solid var(--line); background: #fff; color: var(--forest); border-radius: 999px; padding: 12px 20px;
+             font: 700 1rem inherit; font-family: inherit; cursor: pointer; }
+  button.b:disabled { opacity: .4; cursor: default; }
+  button.rec { width: 92px; height: 92px; border-radius: 50%; border: 0; background: var(--rec); color: #fff; font: 800 1rem inherit;
+               font-family: inherit; cursor: pointer; box-shadow: 0 8px 24px rgba(217,58,43,.35); }
+  button.rec.on { animation: pulse 1s ease-in-out infinite; border-radius: 22px; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 14px rgba(217,58,43,.15); } }
+  kbd { font: 700 .75rem ui-monospace, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; background: #fff; }
+  .meter { height: 10px; background: var(--sand); border-radius: 99px; overflow: hidden; max-width: 520px; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--leaf); transition: width .06s; }
+  .status { color: var(--muted); min-height: 1.5em; }
+  .status.err { color: var(--rec); font-weight: 700; }
+  .tips { background: #fffef8; border: 1px solid var(--line); border-radius: 16px; padding: 14px 18px; color: var(--muted); font-size: .9rem; }
+  .tips b { color: var(--forest); }
+  label.auto { color: var(--muted); font-size: .9rem; display: flex; gap: 6px; align-items: center; }
+  @media (max-width: 760px) { .app { grid-template-columns: 1fr; } aside { position: static; max-height: 40vh; } main { padding: 24px 16px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>🎙️ Snemalnica</h1>
+    <div class="sum" id="sum"></div>
+    <div id="list"></div>
+  </aside>
+  <main>
+    <div class="where" id="where">Nalagam …</div>
+    <div class="text" id="text"></div>
+    <div class="controls">
+      <button class="rec" id="rec" title="Preslednica">● Snemaj</button>
+      <button class="b" id="again">↺ Znova <kbd>R</kbd></button>
+      <button class="b" id="play" disabled>▶ Poslušaj <kbd>P</kbd></button>
+      <button class="b" id="prev">← Nazaj</button>
+      <button class="b" id="next">Naprej → <kbd>Enter</kbd></button>
+      <label class="auto"><input type="checkbox" id="auto" checked> po posnetku samodejno naprej</label>
+    </div>
+    <div class="meter"><i id="lvl"></i></div>
+    <div class="status" id="status"><kbd>Preslednica</kbd> začne snemanje, še enkrat <kbd>Preslednica</kbd> ga konča in shrani. Zmotil_a si se? Pritisni <kbd>R</kbd>.</div>
+    <div class="tips">
+      <b>Nasveti:</b> tiha soba (zavese, preproga pomagajo), mikrofon približno 20 cm od ust. Beri počasi in prijazno, kot pri razlagi v razredu.
+      Na tišino na začetku in koncu ni treba paziti, snemalnik jo odreže. Če se zmotiš med branjem, pritisni <b>R</b>: posnetek se zavrže in snemanje se takoj začne znova pri istem stavku. Če opaziš napako šele po koncu, tudi pritisni <b>R</b>: ponovno posnameš stavek, ki si ga ravnokar končal_a.
+      Ko končaš, povej Claudu, pa video posname znova s tvojim glasom.
+    </div>
+  </main>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+let data = [], flat = [], cur = 0, stream = null, rec = null, chunks = [], meterRaf = null, player = null;
+let zavrzi = false, zadnji = null;   // zadnji: stavek, ki je bil nazadnje shranjen
+
+async function load() {
+  data = await (await fetch('/stavki')).json();
+  flat = data.flatMap(p => p.stavki.map(s => ({ ...s, ime: p.ime })));
+  const first = flat.findIndex(s => !s.posneto);
+  cur = first >= 0 ? first : 0;
+  renderList(); show();
+}
+function renderList() {
+  const done = flat.filter(s => s.posneto).length;
+  $('sum').textContent = `Posnetih ${done} od ${flat.length} stavkov`;
+  $('list').innerHTML = data.map(p => `<div class="pog"><h2>${p.ime}</h2>${p.stavki.map(s => {
+    const k = flat.findIndex(x => x.ime === p.ime && x.i === s.i);
+    return `<button class="st${flat[k].posneto ? ' ok' : ''}${k === cur ? ' on' : ''}" data-k="${k}"><span class="dot"></span><span>${flat[k].besedilo}</span></button>`;
+  }).join('')}</div>`).join('');
+  $('list').querySelectorAll('.st').forEach(b => b.onclick = () => { if (!recording()) { cur = +b.dataset.k; show(); } });
+  const on = $('list').querySelector('.st.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+}
+function show() {
+  const s = flat[cur], inCh = data.find(p => p.ime === s.ime).stavki;
+  $('where').textContent = `${s.ime} · stavek ${inCh.findIndex(x => x.i === s.i) + 1} od ${inCh.length}${s.posneto ? ' · ✓ posneto' : ''}`;
+  $('text').textContent = s.besedilo;
+  $('play').disabled = !s.posneto;
+  $('prev').disabled = cur === 0; $('next').disabled = cur === flat.length - 1;
+  renderList();
+}
+const recording = () => rec && rec.state === 'recording';
+const status = (t, err) => { $('status').innerHTML = t; $('status').classList.toggle('err', !!err); };
+
+async function start() {
+  if (player) player.pause();
+  try {
+    if (!stream) stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: true, channelCount: 1 } });
+  } catch (e) {
+    return status(e && e.name === 'NotFoundError'
+      ? 'Ne najdem mikrofona. Je priključen? Snemalnico odpri v Chromu ali Safariju, ne v oknu aplikacije Claude.'
+      : 'Mikrofon ni dovoljen. V Chromu klikni ikono levo od naslova → Mikrofon → Dovoli in osveži stran. '
+        + 'Če ne pomaga: Sistemske nastavitve → Zasebnost in varnost → Mikrofon → vklopi brskalnik in ga znova zaženi.', true);
+  }
+  const type = ['audio/webm;codecs=opus', 'audio/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+  rec = new MediaRecorder(stream, type ? { mimeType: type } : {});
+  chunks = [];
+  rec.ondataavailable = e => chunks.push(e.data);
+  rec.onstop = save;
+  rec.start();
+  $('rec').classList.add('on'); $('rec').textContent = '■ Konec';
+  status('🔴 Snemam … beri stavek, nato pritisni <kbd>Preslednica</kbd>.');
+  meter();
+}
+function stop() { if (recording()) rec.stop(); }
+/* R: med snemanjem zavrže posnetek in začne znova; sicer znova posname
+   nazadnje shranjen stavek (samodejno naprej je že šel na naslednjega). */
+function again() {
+  if (recording()) { zavrzi = true; rec.stop(); return; }
+  if (zadnji != null) cur = zadnji;
+  show(); start();
+}
+async function save() {
+  cancelAnimationFrame(meterRaf); $('lvl').style.width = 0;
+  $('rec').classList.remove('on'); $('rec').textContent = '● Snemaj';
+  if (zavrzi) { zavrzi = false; status('↺ Znova …'); return start(); }
+  const s = flat[cur], blob = new Blob(chunks, { type: rec.mimeType });
+  status('Shranjujem …');
+  const r = await fetch(`/posnetek?ime=${encodeURIComponent(s.ime)}&i=${s.i}`, { method: 'POST', body: blob,
+    headers: { 'Content-Type': rec.mimeType || 'audio/webm' } }).catch(() => null);
+  if (!r || !r.ok) return status('Shranjevanje ni uspelo. Ali snemalnica še teče?', true);
+  s.posneto = true; zadnji = cur;
+  status('✓ Shranjeno. Napaka? Pritisni <kbd>R</kbd> in ga posnemi znova.');
+  if ($('auto').checked && cur < flat.length - 1) cur++;
+  show();
+}
+function meter() {
+  const ctx = new AudioContext(), an = ctx.createAnalyser(), buf = new Uint8Array(an.fftSize);
+  ctx.createMediaStreamSource(stream).connect(an);
+  const tick = () => {
+    an.getByteTimeDomainData(buf);
+    let peak = 0; for (const v of buf) peak = Math.max(peak, Math.abs(v - 128));
+    $('lvl').style.width = Math.min(100, peak / 128 * 160) + '%';
+    if (recording()) meterRaf = requestAnimationFrame(tick); else ctx.close();
+  };
+  tick();
+}
+function play() {
+  const s = flat[cur]; if (!s.posneto) return;
+  if (player) player.pause();
+  player = new Audio(`/posnetek?ime=${encodeURIComponent(s.ime)}&i=${s.i}&t=${Date.now()}`);
+  player.play();
+}
+const go = d => { if (recording()) return; cur = Math.max(0, Math.min(flat.length - 1, cur + d)); show(); };
+
+$('rec').onclick = () => recording() ? stop() : start();
+$('play').onclick = play;
+$('again').onclick = again;
+$('prev').onclick = () => go(-1);
+$('next').onclick = () => go(1);
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); recording() ? stop() : start(); }
+  else if (e.key === 'Enter' || e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); go(1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); go(-1); }
+  else if (e.key === 'p' || e.key === 'P') play();
+  else if (e.key === 'r' || e.key === 'R' || e.key === 'Escape') { e.preventDefault(); again(); }
+});
+load();
+</script>
+</body>
+</html>
