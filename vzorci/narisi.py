@@ -84,3 +84,17 @@ def scale(cx, cy):
             f'<path d="M{f(cx-R*.55)} {f(cy+R*.45)} A{R*.7} {R*.7} 0 0 0 {f(cx+R*.2)} {f(cy+R*.72)}" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="2" stroke-linecap="round"/>')
 cells = [(0, 0), (2*R, 0), (R, R*0.9), (0, R*1.8), (2*R, R*1.8), (R, -R*0.9)]
 save('luske.svg', ''.join(scale(x, y) for x, y in cells), f'0 0 {2*R} {f(R*1.8)}')
+
+# 5. Nagajivec: sluzasti mehurčki in iskrice strelov (ploščica se ponavlja)
+def blob(cx, cy, r):
+    # rahlo neraven krog — kapljica sluzi, z odsevom
+    pts = [(cx + r * (1 + .08 * math.sin(3 * t)) * math.cos(t), cy + r * (1 + .08 * math.sin(3 * t)) * math.sin(t))
+           for t in [i * math.pi / 8 for i in range(16)]]
+    d = 'M' + ' L'.join(f'{f(x)} {f(y)}' for x, y in pts) + ' Z'
+    return (f'<path d="{d}" fill="#6b0f24" fill-opacity=".07" stroke="#6b0f24" stroke-opacity=".18" stroke-width="1.5" stroke-linejoin="round"/>'
+            f'<path d="M{f(cx-r*.5)} {f(cy-r*.2)} A{f(r*.55)} {f(r*.55)} 0 0 1 {f(cx-r*.05)} {f(cy-r*.6)}" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="1.8" stroke-linecap="round"/>')
+def spark(cx, cy, r):
+    return (f'<path d="M{f(cx)} {f(cy-r)} Q{f(cx)} {f(cy)} {f(cx+r)} {f(cy)} Q{f(cx)} {f(cy)} {f(cx)} {f(cy+r)} '
+            f'Q{f(cx)} {f(cy)} {f(cx-r)} {f(cy)} Q{f(cx)} {f(cy)} {f(cx)} {f(cy-r)} Z" fill="#fff" fill-opacity=".35"/>')
+N = 56
+save('sluz.svg', blob(14, 16, 9) + blob(42, 40, 6) + blob(44, 8, 3.5) + blob(10, 46, 4) + spark(34, 22, 5) + spark(22, 36, 3.5), f'0 0 {N} {N}')

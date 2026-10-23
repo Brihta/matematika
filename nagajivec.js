@@ -114,8 +114,16 @@
   .ng-treat { display: inline-block; margin-top: 8px; background: var(--g-sand, #f6e5cd); border-radius: 999px; padding: 6px 14px; font-weight: 800; }
   /* ploščica na začetnem zaslonu */
   .t-nag { background: linear-gradient(135deg, #ff9a7a, #f2647e); color: #3a0d16; box-shadow: 0 6px 20px rgba(242,100,126,.3); }
-  .t-nag .home-boss { position: absolute; right: -6px; bottom: -8px; width: 104px; height: 104px; pointer-events: none; }
-  .t-nag .home-boss svg { width: 100%; height: 100%; }
+  /* vzorec: sluzasti mehurčki in iskrice strelov (vzorci/narisi.py) */
+  .t-nag::before { background: url(vzorci/sluz.svg) 0 0 / 56px 56px repeat;
+    -webkit-mask-image: linear-gradient(115deg, rgba(0,0,0,.25) 30%, #000 80%); mask-image: linear-gradient(115deg, rgba(0,0,0,.25) 30%, #000 80%); }
+  /* vsi trije nagajivci; selektor mora premagati .home-tile > span:not(...) */
+  .home-tiles .home-tile.t-nag > span.home-boss { position: absolute; right: -2px; bottom: -4px; width: 150px; height: 100px; pointer-events: none; z-index: 2; }
+  .home-boss > span { position: absolute; bottom: 0; }
+  .home-boss svg { height: 100%; width: auto; display: block; }
+  .home-boss .hb-bahac { left: 36px; height: 100%; }
+  .home-boss .hb-kujavka { left: -4px; height: 86%; }
+  .home-boss .hb-sluzko { right: -6px; height: 90%; }
   @media (max-width: 899px) { .home-tiles .t-nag { grid-column: 1 / -1; min-height: 120px; } }
   @media (min-width: 900px) { .home-tiles { grid-template-columns: repeat(5, 1fr) !important; } }
   </style>`);
@@ -644,9 +652,9 @@
     if (document.visibilityState === 'visible' && ng && active() && !pollT) poll();
   });
 
-  /* Nagajivec pokuka iz ploščice na začetnem zaslonu. */
+  /* Vsi trije nagajivci na ploščici na začetnem zaslonu. */
   const hb = $('homeBoss');
-  if (hb) hb.innerHTML = BossArt.draw('sluzko', 'walk');
+  if (hb) hb.innerHTML = ['bahac', 'kujavka', 'sluzko'].map(id => `<span class="hb-${id}">${BossArt.draw(id, 'walk')}</span>`).join('');
 
   /* Kdo nagajivca vidi, odloči baza (boss_access: stikalo boss_config.open
      ali preizkuševalec). Brez odgovora ostane skrit. */
