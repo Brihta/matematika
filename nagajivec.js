@@ -21,7 +21,9 @@
   const BEAM = { zmaj: '#ff8a3d', lisica: '#f2b632', sova: '#4f9dff', macka: '#ff6fae' };
   const FEM = { kujavka: true };
   // prizor: viewBox 0 0 400 200; nagajivec hodi od desne proti ljubljenčkom
-  const BOSS_K = .85, BOSS_X0 = 228, BOSS_X1 = 150, BOSS_Y = 28;
+  const BOSS_K = .85, BOSS_X0 = 236, BOSS_Y = 28;
+  const BOSS_FRONT = 50;      // kje v risbi (0–200) je nagajivčev sprednji rob
+  const DANGER_PAD = 8;       // rdeča črta je toliko desno od ljubljenčkov
 
   document.head.insertAdjacentHTML('beforeend', `<style>
   .ng-card { background: #fffef8; border-radius: 22px; padding: 18px 16px; text-align: center; max-width: 560px; margin: 8px auto;
@@ -92,6 +94,9 @@
   .ng-pet.cheer .ng-pet-in { animation: ngCheer .5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
   @keyframes ngCheer { to { transform: translateY(-14px); } }
   .ng-boss-walk { animation: ngBob .5s ease-in-out infinite alternate; }
+  /* rdeča črta: ko jo nagajivec doseže, zmaga; zadnjih 10 s utripa */
+  .ng-line.hot { animation: ngHot .5s ease-in-out infinite alternate; }
+  @keyframes ngHot { to { opacity: .35; } }
   @keyframes ngBob { to { transform: translateY(-4px); } }
   .ng-beam { stroke-dasharray: 320; stroke-dashoffset: 320; animation: ngShot .42s ease-out forwards; }
   @keyframes ngShot { 55% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
@@ -419,7 +424,7 @@
   function petPos(i, n) {
     const back = n > 4 && i >= Math.ceil(n / 2);
     const row = back ? i - Math.ceil(n / 2) : i, k = back ? .38 : .46;
-    return { x: (back ? 24 : 2) + row * 44, y: back ? 76 : 104, k };
+    return { x: (back ? 22 : 2) + row * 38, y: back ? 76 : 104, k };
   }
 
   function startGame() {
@@ -435,6 +440,11 @@
     const g0 = G;
     petTreats().then(t => { if (t && G === g0) g0.treatsBefore = t.today; });
     const n = st.players.length;
+    /* Rdeča črta tik desno od ljubljenčkov; nagajivec pride točno do nje,
+       ko se izteče čas — da otroci vidijo, zakaj je izgubljeno. */
+    const lineX = Math.max(...st.players.map((p, i) => { const q = petPos(i, n); return q.x + 170 * q.k; })) + DANGER_PAD;
+    G.lineX = lineX;
+    G.x1 = lineX - BOSS_FRONT * BOSS_K;
     const pets = st.players.map((p, i) => {
       const q = petPos(i, n);
       return `<g class="ng-pet${p.id === st.me ? ' me' : ''}" data-pid="${esc(p.id)}" transform="translate(${q.x} ${q.y}) scale(${q.k})">
@@ -453,6 +463,12 @@
       </div>
       <div class="ng-scene"><svg viewBox="0 26 400 182" xmlns="http://www.w3.org/2000/svg">
         <ellipse cx="200" cy="214" rx="260" ry="34" fill="#cfe7a6"/>
+        <rect x="0" y="26" width="${lineX}" height="182" fill="#e8435f" opacity=".06"/>
+        <g class="ng-line" id="ngLine">
+          <line x1="${lineX}" y1="62" x2="${lineX}" y2="200" stroke="#e8435f" stroke-width="3.5" stroke-dasharray="9 6" stroke-linecap="round"/>
+          <path d="M${lineX} 44 L${lineX} 64" stroke="#4a2733" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M${lineX} 44 L${lineX + 16} 49 L${lineX} 55 Z" fill="#e8435f" stroke="#4a2733" stroke-width="1.8" stroke-linejoin="round"/>
+        </g>
         <g>${order.map(i => pets[i]).join('')}</g>
         <g id="ngBossG" transform="translate(${BOSS_X0} ${BOSS_Y}) scale(${BOSS_K})"><g id="ngBossIn" class="ng-boss-walk">${BossArt.draw(st.boss, 'walk', { inner: true })}</g></g>
         <g id="ngBeams"></g>
@@ -497,14 +513,14 @@
   }
   function bossX() {
     const p = Math.min(1, Math.max(0, (now() - G.startsAt) / (G.endsAt - G.startsAt)));
-    return BOSS_X0 - (BOSS_X0 - BOSS_X1) * p;
+    return BOSS_X0 - (BOSS_X0 - G.x1) * p;
   }
   function tick() {
     if (!G) return;
     const b = $('ngBossG');
     if (b && G.active) b.setAttribute('transform', `translate(${bossX().toFixed(1)} ${BOSS_Y}) scale(${BOSS_K})`);
     const left = Math.max(0, Math.ceil((G.endsAt - now()) / 1000)), t = $('ngTime');
-    if (t && t.textContent !== String(left)) { t.textContent = left; t.classList.toggle('danger', left <= 10); if (left <= 5 && left > 0 && G.active) SFX.click(); }
+    if (t && t.textContent !== String(left)) { t.textContent = left; t.classList.toggle('danger', left <= 10); const ln = $('ngLine'); if (ln) ln.classList.toggle('hot', left <= 10 && G.active); if (left <= 5 && left > 0 && G.active) SFX.click(); }
     if (!G.active) return;
     const keys = $('ngKeys'); if (keys) keys.classList.toggle('dazed', Date.now() < G.dizzyUntil);
     const r = hud();
