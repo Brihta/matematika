@@ -24,6 +24,10 @@
 -- Zahteva supabase_ljubljencek.sql (ljubljenčki, mejniki, boss_wins).
 -- Zaženi v Supabase → SQL Editor (celo datoteko; lahko večkrat).
 --
+-- STIKALO: ob zagonu je nagajivec ZAPRT — vidijo ga samo preizkuševalci
+-- ljubljenčka (pet_testers: nik7a, lar4). Odpri za vse:
+--   update boss_config set open = true;
+--
 -- NASTAVITVE (brez nove različice aplikacije):
 --   update boss_config set target_d10 = 7;     -- manj zdravja na igralca
 --   update boss_config set hearts = 4;         -- več srčkov na igralca
@@ -38,6 +42,7 @@ create table if not exists boss_config (
 );
 insert into boss_config (id) values (1) on conflict (id) do nothing;
 alter table boss_config enable row level security;
+alter table boss_config add column if not exists open boolean not null default false;
 
 create table if not exists boss_games (
   id          uuid primary key default gen_random_uuid(),
@@ -176,11 +181,20 @@ begin
   perform _boss_finish(p_game);
 end; $$;
 
--- Ali učenec sme v boj (ljubljenček mora obstajati).
+-- Ali nagajivca učenec sploh vidi (stikalo ali preizkuševalec).
+create or replace function public.boss_access(p_student uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from students where id = p_student)
+     and (coalesce((select open from boss_config where id = 1), false)
+          or exists (select 1 from pet_testers where student_id = p_student));
+$$;
+
+-- Ali učenec sme v boj (odprto zanj, ljubljenček mora obstajati).
 create or replace function public._boss_check(p_student uuid)
 returns text language plpgsql stable security definer set search_path = public as $$
 begin
   if not exists (select 1 from students where id = p_student) then return 'login'; end if;
+  if not boss_access(p_student) then return 'closed'; end if;
   if _boss_pet(p_student) is null then return 'no_pet'; end if;
   return null;
 end; $$;

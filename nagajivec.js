@@ -144,6 +144,7 @@
 
   const ERR = {
     login: 'Za boj z nagajivcem se prijavi.',
+    closed: 'Nagajivec še ni odprt. Kmalu! 👾',
     no_pet: 'Najprej si izberi ljubljenčka — on bo streljal na nagajivca!',
     not_found: 'Boja s to kodo ni. Preveri številke. 🔍',
     started: 'Ta boj se je že začel. Počakaj na naslednjega ali ustvari svojega.',
@@ -197,10 +198,10 @@
     view = 'start'; st = null; overlayOff();
     const a = area(); if (!a) return;
     const hero = `<div class="ng-hero">${BossArt.BOSSES.map(b => BossArt.draw(b.id, 'walk')).join('')}</div>`;
-    if (!profile) {
+    if (!profile || !window.bossAllowed) {
       a.innerHTML = `<div class="ng-card">${hero}<h2>Nagajivec</h2>
         <p class="ng-rules">Ljubljenčki skupaj premagajo nagajivca — vsak pravilen račun je strel.</p>
-        <div class="ng-msg">${ERR.login}</div></div>`;
+        <div class="ng-msg">${profile ? ERR.closed : ERR.login}</div></div>`;
       return;
     }
     a.innerHTML = `<div class="ng-card">${hero}<h2>Nagajivec</h2>
@@ -646,6 +647,33 @@
   /* Nagajivec pokuka iz ploščice na začetnem zaslonu. */
   const hb = $('homeBoss');
   if (hb) hb.innerHTML = BossArt.draw('sluzko', 'walk');
+
+  /* Kdo nagajivca vidi, odloči baza (boss_access: stikalo boss_config.open
+     ali preizkuševalec). Brez odgovora ostane skrit. */
+  window.bossAllowed = false;
+  let accessFor = null;
+  function showAccess(on) {
+    window.bossAllowed = !!on;
+    const tile = document.querySelector('.home-tile.t-nag');
+    if (tile) tile.style.display = on ? '' : 'none';
+    if (typeof updateControlLock === 'function') updateControlLock();
+    if (active() && view === 'start') renderStart();
+  }
+  async function checkAccess() {
+    const id = profile && !teacherSession ? profile.id : null;
+    if (id === accessFor) return;
+    accessFor = id;
+    if (!id) { showAccess(false); return; }
+    const r = await supabaseRPC('boss_access', { p_student: id });
+    if (accessFor === id) showAccess(r === true);
+  }
+  const origProfile = window.updateProfileButton;
+  window.updateProfileButton = function () {
+    const r = origProfile.apply(this, arguments);
+    checkAccess();
+    return r;
+  };
+  checkAccess();
 
   window.showBossPanel = showPanel;
   window.bossLeave = leave;

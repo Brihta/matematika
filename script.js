@@ -587,7 +587,7 @@ function updateControlLock() {
     b.classList.toggle('mode-off', do20 && race);
     b.title = do20 && race ? 'Tekmovanje in bitka sta samo za poštevanko' : '';
     // nagajivec (nagajivec.js) je samo za Do 20
-    if (b.dataset.mode === 'nagajivec') b.style.display = do20 ? '' : 'none';
+    if (b.dataset.mode === 'nagajivec') b.style.display = do20 && window.bossAllowed ? '' : 'none';
   });
 }
 
