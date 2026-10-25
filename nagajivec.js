@@ -123,7 +123,9 @@
   .t-nag::before { background: url(vzorci/sluz.svg) 0 0 / 56px 56px repeat;
     -webkit-mask-image: linear-gradient(115deg, rgba(0,0,0,.25) 30%, #000 80%); mask-image: linear-gradient(115deg, rgba(0,0,0,.25) 30%, #000 80%); }
   /* vsi trije nagajivci; selektor mora premagati .home-tile > span:not(...) */
-  .home-tiles .home-tile.t-nag > span.home-boss { position: absolute; right: -4px; bottom: -4px; width: 176px; height: 93px; pointer-events: none; z-index: 2; }
+  /* v spodnji vrstici čez celo širino (znaka ni), nikoli širši od ploščice */
+  .home-tiles .home-tile.t-nag > span.home-boss { grid-row: 2; grid-column: 1 / -1; align-self: end; justify-self: end; position: relative;
+    width: 176px; max-width: calc(100% + 19px); height: auto; aspect-ratio: 176 / 93; margin: 0 -19px -19px 0; pointer-events: none; z-index: 2; }
   .home-boss svg { width: 100%; height: 100%; display: block; }
   /* s ploščico je ploščic pet: na računalniku pet stolpcev, na telefonu gre
      Bitka (zadnja) čez celo širino. Brez nje ostane mreža kot prej. */
