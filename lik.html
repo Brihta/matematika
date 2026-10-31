@@ -683,22 +683,23 @@ function vikingShield() {
   return s;
 }
 /* Ščit kralja Matjaža: ozek, dolg grbovni ščit (kot križarski) k meču —
-   srebrn rob z zakovicami, črno polje, zgoraj srebrna krona, po sredini
-   navpičen meč s konico navzdol. */
+   zlat rob z zakovicami, belo polje z rdečo obrobo, zgoraj zlata krona z
+   modrim kamnom, po sredini navpičen meč s konico navzdol. */
 function matjazShield() {
-  const cx = 178, SI = '#c3cad3', STEEL = '#e3e8ee';
+  const cx = 178, G = '#f4c542', R = '#c0392b', STEEL = '#e3e8ee';
   const out = 'M132 274 Q178 262 224 274 L224 350 C224 404 206 436 178 466 C150 436 132 404 132 350 Z';
   const field = 'M142 283 Q178 273 214 283 L214 350 C214 398 199 426 178 451 C157 426 142 398 142 350 Z';
-  let s = `<path d="M122 264 Q178 250 234 264 L234 352 C234 412 212 446 178 478 C144 446 122 412 122 352 Z" fill="#dfe6ee" opacity=".3"/>`;
-  s += part(out, SI, { shadow: `M${cx} 256 L236 256 L236 474 L${cx} 474 Z`, hi: 'M137 286 Q144 279 156 277 Q142 292 141 330 Z' });
-  // meč s konico navzdol in krona nad njim
-  const inner = part(`M${cx - 4} 336 L${cx + 4} 336 L${cx + 4} 424 L${cx} 434 L${cx - 4} 424 Z`, STEEL, { w: 2.5 })
-    + part(`M${cx - 16} 330 L${cx + 16} 330 L${cx + 16} 337 L${cx - 16} 337 Z`, SI, { w: 2.5 })
-    + line(`M${cx} 318 L${cx} 329`, 6) + line(`M${cx} 318 L${cx} 329`, 3, '#5b5f6e') + `<circle cx="${cx}" cy="316" r="4" fill="${SI}" stroke="${OL}" stroke-width="2"/>`
+  let s = `<path d="M122 264 Q178 250 234 264 L234 352 C234 412 212 446 178 478 C144 446 122 412 122 352 Z" fill="#ffe27a" opacity=".22"/>`;
+  s += part(out, G, { shadow: `M${cx} 256 L236 256 L236 474 L${cx} 474 Z`, hi: 'M137 286 Q144 279 156 277 Q142 292 141 330 Z' });
+  // rdeča obroba, meč s konico navzdol in krona nad njim
+  const inner = `<path d="${field}" fill="none" stroke="${R}" stroke-width="10" transform="translate(${cx} 362) scale(.97 .98) translate(${-cx} -362)"/>`
+    + part(`M${cx - 4} 336 L${cx + 4} 336 L${cx + 4} 424 L${cx} 434 L${cx - 4} 424 Z`, STEEL, { w: 2.5 })
+    + part(`M${cx - 16} 330 L${cx + 16} 330 L${cx + 16} 337 L${cx - 16} 337 Z`, G, { w: 2.5 })
+    + line(`M${cx} 318 L${cx} 329`, 6) + line(`M${cx} 318 L${cx} 329`, 3, R) + `<circle cx="${cx}" cy="316" r="4" fill="${G}" stroke="${OL}" stroke-width="2"/>`
     + `<g transform="translate(${cx} 300) scale(.62) translate(${-cx} -340)">`
-    + part(`M${cx - 28} 360 L${cx - 32} 326 L${cx - 15} 340 L${cx} 318 L${cx + 15} 340 L${cx + 32} 326 L${cx + 28} 360 Q${cx} 368 ${cx - 28} 360 Z`, SI, { w: 4 })
-    + `<circle cx="${cx}" cy="347" r="5.5" fill="${STEEL}" stroke="${OL}" stroke-width="2.5"/></g>`;
-  s += part(field, '#22252b', { w: 4, shadow: `M${cx} 268 L220 268 L220 458 L${cx} 458 Z`, hi: 'M148 291 Q155 285 166 283 Q152 298 151 330 Z', inner });
+    + part(`M${cx - 28} 360 L${cx - 32} 326 L${cx - 15} 340 L${cx} 318 L${cx + 15} 340 L${cx + 32} 326 L${cx + 28} 360 Q${cx} 368 ${cx - 28} 360 Z`, G, { w: 4 })
+    + `<circle cx="${cx}" cy="347" r="5.5" fill="#3498db" stroke="${OL}" stroke-width="2.5"/></g>`;
+  s += part(field, '#f4f1ea', { w: 4, shadow: `M${cx} 268 L220 268 L220 458 L${cx} 458 Z`, inner });
   for (const [x, y] of [[143, 278], [178, 270], [213, 278], [138, 370], [218, 370], [178, 458]])
     s += `<circle cx="${x}" cy="${y}" r="3" fill="${STEEL}" stroke="${OL}" stroke-width="1.5"/>`;
   return s + sparkle(222, 282, 8);
