@@ -30,10 +30,12 @@
   const TWIST = {
     kujavka: 'Godrnjava Greta zastavlja uganke: »7 + ? = 10«. Rešena uganka je dvojni strel.',
     bahac: 'Bahač ima ščit. Tri pravilne zapored ga razbijejo — potem vsak strel zadene.',
-    sluzko: 'Sluzko zasluzi tipke. Tapni zasluzeno tipko, da jo očistiš.'
+    sluzko: 'Sluzko meče sluz na račun in na tipke. Obriši jo s tapom ali preslednico — ali počakaj, da spolzi dol.'
   };
   const SHIELD_MS = 10000;           // Bahačev ščit je razbit toliko časa
   const SLIME_MS = [8000, 12000];    // Sluzko zasluzi tipko na 8–12 s
+  const SPLAT_MS = [7000, 10000];    // … in vrže sluz na račun na 7–10 s
+  const SPLAT_LIFE = 2600;           // toliko časa sluz polzi z računa
 
   document.head.insertAdjacentHTML('beforeend', `<style>
   .ng-card { background: #fffef8; border-radius: 22px; padding: 18px 16px; text-align: center; max-width: 560px; margin: 8px auto;
@@ -121,6 +123,13 @@
   .ng-open-row em { font-style: normal; font-size: .72rem; font-weight: 800; color: #d9465f; }
   .keypad-btn.slimed { background: radial-gradient(circle at 40% 35%, #b8f05a, #6cc04a) !important; color: transparent !important; position: relative; }
   .keypad-btn.slimed::after { content: '🫧'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: #000; }
+  .ng-qn { position: relative; display: inline-block; }
+  .ng-splat { position: absolute; inset: -.12em -.3em; cursor: pointer; animation: ngSplat ${SPLAT_LIFE}ms ease-in forwards; }
+  .ng-splat svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  @keyframes ngSplat { 0% { transform: scale(.3); opacity: 0; } 8% { transform: scale(1.12); opacity: .82; }
+    14%, 50% { transform: scale(1); opacity: .82; } 100% { transform: translateY(55%) scale(.9, 1.15); opacity: 0; } }
+  .ng-splat.wipe { animation: ngWipe .22s ease-out forwards; }
+  @keyframes ngWipe { from { opacity: .82; } to { transform: scale(1.3); opacity: 0; } }
   .ng-shield { transition: opacity .25s; }
   .ng-shield.down { opacity: 0; }
   .ng-q { text-align: center; font-size: 2.1rem; font-weight: 900; margin: 6px 0; min-height: 2.5rem; }
@@ -492,7 +501,7 @@
           weak: v2 ? weakCards(m && m.weak, lvl) : [],
           k: BOSS_K * (v2 ? 1 + .04 * Math.min(7, (st.stage || 1) - 1) : 1),
           shield: v2 && st.boss === 'bahac' ? { up: true, cracks: 0, back: 0 } : null,
-          slime: v2 && st.boss === 'sluzko' ? { key: null, at: Date.now() + 5000 } : null };
+          slime: v2 && st.boss === 'sluzko' ? { key: null, at: Date.now() + 5000, splat: Date.now() + 2500 } : null };
     seen = {};
     st.players.forEach(p => { seen[p.id] = { c: p.correct, w: p.wrong, d: p.dmg || 0 }; });
     // današnji priboljški pred bojem: na koncu pokažemo, koliko jih je res prinesel
@@ -602,7 +611,8 @@
   function showQ() {
     if (G.idx && G.idx % G.queue.length === 0) G.queue = deck(G.queue[0].g);
     const cur = G.cur = special(G.queue[G.idx % G.queue.length]);
-    const q = $('ngQ'); if (q) q.textContent = cur.question;
+    const q = $('ngQ');
+    if (q) q.innerHTML = esc(cur.question).replace(/\d+/g, n => `<span class="ng-qn">${n}</span>`);
     // oznaka računa (dvojni strel) velja samo zanj; sporočilo ščita ali sluzi ostane 1,5 s
     if (cur.tag || Date.now() > (G.tagUntil || 0)) { const tg = $('ngTag'); if (tg) tg.textContent = cur.tag || ''; if (cur.tag) G.tagUntil = 0; }
     const d = $('ngDisplay');
@@ -611,10 +621,10 @@
     document.querySelectorAll('#ngGrid .keypad-btn').forEach(b => b.disabled = false);
     questionShownTs = Date.now();
   }
-  function input(d) {
+  function input(d, kb) {
     if (!G || !G.active || G.answered || Date.now() < G.dizzyUntil) return;
-    // zasluzena tipka: prvi dotik jo očisti
-    if (G.slime && G.slime.key === d) { unslime(); SFX.click(); return; }
+    // zasluzena tipka na zaslonu: prvi dotik jo očisti (tipkovnica je ne čuti)
+    if (!kb && G.slime && G.slime.key === d) { unslime(); SFX.click(); return; }
     if (d === 'back') { G.input = G.input.slice(0, -1); SFX.click(); }
     else if (d === 'ok') { check(); return; }
     else { if (G.input.length >= 2) return; G.input += d; SFX.click(); }
@@ -843,6 +853,28 @@
     if (!G || !G.slime) return;
     G.slime.key = null;
     document.querySelectorAll('#ngGrid .keypad-btn.slimed').forEach(b => b.classList.remove('slimed'));
+    document.querySelectorAll('#ngQ .ng-splat').forEach(e => e.remove());
+  }
+  /* Sluz na računu: prekrije eno število, a ne povsem, in sama spolzi dol.
+     Tap nanjo ali preslednica jo obriše takoj. */
+  function splat() {
+    const ns = document.querySelectorAll('#ngQ .ng-qn');
+    if (ns.length < 2) return false;
+    const n = ns[Math.floor(Math.random() * 2)];
+    n.insertAdjacentHTML('beforeend', `<span class="ng-splat"><svg viewBox="0 0 100 90" preserveAspectRatio="none">
+      <path d="M50 6 C66 4 70 16 80 14 C94 12 96 30 90 40 C98 52 92 68 78 70 C76 84 62 88 54 80 C44 90 26 86 26 72 C10 72 4 56 12 46 C2 34 10 18 24 20 C28 8 40 8 50 6 Z" fill="#7fcf4a" stroke="#4e9a2a" stroke-width="4"/>
+      <circle cx="36" cy="34" r="7" fill="#c6f58a"/><circle cx="64" cy="58" r="4" fill="#c6f58a"/>
+      <path d="M40 80 Q42 96 46 96 Q50 96 50 84" fill="#7fcf4a" stroke="#4e9a2a" stroke-width="3"/></svg></span>`);
+    const el = n.lastElementChild;
+    el.addEventListener('click', () => wipe(el));
+    el.addEventListener('animationend', () => el.remove());
+    return true;
+  }
+  function wipe(el) {
+    el = el || document.querySelector('#ngQ .ng-splat:not(.wipe)');
+    if (!el) return false;
+    el.classList.add('wipe'); SFX.click();
+    return true;
   }
   /* Vsakih 100 ms: Bahačev ščit se vrne, Sluzko zasluzi novo tipko. */
   function twistTick() {
@@ -854,6 +886,11 @@
       if (b) { sl.key = k; b.classList.add('slimed'); tag('🫧 Sluzko je zasluzil tipko — tapni jo, da jo očistiš!'); }
       sl.at = t + SLIME_MS[0] + Math.random() * (SLIME_MS[1] - SLIME_MS[0]);
     }
+    // na dvojne strele (nagrade) sluz ne pade
+    if (sl && t >= sl.splat && !G.answered && !(G.cur && G.cur.power) && !document.querySelector('#ngQ .ng-splat')) {
+      if (splat()) tag('🫧 Sluzko je zasluzil račun — obriši ga s tapom ali preslednico!');
+      sl.splat = t + SPLAT_MS[0] + Math.random() * (SPLAT_MS[1] - SPLAT_MS[0]);
+    }
   }
 
   /* ── fizična tipkovnica med bojem ── */
@@ -861,9 +898,10 @@
     if (!active() || !G || !G.active) return;
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-    if (e.key >= '0' && e.key <= '9') { e.preventDefault(); input(e.key); }
-    else if (e.key === 'Backspace') { e.preventDefault(); input('back'); }
-    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input('ok'); }
+    if (e.key >= '0' && e.key <= '9') { e.preventDefault(); input(e.key, true); }
+    else if (e.key === 'Backspace') { e.preventDefault(); input('back', true); }
+    else if (e.key === ' ' && wipe()) e.preventDefault();   // preslednica najprej obriše sluz
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input('ok', true); }
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && ng && active() && !pollT) poll();
