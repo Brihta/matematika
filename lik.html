@@ -711,23 +711,27 @@ function cape(col, trim) {
     + (trim ? part('M166 450 Q256 468 346 450 L348 464 Q256 482 164 464 Z', trim, { w: 4 }) : '');
 }
 /* Ogrinjalo maščevalca: temno sivomoder plašč z razcefranim robom zadaj,
-   spredaj (front) bel krzneni ovratnik čez ramena in srebrna zaponka z
+   spredaj (front) belo krzno čez eno ramo in srebrna zaponka z
    volčjo glavo. Krzno se riše po obleki in pred glavo, da vrat sedi na njem. */
 function avengerCape() {
   return part('M204 252 L308 252 L364 438 L352 470 L336 456 L320 480 L302 462 L284 482 L264 464 L246 482 L228 462 L210 480 L192 458 L176 472 L160 440 Z', '#4b5666',
     { shadow: 'M256 246 L380 246 L380 490 L256 490 Z', inner: line('M226 300 L200 460', 2.5, '#353d49') + line('M286 300 L318 462', 2.5, '#353d49') + line('M256 300 L256 470', 2.5, '#353d49') });
 }
 function avengerFur() {
-  const FUR = 'M164 306 C148 284 160 254 194 242 C214 236 234 238 256 242 C278 238 298 236 318 242 C352 254 364 284 348 306 '
-    + 'Q340 320 326 310 Q316 324 302 310 Q292 314 284 300 Q274 304 268 292 Q262 300 256 294 Q250 300 244 292 Q238 304 228 300 Q220 314 210 310 Q196 324 186 310 Q172 320 164 306 Z';
-  const tufts = ['M178 278 Q186 286 182 296', 'M198 262 Q208 270 206 282', 'M222 254 Q230 264 228 274', 'M290 254 Q282 264 284 274', 'M314 262 Q304 270 306 282', 'M334 278 Q326 286 330 296']
+  // krzno samo čez levo ramo (gledano od spredaj), poševno do zaponke desno na prsih
+  const FUR = 'M158 314 C142 286 156 254 192 242 C214 235 240 236 262 242 C270 258 280 274 292 292 '
+    + 'Q288 314 274 306 Q266 322 252 310 Q240 324 228 312 Q216 328 204 314 Q190 328 180 314 Q168 324 158 314 Z';
+  const tufts = ['M176 278 Q184 286 180 296', 'M198 262 Q208 270 206 282', 'M224 256 Q232 266 230 278', 'M250 262 Q256 274 252 286']
     .map(d => line(d, 2.5, '#aab6c4')).join('');
-  const SIL = '#cfd6de', WOLF = '#f4f6f8';
-  return part(FUR, '#eef2f6', { w: 4.5, shadow: 'M300 236 L370 236 L370 330 L300 330 Z M150 300 Q256 284 370 300 L370 330 L150 330 Z', hi: 'M176 270 Q190 252 214 246 Q196 258 186 276 Z', inner: tufts })
+  const SIL = '#cfd6de', WOLF = '#f4f6f8', cx = 290, cy = 296;
+  // usnjen jermen od zaponke čez desno ramo
+  return part('M282 286 L316 244 L332 252 L300 300 Z', '#3b3d4a', { w: 4, hi: 'M318 248 L324 251 L296 292 L292 289 Z' })
+    + part(FUR, '#eef2f6', { w: 4.5, shadow: 'M254 236 L300 236 L300 330 L254 330 Z M140 304 Q220 290 300 304 L300 330 L140 330 Z', hi: 'M172 270 Q186 252 210 246 Q192 258 182 276 Z', inner: tufts })
+    + `<g transform="translate(${cx - 256} ${cy - 292})">`
     + `<circle cx="256" cy="292" r="20" fill="${SIL}" stroke="${OL}" stroke-width="4"/><circle cx="256" cy="292" r="14.5" fill="#7f8a97"/>`
     + part('M245 287 L240 272 L252 281 Z', WOLF, { w: 2.5 }) + part('M267 287 L272 272 L260 281 Z', WOLF, { w: 2.5 })
     + part('M242 284 Q256 277 270 284 L266 297 L256 307 L246 297 Z', WOLF, { w: 2.5 })
-    + line('M247 289 L252 291', 2.2) + line('M265 289 L260 291', 2.2) + `<circle cx="256" cy="301" r="2.6" fill="${OL}"/>` + sparkle(278, 274, 6);
+    + line('M247 289 L252 291', 2.2) + line('M265 289 L260 291', 2.2) + `<circle cx="256" cy="301" r="2.6" fill="${OL}"/>` + sparkle(278, 274, 6) + `</g>`;
 }
 const owl = () => part('M66 408 L70 380 L88 400 Z', '#8a5a3b', { w: 4 }) + part('M118 408 L114 380 L96 400 Z', '#8a5a3b', { w: 4 })
   + part('M92 396 C122 396 128 424 128 440 C128 462 112 474 92 474 C72 474 56 462 56 440 C56 424 62 396 92 396 Z', '#8a5a3b', { shadow: 'M98 388 L140 388 L140 480 L98 480 Z', hi: 'M66 420 Q70 406 82 402 Q72 414 70 430 Z' })
