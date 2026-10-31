@@ -362,6 +362,7 @@ insert into items (id, season, char_id, slot, price, reward_season, reward_page)
   ('scit-les',     1, 'vitez', 'scit',          60,   null, null),
   ('scit-zvezda',  1, 'vitez', 'scit',          150,  null, null),
   ('scit-viking',  1, 'vitez', 'scit',          200,  null, null),   -- vikinški ščit z ovnom, dodan 11. 10. 2026
+  ('scit-matjaz',  1, 'vitez', 'scit',          250,  null, null),   -- Ščit kralja Matjaža (k meču), dodan 31. 10. 2026
   ('scit-brihta',  1, 'vitez', 'scit',          null, 1, 'zve'),
   ('plasc',        1, 'vitez', 'hrbet',         120,  null, null),
   ('plasc-kralj',  1, 'vitez', 'hrbet',         300,  null, null),

@@ -651,6 +651,31 @@ function vikingShield() {
      + `<circle cx="${cx - 3}" cy="365" r="1.6" fill="${OL}"/><circle cx="${cx + 3}" cy="365" r="1.6" fill="${OL}"/>`;
   return s;
 }
+/* Ščit kralja Matjaža: koničast grbovni ščit k meču — zlat rob z zakovicami,
+   rdeče polje, za krono dva prekrižana meča, krona z rdečimi kamni. */
+function matjazShield() {
+  const cx = 178, G = '#f4c542', R = '#c0392b', STEEL = '#e3e8ee';
+  const out = 'M120 284 Q178 272 236 284 L236 336 C236 380 212 406 178 424 C144 406 120 380 120 336 Z';
+  const field = 'M131 294 Q178 284 225 294 L225 336 C225 374 205 396 178 411 C151 396 131 374 131 336 Z';
+  let s = `<path d="M110 274 Q178 260 246 274 L246 340 C246 388 218 414 178 434 C138 414 110 388 110 340 Z" fill="#ffe27a" opacity=".22"/>`;
+  s += part(out, G, { shadow: `M${cx} 266 L250 266 L250 430 L${cx} 430 Z`, hi: 'M126 296 Q134 288 150 286 Q134 300 132 330 Z' });
+  // prekrižana meča za krono
+  const blade = f => `<g transform="rotate(${36 * f} ${cx} 352)">`
+    + part(`M${cx - 4} 300 L${cx} 290 L${cx + 4} 300 L${cx + 4} 384 L${cx - 4} 384 Z`, STEEL, { w: 2.5 })
+    + part(`M${cx - 13} 384 L${cx + 13} 384 L${cx + 13} 390 L${cx - 13} 390 Z`, G, { w: 2.5 })
+    + line(`M${cx} 391 L${cx} 402`, 5) + line(`M${cx} 391 L${cx} 402`, 2.5, '#7a2a2a') + `</g>`;
+  s += part(field, R, { w: 4, shadow: `M${cx} 280 L230 280 L230 416 L${cx} 416 Z`, hi: 'M138 302 Q146 296 158 294 Q144 308 142 330 Z', inner: blade(-1) + blade(1) });
+  for (const [x, y] of [[132, 288], [178, 280], [224, 288], [128, 360], [228, 360], [178, 418]])
+    s += `<circle cx="${x}" cy="${y}" r="3" fill="${STEEL}" stroke="${OL}" stroke-width="1.5"/>`;
+  // krona
+  s += part(`M${cx - 28} 360 L${cx - 32} 326 L${cx - 15} 340 L${cx} 318 L${cx + 15} 340 L${cx + 32} 326 L${cx + 28} 360 Q${cx} 368 ${cx - 28} 360 Z`, G,
+         { w: 3.5, shadow: `M${cx} 312 L${cx + 40} 312 L${cx + 40} 372 L${cx} 372 Z`, hi: `M${cx - 26} 334 L${cx - 21} 338 L${cx - 21} 354 L${cx - 25} 354 Z` });
+  s += line(`M${cx - 27} 352 Q${cx} 359 ${cx + 27} 352`, 2.5)
+     + [[cx - 32, 324, 3.5], [cx, 316, 4], [cx + 32, 324, 3.5]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${G}" stroke="${OL}" stroke-width="2"/>`).join('')
+     + `<circle cx="${cx}" cy="347" r="5.5" fill="${R}" stroke="${OL}" stroke-width="2"/>`
+     + `<circle cx="${cx - 17}" cy="350" r="3.5" fill="#3498db" stroke="${OL}" stroke-width="2"/><circle cx="${cx + 17}" cy="350" r="3.5" fill="#3498db" stroke="${OL}" stroke-width="2"/>`;
+  return s + sparkle(232, 290, 8) + sparkle(130, 392, 6);
+}
 function cape(col, trim) {
   return part('M210 256 L302 256 L348 464 Q256 482 164 464 Z', col, { shadow: 'M256 250 L360 250 L360 490 L256 490 Z' })
     + (trim ? part('M166 450 Q256 468 346 450 L348 464 Q256 482 164 464 Z', trim, { w: 4 }) : '');
@@ -801,6 +826,7 @@ const ITEMS = {
   'scit-les':   { slot: 'scit', char: 'vitez', season: 1, name: 'Lesen ščit', rarity: 'navaden', price: 60, draw: () => shield('les') },
   'scit-zvezda':{ slot: 'scit', char: 'vitez', season: 1, name: 'Ščit z zvezdo', rarity: 'redek', price: 150, draw: () => shield('zvezda') },
   'scit-viking':{ slot: 'scit', char: 'vitez', season: 1, name: 'Vikinški ščit', rarity: 'epski', price: 200, crop: '106 273 144 144', draw: vikingShield },
+  'scit-matjaz':{ slot: 'scit', char: 'vitez', season: 1, name: 'Ščit kralja Matjaža', rarity: 'epski', price: 250, crop: '92 262 172 172', draw: matjazShield },
   'scit-brihta':{ slot: 'scit', char: 'vitez', season: 1, name: 'Ščit Brihta', rarity: 'nagrada', reward: [1, 'zve'], draw: () => shield('brihta') },
   plasc:        { slot: 'hrbet', char: 'vitez', season: 1, name: 'Rdeč plašč', rarity: 'redek', price: 120, draw: () => cape('#c0392b') },
   'plasc-kralj':{ slot: 'hrbet', char: 'vitez', season: 1, name: 'Kraljevi plašč', rarity: 'epski', price: 300, draw: () => cape('#6a4fc0', '#f4c542') },
