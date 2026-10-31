@@ -693,9 +693,11 @@ function matjazShield() {
   s += part(out, G, { shadow: `M${cx} 256 L236 256 L236 474 L${cx} 474 Z`, hi: 'M137 286 Q144 279 156 277 Q142 292 141 330 Z' });
   // rdeča obroba, meč s konico navzdol in krona nad njim
   const inner = `<path d="${field}" fill="none" stroke="${R}" stroke-width="10" transform="translate(${cx} 362) scale(.97 .98) translate(${-cx} -362)"/>`
-    + part(`M${cx - 4} 336 L${cx + 4} 336 L${cx + 4} 424 L${cx} 434 L${cx - 4} 424 Z`, STEEL, { w: 2.5 })
-    + part(`M${cx - 16} 330 L${cx + 16} 330 L${cx + 16} 337 L${cx - 16} 337 Z`, G, { w: 2.5 })
-    + line(`M${cx} 318 L${cx} 329`, 6) + line(`M${cx} 318 L${cx} 329`, 3, R) + `<circle cx="${cx}" cy="316" r="4" fill="${G}" stroke="${OL}" stroke-width="2"/>`
+    + part(`M${cx - 8} 338 L${cx + 8} 338 L${cx + 8} 418 L${cx} 438 L${cx - 8} 418 Z`, STEEL, { w: 3, shadow: `M${cx} 334 L${cx + 10} 334 L${cx + 10} 440 L${cx} 440 Z` })
+    + line(`M${cx} 344 L${cx} 418`, 2.5, '#9aa4b0')
+    + part(`M${cx - 24} 329 L${cx + 24} 329 Q${cx + 28} 334 ${cx + 25} 340 L${cx - 25} 340 Q${cx - 28} 334 ${cx - 24} 329 Z`, G, { w: 3 })
+    + line(`M${cx} 316 L${cx} 328`, 9) + line(`M${cx} 316 L${cx} 328`, 5, R) + line(`M${cx - 3} 320 L${cx + 3} 318`, 1.5) + line(`M${cx - 3} 325 L${cx + 3} 323`, 1.5)
+    + `<circle cx="${cx}" cy="313" r="5.5" fill="${G}" stroke="${OL}" stroke-width="2.5"/>`
     + `<g transform="translate(${cx} 300) scale(.62) translate(${-cx} -340)">`
     + part(`M${cx - 28} 360 L${cx - 32} 326 L${cx - 15} 340 L${cx} 318 L${cx + 15} 340 L${cx + 32} 326 L${cx + 28} 360 Q${cx} 368 ${cx - 28} 360 Z`, G, { w: 4 })
     + `<circle cx="${cx}" cy="347" r="5.5" fill="#3498db" stroke="${OL}" stroke-width="2.5"/></g>`;
