@@ -374,5 +374,33 @@
     return `<svg viewBox="${o.viewBox || '0 0 200 200'}" xmlns="http://www.w3.org/2000/svg" class="ba-svg">${s}</svg>`;
   }
 
-  window.BossArt = { draw, group, BOSSES, find, stars, spiral };
+  /* Jeza po stopnjah (nadgradnja 31. 10. 2026): od 2. stopnje 💢 ob glavi
+     (do tri), od 5. rdeč sij za nagajivcem. Riše se v prostor 0 0 200 200. */
+  function anger(stage) {
+    if (!stage || stage < 2) return '';
+    const mark = (x, y, k) => `<g transform="translate(${x} ${y}) scale(${k})" stroke="#e8435f" stroke-width="4.2" fill="none" stroke-linecap="round">`
+      + `<path d="M-9 -3 Q-3 -3 -3 -9 M3 -9 Q3 -3 9 -3 M9 3 Q3 3 3 9 M-3 9 Q-3 3 -9 3"/></g>`;
+    const at = [[160, 26, 1], [40, 30, .85], [176, 60, .75]];
+    return (stage >= 5 ? `<ellipse cx="100" cy="110" rx="96" ry="88" fill="#e8435f" opacity=".13"/>` : '')
+      + at.slice(0, Math.min(3, stage - 1)).map(([x, y, k]) => mark(x, y, k)).join('');
+  }
+  /* Zbirka premaganih nagajivcev (boss_trophies): za vsakega nagajivca
+     največja stopnja in število zmag po ravneh. */
+  const LV = { d10: 'Do 10', b20: 'Brez prehoda', pr: 'S prehodom' };
+  function trophies(list) {
+    list = Array.isArray(list) ? list : [];
+    return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${BOSSES.map(b => {
+      const mine = list.filter(t => t.boss === b.id);
+      const best = mine.reduce((m, t) => Math.max(m, t.stage), 0);
+      return `<div style="background:#fdfcf3;border-radius:14px;box-shadow:inset 0 0 0 1px #ecd9bc;padding:4px 4px 8px;text-align:center;font-size:.74rem;font-weight:700">
+        <div style="${mine.length ? '' : 'filter:grayscale(1);opacity:.35'}">${draw(b.id, mine.length ? 'down' : 'walk', { viewBox: '0 20 200 180' })}</div>
+        <div style="font-weight:900;font-size:.84rem">${b.name}</div>
+        ${mine.length ? `<div style="color:#d9465f;font-weight:900">${'★'.repeat(Math.min(best, 8))}</div>`
+          + mine.map(t => `<div style="color:#5d6b52">${LV[t.level] || t.level}: ${t.stage}. st. · ${t.wins}×</div>`).join('')
+          : '<div style="color:#5d6b52">Še ne</div>'}
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  window.BossArt = { draw, group, BOSSES, find, stars, spiral, anger, trophies };
 })();

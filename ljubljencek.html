@@ -140,6 +140,7 @@ h2 { font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform:
 <div class="wrap" id="app"><div class="empty">Nalagam …</div></div>
 <div class="toast" id="toast"></div>
 <script src="pet-art.js"></script>
+<script src="boss-art.js"></script>
 <script>
 const A = PetArt;
 const api = () => { try { return parent.petApi; } catch (e) { return null; } };
@@ -153,6 +154,7 @@ const START = { zmaj: 'gozd', lisica: 'med', sova: 'nebo', macka: 'oblak' };
 let S = null;          // pet_state iz baze
 let draft = null;      // videz na zaslonu (pred odgovorom baze)
 let saving = false, lastStage = null;
+let TROPHIES = null;   // premagani nagajivci (boss_trophies, supabase_nagajivec.sql)
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -169,6 +171,8 @@ async function load() {
     return;
   }
   setState(st);
+  const tr = await a.rpc('boss_trophies', { p_student: a.profile().id });
+  if (Array.isArray(tr)) { TROPHIES = tr; render(); }
 }
 window.petReload = load;
 
@@ -260,6 +264,7 @@ function render() {
         </div>
         ${shopCard(stage)}
         ${companionCard(stage)}
+        ${TROPHIES && TROPHIES.length ? `<div class="card section"><h2>Premagani nagajivci</h2>${BossArt.trophies(TROPHIES)}</div>` : ''}
       </div>
     </div>`;
   wire();

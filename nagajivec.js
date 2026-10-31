@@ -24,6 +24,16 @@
   const BOSS_K = .85, BOSS_X0 = 236, BOSS_Y = 28;
   const BOSS_FRONT = 50;      // kje v risbi (0–200) je nagajivčev sprednji rob
   const DANGER_PAD = 8;       // rdeča črta je toliko desno od ljubljenčkov
+  /* Nadgradnja (31. 10. 2026, st.v2 — najprej preizkuševalci): zadetki
+     nagajivca odbijejo nazaj, stopnje, posebnosti nagajivcev, šibki računi. */
+  const PUSH = 13, PUSH_MS = 2400;   // odboj na zadetek (enot prizora) in kako hitro zbledi
+  const TWIST = {
+    kujavka: 'Godrnjava Greta zastavlja uganke: »7 + ? = 10«. Rešena uganka je dvojni strel.',
+    bahac: 'Bahač ima ščit. Tri pravilne zapored ga razbijejo — potem vsak strel zadene.',
+    sluzko: 'Sluzko zasluzi tipke. Tapni zasluzeno tipko, da jo očistiš.'
+  };
+  const SHIELD_MS = 10000;           // Bahačev ščit je razbit toliko časa
+  const SLIME_MS = [8000, 12000];    // Sluzko zasluzi tipko na 8–12 s
 
   document.head.insertAdjacentHTML('beforeend', `<style>
   .ng-card { background: #fffef8; border-radius: 22px; padding: 18px 16px; text-align: center; max-width: 560px; margin: 8px auto;
@@ -102,6 +112,17 @@
   @keyframes ngShot { 55% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
   .ng-spark { transform-box: fill-box; transform-origin: center; animation: ngSpark .42s ease-out forwards; }
   @keyframes ngSpark { 0%, 40% { transform: scale(.2); opacity: 0; } 60% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+  .ng-tag { text-align: center; font-size: .82rem; font-weight: 900; color: #d9465f; min-height: 1.1em; margin-top: 6px; }
+  .ng-twist { font-size: .84rem; font-weight: 700; color: var(--g-muted, #5d6b52); margin: 6px 0 0; }
+  .ng-stage { display: inline-block; background: #fff1f0; color: #d9465f; border-radius: 999px; padding: 3px 10px; font-weight: 900; font-size: .8rem; margin-top: 4px; }
+  .ng-mine { font-weight: 900; margin-top: 8px; }
+  .ng-trophies { margin-top: 14px; text-align: left; }
+  .ng-trophies svg { width: 100%; height: auto; display: block; max-height: 90px; }
+  .ng-open-row em { font-style: normal; font-size: .72rem; font-weight: 800; color: #d9465f; }
+  .keypad-btn.slimed { background: radial-gradient(circle at 40% 35%, #b8f05a, #6cc04a) !important; color: transparent !important; position: relative; }
+  .keypad-btn.slimed::after { content: '🫧'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: #000; }
+  .ng-shield { transition: opacity .25s; }
+  .ng-shield.down { opacity: 0; }
   .ng-q { text-align: center; font-size: 2.1rem; font-weight: 900; margin: 6px 0; min-height: 2.5rem; }
   .ng-keys { position: relative; max-width: 400px; margin: 0 auto; }
   .ng-keys .keypad-grid { margin: 10px auto 0; }
@@ -233,6 +254,7 @@
       <div class="ng-join"><input id="ngCode" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="koda">
         <button class="ng-btn" id="ngJoin">Pridruži se</button></div>
       <div class="ng-open"><h3>Odprti boji</h3><div id="ngOpen"><div class="ng-hint">Iščem …</div></div></div>
+      <div class="ng-trophies"><h3>Tvoji premagani nagajivci</h3><div id="ngTrophies"></div></div>
     </div>`;
     const code = $('ngCode');
     code.addEventListener('input', () => { code.value = code.value.replace(/\D/g, '').slice(0, 4); });
@@ -241,6 +263,13 @@
     $('ngJoin').addEventListener('click', () => join(code.value));
     if (msg === ERR.no_pet) petFix();
     listGen++; refreshList(listGen);
+    loadTrophies();
+  }
+  async function loadTrophies() {
+    const r = await supabaseRPC('boss_trophies', { p_student: profile.id });
+    const el = $('ngTrophies'); if (!el || view !== 'start') return;
+    if (!Array.isArray(r)) { el.closest('.ng-trophies').remove(); return; }
+    el.innerHTML = BossArt.trophies(r) + (r.length ? '' : '<div class="ng-hint" style="margin-top:6px">Še nobenega — premagaj prvega! 💪</div>');
   }
   function petFix() {
     const el = $('ngPetFix'); if (!el || typeof Svet === 'undefined') return;
@@ -257,7 +286,7 @@
     const el = $('ngOpen');
     if (el && Array.isArray(r)) {
       el.innerHTML = r.length ? r.map(b => `<div class="ng-open-row"><b>${esc(b.code)}</b>
-          <span>${(b.players || []).map(esc).join(', ')}</span><button data-code="${esc(b.code)}">Pridruži se</button></div>`).join('')
+          <span>${b.status && b.status !== 'lobby' ? '<em>boj poteka · </em>' : ''}${(b.players || []).map(esc).join(', ')}</span><button data-code="${esc(b.code)}">Pridruži se</button></div>`).join('')
         : '<div class="ng-hint">Zdaj ni odprtega boja — ustvari svojega!</div>';
       el.querySelectorAll('[data-code]').forEach(b => b.addEventListener('click', () => join(b.dataset.code)));
     }
@@ -293,6 +322,7 @@
     if (!ng || !active()) return;
     const p = { p_code: ng.code, p_token: ng.token };
     if (G && G.round) Object.assign(p, { p_round: G.round, p_correct: G.correct, p_wrong: G.wrong });
+    if (G && G.round && G.v2) p.p_dmg = G.dmg;   // samo nova baza (st.v2) pozna p_dmg
     const sent = ng;
     const r = await call('boss_sync', p);
     if (ng !== sent) return;
@@ -321,9 +351,11 @@
     }
     if (s.status === 'running') {
       const fresh = s.round !== played;
-      if (fresh && now() < s.ends_at - 5000) { played = s.round; countdown(); }
+      const late = me() && me().late;
+      if (fresh && !late && now() < s.ends_at - 5000) { played = s.round; countdown(); }
       else if (fresh || view === 'resume') { played = s.round; lateScreen(); }
       else if (view === 'game') others();
+      else if (view !== 'late' && view !== 'countdown') lateScreen();
       schedule(view === 'game' ? POLL_GAME : POLL_LOBBY); return;
     }
     // finished
@@ -331,7 +363,8 @@
       others();
       if (G && G.active) localEnd(s.result === 'win' ? 'win' : 'lose');
       if (!resT) resT = setTimeout(() => { resT = null; result(); }, 1600);
-    } else if (view !== 'result' && view !== 'game') result();
+    } else if (me() && me().late) { if (view !== 'late' || (prev && prev.status !== s.status)) lateScreen(); }
+    else if (view !== 'result' && view !== 'game') result();
     else if (prev && prev.host !== s.host) resultButtons();
     schedule(POLL_END);
   }
@@ -342,7 +375,7 @@
     area().innerHTML = `<div class="ng-card">
       <div class="ng-hint">Koda boja</div><div class="ng-code">${esc(st.code)}</div>
       <div class="ng-hint">Povej jo prijateljem — vpišejo jo pod »Odženi nagajivce!«</div>
-      <h3>Koga gremo premagat?</h3><div class="ng-bosses" id="ngBosses"></div>
+      <h3>Koga gremo premagat?</h3><div id="ngStageL"></div><div class="ng-bosses" id="ngBosses"></div><div class="ng-twist" id="ngTwist"></div>
       <h3>Tvoji računi</h3><div class="ng-levels" id="ngLevels"></div>
       <h3 id="ngTeamH">Ekipa</h3><div class="ng-team" id="ngTeam"></div>
       <div class="ng-msg" id="ngMsg"></div>
@@ -360,6 +393,10 @@
         ${BossArt.draw(b.id, 'walk')}${b.name}
         <div class="ng-votes">${st.players.filter(p => p.vote === b.id).map(p => petSvg(p.pet, { viewBox: PetArt.faceBox(p.pet && p.pet.stage) })).join('')}</div>
       </button>`).join('');
+    const sl = $('ngStageL'), ns = nextStage();
+    if (sl) sl.innerHTML = st.v2 && ns > 1 ? `<span class="ng-stage">💢 Naslednji boj: ${ns}. stopnja</span>` : '';
+    const tw = $('ngTwist');
+    if (tw) tw.textContent = st.v2 ? (mine ? TWIST[mine] : 'Vsak nagajivec ima svojo posebnost — izberi ga in jo spoznaj.') : '';
     const lv = (m && m.levels) || ['d10'];
     $('ngLevels').innerHTML = Object.keys(LEVEL).map(k => `<button class="ng-lv${m && m.level === k ? ' on' : ''}" data-lv="${k}" ${lv.includes(k) ? '' : 'disabled'}>
         ${LEVEL[k]}${lv.includes(k) ? '' : ' 🔒'}</button>`).join('');
@@ -375,6 +412,11 @@
         $('ngStart').addEventListener('click', start);
       }
     } else act.innerHTML = `<div class="ng-wait">Čakamo, da ${hostName()} začne boj …</div>`;
+  }
+  /* Stopnja naslednjega boja (enako kot boss_start): zmaga +1, poraz −1. */
+  function nextStage() {
+    const sg = (st && st.stage) || 1;
+    return !st || !st.round ? 1 : st.result === 'win' ? Math.min(8, sg + 1) : st.result === 'lose' ? Math.max(1, sg - 1) : sg;
   }
   async function choose(vote, level) {
     const m = me(); if (!m) return;
@@ -396,9 +438,11 @@
     view = 'countdown'; stop(); overlayOff();
     if (typeof collapseToolbar === 'function') collapseToolbar();
     document.body.insertAdjacentHTML('beforeend', `<div class="ng-overlay" id="ngOverlay"><div class="ng-card">
-      <div class="ng-res-art">${BossArt.draw(st.boss, 'walk')}</div>
+      <div class="ng-res-art"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${st.v2 ? BossArt.anger(st.stage) : ''}${BossArt.draw(st.boss, 'walk', { inner: true })}</svg></div>
       <h2>Prihaja ${bossName(st.boss)}!</h2>
-      <div class="ng-hint">${st.players.length === 1 ? 'Sam proti nagajivcu' : `${st.players.length} ljubljenčkov skupaj`} · ${st.hp} zadetkov za zmago</div>
+      ${st.v2 && st.stage > 1 ? `<span class="ng-stage">💢 ${st.stage}. stopnja</span>` : ''}
+      ${st.v2 ? `<p class="ng-twist">${TWIST[st.boss] || ''}</p>` : ''}
+      <div class="ng-hint">${st.players.length === 1 ? 'Sam proti nagajivcu' : `${st.players.length} ${st.players.length === 2 ? 'ljubljenčka' : st.players.length <= 4 ? 'ljubljenčki' : 'ljubljenčkov'} skupaj`} · ${st.hp} zadetkov za zmago</div>
       <div class="ng-cd" id="ngCd"></div></div></div>`);
     let shown = null;
     const step = () => {
@@ -410,10 +454,17 @@
     step(); cdT = setInterval(step, 50);
   }
 
+  /* Pridružil se je med bojem (ali osvežil stran): v ekipi je, igra od
+     naslednjega boja naprej. */
   function lateScreen() {
     view = 'late'; overlayOff();
+    const m = me(), inTeam = m && m.late;
     area().innerHTML = `<div class="ng-card"><div class="ng-res-art">${BossArt.draw(st.boss || 'sluzko', 'walk')}</div>
-      <h2>Boj poteka</h2><p class="ng-rules">Ta boj se je začel brez tebe. Ko se konča, se lahko pridružiš naslednjemu.</p></div>`;
+      <h2>${st.status === 'running' ? 'Boj poteka' : 'Boj je končan'}</h2>
+      <p class="ng-rules">${inTeam ? `Si v ekipi${st.code ? ` ${esc(st.code)}` : ''}! Ko ${hostName()} začne naslednji boj, si zraven. 🐾`
+        : 'Ta boj se je začel brez tebe. Ko se konča, se lahko pridružiš naslednjemu.'}</p>
+      <button class="ng-btn ghost" id="ngLeave">Zapusti boj</button></div>`;
+    $('ngLeave').addEventListener('click', () => { leave(); renderStart(); });
   }
 
   /* ═══ IGRA ═══ */
@@ -433,11 +484,17 @@
     if (!active() || !st) return;
     view = 'game';
     const m = me();
+    const v2 = !!st.v2, lvl = (m && m.level) || 'd10';
     G = { round: st.round, startsAt: st.starts_at, endsAt: st.ends_at, hp: st.hp, hearts: st.hearts,
-          queue: deck((m && m.level) || 'd10'), idx: 0, correct: 0, wrong: 0, input: '',
-          answered: false, dizzyUntil: 0, active: true, ended: null, tick: null, next: null };
+          queue: deck(lvl), idx: 0, correct: 0, wrong: 0, dmg: 0, input: '',
+          answered: false, dizzyUntil: 0, active: true, ended: null, tick: null, next: null,
+          v2, boss: st.boss, stage: v2 ? st.stage || 1 : 1, hits: [], streak: 0,
+          weak: v2 ? weakCards(m && m.weak, lvl) : [],
+          k: BOSS_K * (v2 ? 1 + .04 * Math.min(7, (st.stage || 1) - 1) : 1),
+          shield: v2 && st.boss === 'bahac' ? { up: true, cracks: 0, back: 0 } : null,
+          slime: v2 && st.boss === 'sluzko' ? { key: null, at: Date.now() + 5000 } : null };
     seen = {};
-    st.players.forEach(p => { seen[p.id] = { c: p.correct, w: p.wrong }; });
+    st.players.forEach(p => { seen[p.id] = { c: p.correct, w: p.wrong, d: p.dmg || 0 }; });
     // današnji priboljški pred bojem: na koncu pokažemo, koliko jih je res prinesel
     const g0 = G;
     petTreats().then(t => { if (t && G === g0) g0.treatsBefore = t.today; });
@@ -446,7 +503,7 @@
        ko se izteče čas — da otroci vidijo, zakaj je izgubljeno. */
     const lineX = Math.max(...st.players.map((p, i) => { const q = petPos(i, n); return q.x + 170 * q.k; })) + DANGER_PAD;
     G.lineX = lineX;
-    G.x1 = lineX - BOSS_FRONT * BOSS_K;
+    G.x1 = lineX - BOSS_FRONT * G.k;
     const pets = st.players.map((p, i) => {
       const q = petPos(i, n);
       return `<g class="ng-pet${p.id === st.me ? ' me' : ''}" data-pid="${esc(p.id)}" transform="translate(${q.x} ${q.y}) scale(${q.k})">
@@ -458,7 +515,7 @@
     const order = st.players.map((p, i) => i).sort((a, b) => petPos(b, n).y - petPos(a, n).y).reverse();
     area().innerHTML = `<div class="ng-game">
       <div class="ng-hud">
-        <div class="ng-hp"><div class="ng-hp-top"><span>👾 ${bossName(st.boss)}</span><span id="ngHpNum"></span></div>
+        <div class="ng-hp"><div class="ng-hp-top"><span>👾 ${bossName(st.boss)}${G.stage > 1 ? ` · ${G.stage}. st.` : ''}</span><span id="ngHpNum"></span></div>
           <div class="ng-bar"><i id="ngHp"></i></div></div>
         <div class="ng-hearts" id="ngHearts"></div>
         <div class="ng-time" id="ngTime">60</div>
@@ -472,9 +529,10 @@
           <path d="M${lineX} 44 L${lineX + 16} 49 L${lineX} 55 Z" fill="#e8435f" stroke="#4a2733" stroke-width="1.8" stroke-linejoin="round"/>
         </g>
         <g>${order.map(i => pets[i]).join('')}</g>
-        <g id="ngBossG" transform="translate(${BOSS_X0} ${BOSS_Y}) scale(${BOSS_K})"><g id="ngBossIn" class="ng-boss-walk">${BossArt.draw(st.boss, 'walk', { inner: true })}</g></g>
+        <g id="ngBossG" transform="translate(${BOSS_X0} ${BOSS_Y}) scale(${G.k})">${G.v2 ? BossArt.anger(G.stage) : ''}<g id="ngBossIn" class="ng-boss-walk">${BossArt.draw(st.boss, 'walk', { inner: true })}</g>${G.shield ? shieldSvg() : ''}</g>
         <g id="ngBeams"></g>
       </svg></div>
+      <div class="ng-tag" id="ngTag"></div>
       <div class="ng-q" id="ngQ"></div>
       <div class="ng-keys" id="ngKeys">
         <div class="keypad-display" id="ngDisplay"><span class="keypad-display-text" id="ngDisplayText">_</span></div>
@@ -494,9 +552,11 @@
     schedule(POLL_GAME);
   }
 
+  /* c = škoda nagajivcu: v novi različici šteje škoda (dvojni streli,
+     Bahačev ščit), sicer pravilni odgovori. Pozni igralci ne štejejo. */
   function totals() {
-    let c = G ? G.correct : 0, w = G ? G.wrong : 0;
-    (st ? st.players : []).forEach(p => { if (p.id !== st.me) { c += p.correct; w += p.wrong; } });
+    let c = G ? (G.v2 ? G.dmg : G.correct) : 0, w = G ? G.wrong : 0;
+    (st ? st.players : []).forEach(p => { if (p.id !== st.me && !p.late) { c += G && G.v2 ? (p.dmg || 0) : p.correct; w += p.wrong; } });
     return { c, w };
   }
   function hud() {
@@ -513,18 +573,26 @@
     el.innerHTML = BossArt.draw(st.boss, pose, { inner: true });
     el.classList.toggle('ng-boss-walk', pose === 'walk');
   }
+  /* Nagajivec hodi proti rdeči črti in jo doseže ob koncu časa. V novi
+     različici ga vsak zadetek odbije nazaj (odboj počasi zbledi), proti
+     koncu pa pospeši. */
   function bossX() {
     const p = Math.min(1, Math.max(0, (now() - G.startsAt) / (G.endsAt - G.startsAt)));
-    return BOSS_X0 - (BOSS_X0 - G.x1) * p;
+    if (!G.v2) return BOSS_X0 - (BOSS_X0 - G.x1) * p;
+    const t = Date.now();
+    G.hits = G.hits.filter(h => t - h.t < PUSH_MS * 4);
+    const push = G.hits.reduce((a, h) => a + PUSH * h.n * Math.exp(-(t - h.t) / PUSH_MS), 0);
+    return Math.min(BOSS_X0 + 6, BOSS_X0 - (BOSS_X0 - G.x1) * Math.pow(p, 1.35) + push);
   }
   function tick() {
     if (!G) return;
     const b = $('ngBossG');
-    if (b && G.active) b.setAttribute('transform', `translate(${bossX().toFixed(1)} ${BOSS_Y}) scale(${BOSS_K})`);
+    if (b && G.active) b.setAttribute('transform', `translate(${bossX().toFixed(1)} ${BOSS_Y}) scale(${G.k})`);
     const left = Math.max(0, Math.ceil((G.endsAt - now()) / 1000)), t = $('ngTime');
     if (t && t.textContent !== String(left)) { t.textContent = left; t.classList.toggle('danger', left <= 10); const ln = $('ngLine'); if (ln) ln.classList.toggle('hot', left <= 10 && G.active); if (left <= 5 && left > 0 && G.active) SFX.click(); }
     if (!G.active) return;
     const keys = $('ngKeys'); if (keys) keys.classList.toggle('dazed', Date.now() < G.dizzyUntil);
+    twistTick();
     const r = hud();
     if (r.hpLeft <= 0) localEnd('win');
     else if (r.hLeft <= 0) localEnd('lose');
@@ -532,9 +600,11 @@
   }
 
   function showQ() {
-    const cur = G.queue[G.idx % G.queue.length];
     if (G.idx && G.idx % G.queue.length === 0) G.queue = deck(G.queue[0].g);
+    const cur = G.cur = special(G.queue[G.idx % G.queue.length]);
     const q = $('ngQ'); if (q) q.textContent = cur.question;
+    // oznaka računa (dvojni strel) velja samo zanj; sporočilo ščita ali sluzi ostane 1,5 s
+    if (cur.tag || Date.now() > (G.tagUntil || 0)) { const tg = $('ngTag'); if (tg) tg.textContent = cur.tag || ''; if (cur.tag) G.tagUntil = 0; }
     const d = $('ngDisplay');
     if (d) { d.className = 'keypad-display'; d.innerHTML = '<span class="keypad-display-text" id="ngDisplayText">_</span>'; }
     G.input = ''; G.answered = false;
@@ -543,6 +613,8 @@
   }
   function input(d) {
     if (!G || !G.active || G.answered || Date.now() < G.dizzyUntil) return;
+    // zasluzena tipka: prvi dotik jo očisti
+    if (G.slime && G.slime.key === d) { unslime(); SFX.click(); return; }
     if (d === 'back') { G.input = G.input.slice(0, -1); SFX.click(); }
     else if (d === 'ok') { check(); return; }
     else { if (G.input.length >= 2) return; G.input += d; SFX.click(); }
@@ -551,20 +623,23 @@
   function check() {
     if (!G.input.length) return;
     G.answered = true;
-    const cur = G.queue[G.idx % G.queue.length], ok = G.input === cur.answer;
+    const cur = G.cur, ok = G.input === cur.answer;
     const d = $('ngDisplay');
     if (ok) {
-      SFX.correct(); G.correct++;
+      SFX.correct(); G.correct++; G.streak++;
       if (d) d.classList.add('correct');
-      shoot(st.me);
+      const power = hitPower(cur);
+      G.dmg += power;
+      shoot(st.me, power);
     } else {
-      SFX.wrong(); G.wrong++;
+      SFX.wrong(); G.wrong++; G.streak = 0;
+      if (G.shield && G.shield.up) { G.shield.cracks = 0; drawShield(); }
       if (d) { d.classList.add('wrong'); d.innerHTML = `<span class="keypad-display-text keypad-strike">${esc(G.input)}</span>
         <span class="keypad-display-arrow">→</span><span class="keypad-display-correct">${esc(cur.answer)}</span>`; }
       G.dizzyUntil = Date.now() + DIZZY_MS;
       dizzy(st.me);
     }
-    recordTableStat(cur.question, ok);
+    recordTableStat(cur.base || cur.question, ok);   // uganka se zapiše kot osnovni račun
     hud();
     document.querySelectorAll('#ngGrid .keypad-btn').forEach(b => b.disabled = true);
     const g = G;
@@ -572,7 +647,7 @@
   }
 
   /* Strel ljubljenčka igralca pid v nagajivca. */
-  function shoot(pid) {
+  function shoot(pid, power = 1) {
     const pg = document.querySelector(`.ng-pet[data-pid="${CSS.escape(pid)}"]`), beams = $('ngBeams');
     if (!pg || !beams || !G) return;
     const m = /translate\(([\d.]+) ([\d.]+)\) scale\(([\d.]+)\)/.exec(pg.getAttribute('transform'));
@@ -580,13 +655,15 @@
     const k = +m[3], x1 = +m[1] + 100 * k, y1 = +m[2] + 92 * k;
     const x2 = bossX() + 96 * BOSS_K + (Math.random() * 20 - 10), y2 = BOSS_Y + 100 * BOSS_K + (Math.random() * 30 - 15);
     const p = st.players.find(q => q.id === pid), c = BEAM[p && p.pet && p.pet.species] || '#ff8a3d';
+    const big = power > 1, blocked = power === 0;
     beams.insertAdjacentHTML('beforeend', `<g class="ng-shot">
-      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="10" stroke-linecap="round" class="ng-beam" opacity=".8"/>
-      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="5.5" stroke-linecap="round" class="ng-beam"/>
-      <circle cx="${x2}" cy="${y2}" r="12" fill="${c}" class="ng-spark"/></g>`);
+      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="${big ? 16 : 10}" stroke-linecap="round" class="ng-beam" opacity=".8"/>
+      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${big ? 10 : 5.5}" stroke-linecap="round" class="ng-beam"/>
+      <circle cx="${x2}" cy="${y2}" r="${big ? 20 : 12}" fill="${blocked ? '#9fd3ff' : c}" class="ng-spark"/></g>`);
+    if (G.v2 && power > 0) G.hits.push({ t: Date.now(), n: power });
     const shot = beams.lastElementChild;
     setTimeout(() => shot.remove(), 460);
-    if (G.active) { bossPose('hit'); clearTimeout(G.hitT); G.hitT = setTimeout(() => { if (G && G.active) bossPose('walk'); }, 240); }
+    if (G.active && !blocked) { bossPose('hit'); clearTimeout(G.hitT); G.hitT = setTimeout(() => { if (G && G.active) bossPose('walk'); }, 240); }
   }
   function dizzy(pid, ms = DIZZY_MS) {
     const pg = document.querySelector(`.ng-pet[data-pid="${CSS.escape(pid)}"]`);
@@ -601,11 +678,13 @@
     if (!G || !st) return;
     st.players.forEach(p => {
       if (p.id === st.me) return;
-      const was = seen[p.id] || { c: 0, w: 0 };
+      const was = seen[p.id] || { c: 0, w: 0, d: 0 };
       const shots = Math.min(3, p.correct - was.c);
-      for (let i = 0; i < shots; i++) setTimeout(() => shoot(p.id), i * 160);
+      // v novi različici: dvojni streli so večji, Bahačev ščit jih ustavi
+      const extra = G.v2 ? (p.dmg || 0) - (was.d || 0) - (p.correct - was.c) : 0;
+      for (let i = 0; i < shots; i++) setTimeout(() => shoot(p.id, !G.v2 ? 1 : extra > 0 && i < extra ? 2 : extra < 0 && i < -extra ? 0 : 1), i * 160);
       if (p.wrong > was.w && G.active) dizzy(p.id);
-      seen[p.id] = { c: p.correct, w: p.wrong };
+      seen[p.id] = { c: p.correct, w: p.wrong, d: p.dmg || 0 };
     });
     hud();
   }
@@ -619,10 +698,16 @@
     const keys = $('ngKeys'); if (keys) keys.classList.remove('dazed');
     const q = $('ngQ');
     if (how === 'win') {
+      unslime();
+      const sh = $('ngShield'); if (sh) sh.classList.add('down');
       bossPose('down'); SFX.victory();
       document.querySelectorAll('.ng-pet').forEach(p => { p.classList.remove('dizzy'); p.classList.add('cheer'); });
       if (q) q.textContent = '🎉 Premagali ste ga!';
     } else {
+      // nagajivec pride do rdeče črte (odboj zbledi)
+      const b = $('ngBossG');
+      if (b && G.v2) { b.style.transition = 'transform .6s ease-in'; b.setAttribute('transform', `translate(${G.x1.toFixed(1)} ${BOSS_Y}) scale(${G.k})`); }
+      unslime();
       bossPose('win'); SFX.wrong();
       document.querySelectorAll('.ng-pet').forEach(p => dizzy(p.dataset.pid, 0));
       if (q) q.textContent = '😵 Ojoj …';
@@ -657,18 +742,34 @@
     view = 'result'; stop(); overlayOff();
     if (G) clearInterval(G.tick);
     const win = st.result === 'win', b = st.boss, nm = bossName(b);
-    const t = st.players.reduce((a, p) => a + p.correct, 0);
+    const t = st.players.reduce((a, p) => a + (p.late ? 0 : p.correct), 0);
+    const left = Math.max(0, st.hp - st.players.reduce((a, p) => a + (p.late ? 0 : st.v2 ? p.dmg || 0 : p.correct), 0));
     document.body.insertAdjacentHTML('beforeend', `<div class="ng-overlay" id="ngOverlay"><div class="ng-card">
       <div class="ng-res-art">${BossArt.draw(b, win ? 'down' : 'win')}</div>
       <h2>${win ? '🎉 Zmaga!' : `Tokrat je zmagal${FEM[b] ? 'a' : ''} ${nm}`}</h2>
       <p class="ng-rules">${win ? `${nm} je premagan${FEM[b] ? 'a' : ''}! Skupaj ste zadeli ${t}-krat.`
-        : `Zadeli ste ${t} od ${st.hp}. Manjkalo je še ${Math.max(0, st.hp - t)} — poskusite še enkrat!`}</p>
-      <div class="ng-team">${st.players.map(p => `<div class="ng-mate${p.id === st.me ? ' me' : ''}">${petSvg(p.pet)}${esc(p.name)}</div>`).join('')}</div>
+        : st.v2 ? `Zadeli ste ${t}-krat. ${nm} je imel${FEM[b] ? 'a' : ''} še ${left} zdravja — poskusite še enkrat!`
+        : `Zadeli ste ${t} od ${st.hp}. Manjkalo je še ${left} — poskusite še enkrat!`}</p>
+      <div class="ng-team">${st.players.filter(p => !p.late).map(p => `<div class="ng-mate${p.id === st.me ? ' me' : ''}">${petSvg(p.pet)}${esc(p.name)}</div>`).join('')}</div>
+      ${mine()}
+      ${st.v2 ? `<div>${stageLine(win)}</div>` : ''}
       ${win ? '<div class="ng-treat" id="ngTreat">🍎 …</div>' : ''}
       <div id="ngResAct"></div></div></div>`);
     (win ? SFX.victory : SFX.click)();
     resultButtons();
     showTreats(win, G && G.treatsBefore);
+  }
+  /* Samo svoji zadetki — brez lestvice, boj je skupinski. */
+  function mine() {
+    const m = me(); if (!m) return '';
+    const c = G && G.round === st.round ? G.correct : m.correct;
+    return `<div class="ng-mine">🎯 Tvoji zadetki: ${c}</div>`;
+  }
+  function stageLine(win) {
+    const sg = st.stage || 1, nx = win ? Math.min(8, sg + 1) : Math.max(1, sg - 1);
+    if (!win && sg <= 1) return '';
+    return `<div class="ng-stage">${win ? (sg >= 8 ? '👑 Najvišja stopnja premagana!' : `💪 Naslednji bo močnejši: ${nx}. stopnja`)
+      : `Naslednji boj: ${nx}. stopnja`}</div>`;
   }
   function resultButtons() {
     const box = $('ngResAct'); if (!box) return;
@@ -683,6 +784,76 @@
       apply(r);
     });
     $('ngOut').addEventListener('click', () => { leave(); renderStart(); });
+  }
+
+  /* ═══ NOVOSTI (st.v2) ═══ */
+  /* Šibki računi iz baze [[x, y, "p"|"m"], ...] (x <= y) → karte te ravni. */
+  function weakCards(list, lvl) {
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    list.forEach(([x, y, op]) => {
+      const qs = op === 'p' ? [`${x} + ${y} =`, `${y} + ${x} =`] : [`${x + y} ${MINUS} ${y} =`, `${x + y} ${MINUS} ${x} =`];
+      do20Cards.forEach(c => { if (c.g === lvl && qs.includes(c.question)) out.push(c); });
+    });
+    return out;
+  }
+  /* Posebni računi: vsak 3. iz šibkih računov (dvojni strel), pri Greti vsak
+     4. uganka z manjkajočim številom (dvojni strel). */
+  function special(card) {
+    if (!G.v2) return card;
+    const i = G.idx;
+    if (G.boss === 'kujavka' && i % 4 === 3) {
+      const m = /^(\d+) (\+|\S) (\d+) =$/.exec(card.question);
+      if (m) {
+        const a = m[1], op = m[2], b = m[3], res = card.answer;
+        return { question: `${a} ${op} ? = ${res}`, answer: b, base: card.question, power: 2, tag: '🧩 Gretina uganka — dvojni strel!' };
+      }
+    }
+    if (G.weak.length && i % 3 === 1) {
+      const w = G.weak[Math.floor(Math.random() * G.weak.length)];
+      return Object.assign({}, w, { power: 2, tag: '🎯 Tvoj težji račun — dvojni strel!' });
+    }
+    return card;
+  }
+  /* Koliko škode naredi pravilen odgovor (0 = Bahačev ščit ga je ustavil). */
+  function hitPower(cur) {
+    const sh = G.shield;
+    if (sh && sh.up) {
+      sh.cracks++;
+      if (sh.cracks >= 3) { sh.up = false; sh.back = Date.now() + SHIELD_MS; tag('💥 Ščit je razbit! Streljaj!'); }
+      else tag(`🛡️ Ščit poka … še ${3 - sh.cracks} zapored`);
+      drawShield();
+      return 0;
+    }
+    return cur.power || 1;
+  }
+  /* Sporočilo nad računom ostane vsaj 1,5 s (naslednji račun ga ne zbriše). */
+  function tag(t) { const el = $('ngTag'); if (el) el.textContent = t; if (G) G.tagUntil = Date.now() + 1500; }
+  function shieldSvg() {
+    return `<g id="ngShield" class="ng-shield"><ellipse cx="38" cy="112" rx="26" ry="62" fill="#9fd3ff" opacity=".45" stroke="#3a7bd5" stroke-width="4"/>
+      <g id="ngCracks" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"></g></g>`;
+  }
+  function drawShield() {
+    const sh = G && G.shield, el = $('ngShield'), cr = $('ngCracks');
+    if (!sh || !el || !cr) return;
+    el.classList.toggle('down', !sh.up);
+    cr.innerHTML = ['M30 70 L42 92 L34 110', 'M46 120 L32 140 L42 160', 'M24 96 L40 118 L28 132'].slice(0, sh.up ? sh.cracks : 0).map(d => `<path d="${d}"/>`).join('');
+  }
+  function unslime() {
+    if (!G || !G.slime) return;
+    G.slime.key = null;
+    document.querySelectorAll('#ngGrid .keypad-btn.slimed').forEach(b => b.classList.remove('slimed'));
+  }
+  /* Vsakih 100 ms: Bahačev ščit se vrne, Sluzko zasluzi novo tipko. */
+  function twistTick() {
+    const t = Date.now(), sh = G.shield, sl = G.slime;
+    if (sh && !sh.up && t >= sh.back) { sh.up = true; sh.cracks = 0; drawShield(); tag('🛡️ Bahač je spet dvignil ščit!'); }
+    if (sl && !sl.key && t >= sl.at) {
+      const k = String(Math.floor(Math.random() * 10));
+      const b = document.querySelector(`#ngGrid .keypad-btn[data-d="${k}"]`);
+      if (b) { sl.key = k; b.classList.add('slimed'); tag('🫧 Sluzko je zasluzil tipko — tapni jo, da jo očistiš!'); }
+      sl.at = t + SLIME_MS[0] + Math.random() * (SLIME_MS[1] - SLIME_MS[0]);
+    }
   }
 
   /* ── fizična tipkovnica med bojem ── */

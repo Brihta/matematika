@@ -28,6 +28,16 @@
 -- ljubljenčka (pet_testers: nik7a, lar4). Odpri za vse:
 --   update boss_config set open = true;
 --
+-- NADGRADNJA (31. 10. 2026) — najprej samo za preizkuševalce:
+--   * stopnje: zmaga → naslednji nagajivec je močnejši (+25 % zdravja na
+--     stopnjo, največ 8), poraz → stopnja nižje; stopnja živi v boju (kodi).
+--   * škoda: dvojni streli (šibki računi, Gretine uganke, Bahač brez ščita)
+--     — naprava pošlje škodo, baza jo omeji na 2 × pravilni.
+--   * zbirka premaganih nagajivcev (boss_wins.boss/stage/level, boss_trophies).
+--   * pridružiš se lahko tudi med bojem — igraš od naslednjega boja naprej.
+--   Novosti ima boj, v katerem je preizkuševalec (pet_testers), ali vsi:
+--   update boss_config set v2 = true;
+--
 -- NASTAVITVE (brez nove različice aplikacije):
 --   update boss_config set target_d10 = 7;     -- manj zdravja na igralca
 --   update boss_config set hearts = 4;         -- več srčkov na igralca
@@ -43,6 +53,7 @@ create table if not exists boss_config (
 insert into boss_config (id) values (1) on conflict (id) do nothing;
 alter table boss_config enable row level security;
 alter table boss_config add column if not exists open boolean not null default false;
+alter table boss_config add column if not exists v2   boolean not null default false;
 
 create table if not exists boss_games (
   id          uuid primary key default gen_random_uuid(),
@@ -77,6 +88,15 @@ create table if not exists boss_players (
   unique (game_id, student_id)
 );
 create index if not exists boss_players_game on boss_players(game_id);
+
+-- nadgradnja (31. 10. 2026)
+alter table boss_games   add column if not exists v2    boolean not null default false;
+alter table boss_games   add column if not exists stage int     not null default 1;
+alter table boss_players add column if not exists dmg   int     not null default 0;
+alter table boss_players add column if not exists weak  json;
+alter table boss_wins    add column if not exists boss  text;
+alter table boss_wins    add column if not exists stage int;
+alter table boss_wins    add column if not exists level text;
 
 alter table boss_games   enable row level security;
 alter table boss_players enable row level security;
@@ -116,6 +136,38 @@ begin
   return _pet_json(p_student, s.id);
 end; $$;
 
+-- Šibki računi učenca v njegovi skupini (zadnjih 30 dni sezone): točnost
+-- pod 85 % ali počasi (manj kot polovica hitrih). Največ 8, najslabši prvi.
+-- Oblika: [[x, y, "p"|"m"], ...] z x <= y kot v do20_facts.
+create or replace function public._boss_weak(p_student uuid, p_level text)
+returns json language plpgsql stable security definer set search_path = public as $$
+declare s seasons; v_from date;
+begin
+  s := _album_season_for(p_student);
+  v_from := greatest(coalesce(s.starts, _album_today() - 30), _album_today() - 30);
+  return coalesce((
+    select json_agg(json_build_array(x, y, op) order by bad desc)
+      from (select x, y, op,
+                   sum(wrong)::numeric / greatest(1, sum(correct) + sum(wrong))
+                   + case when sum(timed) >= 2 then 0.5 * (1 - sum(fast)::numeric / sum(timed)) else 0 end as bad
+              from do20_facts
+             where student_id = p_student and grp = p_level and day >= v_from
+             group by x, y, op
+            having sum(correct) + sum(wrong) > 0
+               and (sum(correct)::numeric / (sum(correct) + sum(wrong)) < 0.85
+                    or (sum(timed) >= 2 and sum(fast)::numeric / sum(timed) < 0.5))
+             order by bad desc
+             limit 8) t), '[]'::json);
+end; $$;
+
+-- Novosti (stopnje, škoda, posebnosti nagajivcev) ima boj, ko je stikalo
+-- boss_config.v2 vklopljeno ali je v boju preizkuševalec.
+create or replace function public._boss_v2(p_game uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((select v2 from boss_config where id = 1), false)
+      or exists (select 1 from boss_players p join pet_testers t on t.student_id = p.student_id where p.game_id = p_game);
+$$;
+
 -- Stanje boja, kot ga vidi igralec p_me. Žetonov in id-jev učencev ne vrne.
 create or replace function public._boss_state(p_game uuid, p_me uuid)
 returns json language sql security definer set search_path = public as $$
@@ -128,6 +180,9 @@ returns json language sql security definer set search_path = public as $$
     'hp',        g.hp,
     'hearts',    g.hearts,
     'result',    g.result,
+    -- v čakalnici: ali bo naslednji boj z novostmi (stikalo ali preizkuševalec)
+    'v2',        case when g.status = 'lobby' then _boss_v2(g.id) else g.v2 end,
+    'stage',     g.stage,
     'starts_at', (extract(epoch from g.starts_at) * 1000)::bigint,
     'ends_at',   (extract(epoch from g.ends_at)   * 1000)::bigint,
     'host',      g.host_player,
@@ -137,7 +192,9 @@ returns json language sql security definer set search_path = public as $$
                'id', p.id, 'name', p.name, 'pet', p.pet, 'level', p.level, 'vote', p.vote,
                'levels', case when p.id = p_me then to_json(p.levels) end,
                'target', _boss_target(p.level),
-               'correct', p.correct, 'wrong', p.wrong)
+               'weak', case when p.id = p_me then p.weak end,
+               'late', g.status <> 'lobby' and p.joined_at > g.starts_at,
+               'correct', p.correct, 'wrong', p.wrong, 'dmg', p.dmg)
              order by p.joined_at)
         from boss_players p where p.game_id = g.id), '[]'::json))
   from boss_games g where g.id = p_game;
@@ -152,16 +209,19 @@ declare g boss_games; v_c int; v_w int; v_res text;
 begin
   select * into g from boss_games where id = p_game for update;
   if g.status <> 'running' or now() < g.starts_at then return; end if;
-  select coalesce(sum(correct), 0), coalesce(sum(wrong), 0) into v_c, v_w
-    from boss_players where game_id = p_game;
+  -- v novi različici šteje škoda (dvojni streli, Bahačev ščit), sicer pravilni
+  select coalesce(sum(case when g.v2 then dmg else correct end), 0), coalesce(sum(wrong), 0) into v_c, v_w
+    from boss_players where game_id = p_game and joined_at <= g.starts_at;
   v_res := case when v_c >= g.hp then 'win'
                 when v_w >= g.hearts then 'lose'
                 when now() > g.ends_at + interval '3 seconds' then 'lose' end;
   if v_res is null then return; end if;
   update boss_games set status = 'finished', result = v_res, finished_at = now() where id = p_game;
   if v_res = 'win' then
-    insert into boss_wins (student_id, day, game_id, round)
-    select student_id, _album_today(), p_game, g.round from boss_players where game_id = p_game
+    -- samo tisti, ki so bili v boju od začetka (ne kdor se je pridružil med bojem)
+    insert into boss_wins (student_id, day, game_id, round, boss, stage, level)
+    select student_id, _album_today(), p_game, g.round, g.boss, g.stage, level
+      from boss_players where game_id = p_game and joined_at <= g.starts_at
     on conflict do nothing;
   end if;
 end; $$;
@@ -250,8 +310,8 @@ begin
     update boss_players set last_seen = now() where id = v.id;
     return json_build_object('token', v.token, 'state', _boss_state(g.id, v.id));
   end if;
+  -- med bojem ali po njem: igralec počaka in je zraven v naslednjem boju
   select * into g from boss_games where id = g.id;
-  if g.status <> 'lobby' then return json_build_object('error', 'started'); end if;
   if (select count(*) from boss_players where game_id = g.id) >= 8 then
     return json_build_object('error', 'full');
   end if;
@@ -276,11 +336,13 @@ begin
 end; $$;
 
 -- ── 5. Sinhronizacija (vsaki 2 s) ─────────────────────────────────────────
+drop function if exists public.boss_sync(text, uuid, int, int, int);   -- stara različica brez p_dmg
 create or replace function public.boss_sync(
   p_code text, p_token uuid,
-  p_round int default null, p_correct int default null, p_wrong int default null)
+  p_round int default null, p_correct int default null, p_wrong int default null,
+  p_dmg int default null)
 returns json language plpgsql security definer set search_path = public as $$
-declare v boss_players; g boss_games; v_el numeric;
+declare v boss_players; g boss_games; v_el numeric; v_c int;
 begin
   select p.* into v from boss_players p join boss_games b on b.id = p.game_id
    where p.token = p_token and b.code = trim(p_code);
@@ -293,10 +355,14 @@ begin
   if p_correct is not null and g.status = 'running' and p_round = g.round
      and now() between g.starts_at and g.ends_at + interval '3 seconds' then
     v_el := extract(epoch from (least(now(), g.ends_at) - g.starts_at));
+    -- kdor se je pridružil med bojem, v tem boju ne šteje
+    v_c := greatest(v.correct, least(greatest(p_correct, 0), ceil(v_el * 1.5)::int + 2));
     update boss_players
-       set correct = greatest(correct, least(greatest(p_correct, 0), ceil(v_el * 1.5)::int + 2)),
-           wrong   = greatest(wrong,   least(greatest(coalesce(p_wrong, 0), 0), ceil(v_el)::int + 2))
-     where id = v.id;
+       set correct = v_c,
+           wrong   = greatest(wrong, least(greatest(coalesce(p_wrong, 0), 0), ceil(v_el)::int + 2)),
+           -- škoda: največ 2 na pravilen odgovor; stara aplikacija je ne pošilja
+           dmg     = greatest(dmg, least(greatest(coalesce(p_dmg, v_c), 0), 2 * v_c))
+     where id = v.id and joined_at <= g.starts_at;
   end if;
   perform _boss_tidy(g.id);
   return _boss_state(g.id, v.id);
@@ -326,10 +392,21 @@ begin
    order by n desc, random() limit 1;
   select count(*) into v_n from boss_players where game_id = g.id;
 
-  update boss_players set correct = 0, wrong = 0 where game_id = g.id;
+  -- novosti: stikalo ali preizkuševalec v boju. Stopnja: po zmagi +1 (največ
+  -- 8), po porazu −1 (najmanj 1); +25 % zdravja na stopnjo.
+  g.v2 := _boss_v2(g.id);
+  g.stage := case when not g.v2 then 1
+                  when g.result = 'win'  then least(8, g.stage + 1)
+                  when g.result = 'lose' then greatest(1, g.stage - 1)
+                  else g.stage end;
+
+  update boss_players set correct = 0, wrong = 0, dmg = 0,
+         weak = case when g.v2 then _boss_weak(student_id, level) end
+   where game_id = g.id;
   update boss_games
      set status = 'running', round = round + 1, boss = v_boss, result = null, finished_at = null,
-         hp = (select sum(_boss_target(level)) from boss_players where game_id = g.id),
+         v2 = g.v2, stage = g.stage,
+         hp = ceil((select sum(_boss_target(level)) from boss_players where game_id = g.id) * (1 + 0.25 * (g.stage - 1)))::int,
          hearts = v_n * (select hearts from boss_config where id = 1),
          starts_at = now() + interval '5 seconds',
          ends_at   = now() + interval '65 seconds'
@@ -350,7 +427,7 @@ begin
   select * into g from boss_games where id = v_game;
   if g.host_player is distinct from v_me then return json_build_object('error', 'not_host'); end if;
   if g.status = 'finished' then
-    update boss_players set correct = 0, wrong = 0, last_seen = now() where game_id = g.id;
+    update boss_players set correct = 0, wrong = 0, dmg = 0, last_seen = now() where game_id = g.id;
     update boss_games set status = 'lobby', starts_at = null, ends_at = null where id = g.id;
   end if;
   return _boss_state(g.id, v_me);
@@ -382,19 +459,33 @@ begin
   return coalesce((
     select json_agg(json_build_object(
              'code', g.code,
+             'status', g.status,
              'players', (select json_agg(p.name order by p.joined_at) from boss_players p where p.game_id = g.id))
            order by g.created_at desc)
       from boss_games g
-     where g.status = 'lobby' and g.created_at > now() - interval '12 hours'
+     where g.created_at > now() - interval '12 hours'
        and exists (select 1 from boss_players p where p.game_id = g.id
                     and p.last_seen > now() - interval '20 seconds')), '[]'::json);
 end; $$;
+
+-- ── 9b. Zbirka premaganih nagajivcev ─────────────────────────────────────
+-- Za vsakega nagajivca in raven: največja premagana stopnja in število zmag.
+create or replace function public.boss_trophies(p_student uuid)
+returns json language sql stable security definer set search_path = public as $$
+  select coalesce(json_agg(json_build_object('boss', boss, 'level', level, 'stage', stage, 'wins', wins)
+                           order by boss, level), '[]'::json)
+    from (select boss, coalesce(level, 'd10') level, max(coalesce(stage, 1)) stage, count(*)::int wins
+            from boss_wins where student_id = p_student and boss is not null
+           group by boss, coalesce(level, 'd10')) t;
+$$;
 
 -- ── 10. Pravice ───────────────────────────────────────────────────────────
 revoke execute on function public._boss_state(uuid, uuid) from public, anon, authenticated;
 revoke execute on function public._boss_tidy(uuid)        from public, anon, authenticated;
 revoke execute on function public._boss_finish(uuid)      from public, anon, authenticated;
 revoke execute on function public._boss_add(uuid, uuid)   from public, anon, authenticated;
+revoke execute on function public._boss_weak(uuid, text)  from public, anon, authenticated;
+revoke execute on function public._boss_v2(uuid)          from public, anon, authenticated;
 
 -- ── Hitri test ────────────────────────────────────────────────────────────
 -- select code, status, boss, hp, hearts, result from boss_games order by created_at desc limit 5;

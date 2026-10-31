@@ -289,6 +289,9 @@ create table if not exists boss_wins (
   primary key (student_id, game_id, round)
 );
 alter table boss_wins enable row level security;
+alter table boss_wins add column if not exists boss  text;   -- zbirka premaganih (supabase_nagajivec.sql)
+alter table boss_wins add column if not exists stage int;
+alter table boss_wins add column if not exists level text;
 
 create or replace function public._pet_treats_by_day(p_student uuid)
 returns table(day date, treats int)
@@ -635,8 +638,8 @@ begin
     insert into pet_companion (student_id, season)
     select v_into, season from pet_companion where student_id = v_from
     on conflict do nothing;
-    insert into boss_wins (student_id, day, game_id, round)
-    select v_into, day, game_id, round from boss_wins where student_id = v_from
+    insert into boss_wins (student_id, day, game_id, round, boss, stage, level)   -- boss/stage/level: supabase_nagajivec.sql
+    select v_into, day, game_id, round, boss, stage, level from boss_wins where student_id = v_from
     on conflict do nothing;
 
     -- Ime in razred: če jih ciljni račun nima, jih vzemi od starega
