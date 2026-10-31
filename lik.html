@@ -710,6 +710,25 @@ function cape(col, trim) {
   return part('M210 256 L302 256 L348 464 Q256 482 164 464 Z', col, { shadow: 'M256 250 L360 250 L360 490 L256 490 Z' })
     + (trim ? part('M166 450 Q256 468 346 450 L348 464 Q256 482 164 464 Z', trim, { w: 4 }) : '');
 }
+/* Ogrinjalo maščevalca: temno sivomoder plašč z razcefranim robom zadaj,
+   spredaj (front) bel krzneni ovratnik čez ramena in srebrna zaponka z
+   volčjo glavo. Krzno se riše po obleki in pred glavo, da vrat sedi na njem. */
+function avengerCape() {
+  return part('M204 252 L308 252 L364 438 L352 470 L336 456 L320 480 L302 462 L284 482 L264 464 L246 482 L228 462 L210 480 L192 458 L176 472 L160 440 Z', '#4b5666',
+    { shadow: 'M256 246 L380 246 L380 490 L256 490 Z', inner: line('M226 300 L200 460', 2.5, '#353d49') + line('M286 300 L318 462', 2.5, '#353d49') + line('M256 300 L256 470', 2.5, '#353d49') });
+}
+function avengerFur() {
+  const FUR = 'M164 306 C148 284 160 254 194 242 C214 236 234 238 256 242 C278 238 298 236 318 242 C352 254 364 284 348 306 '
+    + 'Q340 320 326 310 Q316 324 302 310 Q292 314 284 300 Q274 304 268 292 Q262 300 256 294 Q250 300 244 292 Q238 304 228 300 Q220 314 210 310 Q196 324 186 310 Q172 320 164 306 Z';
+  const tufts = ['M178 278 Q186 286 182 296', 'M198 262 Q208 270 206 282', 'M222 254 Q230 264 228 274', 'M290 254 Q282 264 284 274', 'M314 262 Q304 270 306 282', 'M334 278 Q326 286 330 296']
+    .map(d => line(d, 2.5, '#aab6c4')).join('');
+  const SIL = '#cfd6de', WOLF = '#f4f6f8';
+  return part(FUR, '#eef2f6', { w: 4.5, shadow: 'M300 236 L370 236 L370 330 L300 330 Z M150 300 Q256 284 370 300 L370 330 L150 330 Z', hi: 'M176 270 Q190 252 214 246 Q196 258 186 276 Z', inner: tufts })
+    + `<circle cx="256" cy="292" r="20" fill="${SIL}" stroke="${OL}" stroke-width="4"/><circle cx="256" cy="292" r="14.5" fill="#7f8a97"/>`
+    + part('M245 287 L240 272 L252 281 Z', WOLF, { w: 2.5 }) + part('M267 287 L272 272 L260 281 Z', WOLF, { w: 2.5 })
+    + part('M242 284 Q256 277 270 284 L266 297 L256 307 L246 297 Z', WOLF, { w: 2.5 })
+    + line('M247 289 L252 291', 2.2) + line('M265 289 L260 291', 2.2) + `<circle cx="256" cy="301" r="2.6" fill="${OL}"/>` + sparkle(278, 274, 6);
+}
 const owl = () => part('M66 408 L70 380 L88 400 Z', '#8a5a3b', { w: 4 }) + part('M118 408 L114 380 L96 400 Z', '#8a5a3b', { w: 4 })
   + part('M92 396 C122 396 128 424 128 440 C128 462 112 474 92 474 C72 474 56 462 56 440 C56 424 62 396 92 396 Z', '#8a5a3b', { shadow: 'M98 388 L140 388 L140 480 L98 480 Z', hi: 'M66 420 Q70 406 82 402 Q72 414 70 430 Z' })
   + part('M92 432 C106 432 112 444 112 454 C112 466 102 472 92 472 C82 472 72 466 72 454 C72 444 78 432 92 432 Z', '#e3c49d', { w: 3 })
@@ -861,6 +880,7 @@ const ITEMS = {
   'scit-brihta':{ slot: 'scit', char: 'vitez', season: 1, name: 'Ščit Brihta', rarity: 'nagrada', reward: [1, 'zve'], draw: () => shield('brihta') },
   plasc:        { slot: 'hrbet', char: 'vitez', season: 1, name: 'Rdeč plašč', rarity: 'redek', price: 120, draw: () => cape('#c0392b') },
   'plasc-kralj':{ slot: 'hrbet', char: 'vitez', season: 1, name: 'Kraljevi plašč', rarity: 'epski', price: 300, draw: () => cape('#6a4fc0', '#f4c542') },
+  'ogrinjalo-mascevalca': { slot: 'hrbet', char: 'vitez', season: 1, name: 'Ogrinjalo maščevalca', rarity: 'epski', price: 350, draw: avengerCape, front: avengerFur },
   'plasc-zima': { slot: 'hrbet', char: 'vitez', season: 2, name: 'Zimski plašč', rarity: 'nagrada', reward: [2, 'post'], draw: () => cape('#e9eef5', '#ffffff') },
   halja:        { slot: 'obleka', char: 'carovnik', season: 2, name: 'Čarovniška halja', acc: 'Čarovniško haljo', rarity: 'navaden', price: 0, robe: true, pants: '#3a3550', boots: '#4a3060', draw: () => robe('#5a4fc0') },
   'halja-noc':  { slot: 'obleka', char: 'carovnik', season: 2, name: 'Nočna halja', acc: 'Nočno haljo', rarity: 'nagrada', reward: [2, 'bit'], robe: true, pants: '#2a2550', boots: '#2a2040', draw: () => robe('#2f2a6e') },
@@ -906,6 +926,7 @@ function hero(look, eq, viewBox = '0 0 512 512', noBg, pet = PET_COMP) {
   const pose = it('v-roki') && POSES[it('v-roki').pose];
   if (!out.robe) s += arms(out.sleeve, out.cuff, pose);
   s += out.draw();
+  if (it('hrbet') && it('hrbet').front) s += it('hrbet').front();   // krzno ogrinjala čez ramena
   if (!hide) s += hairMid(look);   // kitke čez rame: po obleki, pred glavo
   /* Zaprt šlem (hidesFace) pokrije vso glavo — glave ne rišemo, šlem je zato
      lahko manjši in sedi na ramenih. */

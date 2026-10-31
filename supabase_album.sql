@@ -367,6 +367,7 @@ insert into items (id, season, char_id, slot, price, reward_season, reward_page)
   ('scit-brihta',  1, 'vitez', 'scit',          null, 1, 'zve'),
   ('plasc',        1, 'vitez', 'hrbet',         120,  null, null),
   ('plasc-kralj',  1, 'vitez', 'hrbet',         300,  null, null),
+  ('ogrinjalo-mascevalca', 1, 'vitez', 'hrbet', 350,  null, null),   -- Ogrinjalo maščevalca (krzno, volčja zaponka), dodan 31. 10. 2026
   ('sova',         1, null,    'spremljevalec', null, 1, 'post'),
   -- mucek, lisicka, zmajcek odstranjeni 20. 10. 2026 (supabase_spremljevalci.sql)
   ('travnik',      1, null,    'ozadje',        0,    null, null),
