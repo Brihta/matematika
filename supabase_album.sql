@@ -359,6 +359,7 @@ insert into items (id, season, char_id, slot, price, reward_season, reward_page)
   ('buzdovan',     1, 'vitez', 'v-roki',        200,  null, null),   -- buzdovan (bojni cepec), dodan 11. 10. 2026
   ('zlati-mec',    1, 'vitez', 'v-roki',        350,  null, null),
   ('mec-matjaz',   1, 'vitez', 'v-roki',        400,  null, null),   -- Meč kralja Matjaža (drža pred obrazom), dodan 18. 10. 2026
+  ('sekira',       1, 'vitez', 'v-roki',        450,  null, null),   -- Ogromna sekira (v obeh rokah), dodan 31. 10. 2026
   ('scit-les',     1, 'vitez', 'scit',          60,   null, null),
   ('scit-zvezda',  1, 'vitez', 'scit',          150,  null, null),
   ('scit-viking',  1, 'vitez', 'scit',          200,  null, null),   -- vikinški ščit z ovnom, dodan 11. 10. 2026

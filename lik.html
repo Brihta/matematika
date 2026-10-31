@@ -612,6 +612,37 @@ function matjazSword(pose) {
     + `<circle cx="0" cy="-38" r="14" fill="${G}" stroke="${OL}" stroke-width="4"/><circle cx="0" cy="-38" r="6.5" fill="#c0392b" stroke="${OL}" stroke-width="2"/>`
     + sparkle(34, T - 20, 9) + sparkle(-34, T * .6, 7) + sparkle(22, 80, 5) + `</g>`;
 }
+/* Ogromna sekira: dvorezna bojna sekira, ki jo lik drži z obema rokama
+   poševno čez telo — desna dlan pred prsmi (poza obraz), leva ob boku
+   (186 374). Polmesečni rezili z oranžnim vložkom, temen tulec z zakovico,
+   na vrhu konica. Narisana okoli desne dlani, ročaj kaže v smer +y. */
+function giantAxe(pose) {
+  const STEEL = '#aab2ba', EDGE = '#dfe4e9', O = '#f08c2e', DARK = '#4a4f57', H = -210;
+  // desno rezilo (lokalno); levo je zrcaljeno
+  const bladeD = `M22 ${H - 20} C36 ${H - 28} 48 ${H - 50} 52 ${H - 76} C98 ${H - 58} 104 ${H + 58} 52 ${H + 76} C48 ${H + 50} 36 ${H + 28} 22 ${H + 20} Z`;
+  const edge = `M60 ${H - 66} C96 ${H - 44} 96 ${H + 44} 60 ${H + 66} C80 ${H + 36} 80 ${H - 36} 60 ${H - 66} Z`;
+  const inlay = `M38 ${H - 34} C66 ${H - 30} 72 ${H + 30} 38 ${H + 34} C52 ${H + 14} 52 ${H - 14} 38 ${H - 34} Z`;
+  const blade = f => `<g transform="scale(${f} 1)">`
+    + part(bladeD, STEEL, { shadow: `M0 ${H + 4} L110 ${H + 4} L110 ${H + 90} L0 ${H + 90} Z`,
+        inner: `<path d="${edge}" fill="${EDGE}"/>` + part(inlay, O, { w: 3 }) + line(`M58 ${H - 60} C88 ${H - 40} 88 ${H + 40} 58 ${H + 60}`, 2.5, '#7f8891') })
+    // zareza v rezilu
+    + `<path d="M74 ${H - 54} L64 ${H - 46} L80 ${H - 42} Z" fill="#fff" stroke="${OL}" stroke-width="3" stroke-linejoin="round"/></g>`;
+  let s = `<g transform="translate(${pose.hand[0]} ${pose.hand[1]}) rotate(49)">`;
+  // ročaj, ovit z usnjem
+  s += part(`M-10 ${H - 30} L10 ${H - 30} L11 150 L-11 150 Z`, '#8a5530', { w: 5, shadow: `M2 ${H - 40} L18 ${H - 40} L18 156 L2 156 Z`,
+    inner: [...Array(14)].map((_, i) => line(`M-11 ${H + 60 + i * 20} L11 ${H + 48 + i * 20}`, 2.5, '#5a3320')).join('') });
+  // kovinski obroč pod glavo in glavica spodaj
+  s += part(`M-14 ${H + 34} L14 ${H + 34} L14 ${H + 48} L-14 ${H + 48} Z`, EDGE, { w: 4 })
+     + part('M-13 146 L13 146 L13 156 L-13 156 Z', EDGE, { w: 4 })
+     + part('M-12 156 L12 156 L14 176 L0 188 L-14 176 Z', '#2f3238', { w: 4, hi: 'M-9 160 L-5 160 L-5 176 L-9 174 Z' });
+  // konica na vrhu
+  s += part(`M-11 ${H - 34} L0 ${H - 86} L11 ${H - 34} Z`, EDGE, { w: 4, shadow: `M0 ${H - 90} L14 ${H - 90} L14 ${H - 30} L0 ${H - 30} Z` });
+  s += blade(-1) + blade(1);
+  // tulec z zakovico
+  s += part(`M-24 ${H - 34} L24 ${H - 34} L24 ${H + 34} L-24 ${H + 34} Z`, DARK, { w: 5, shadow: `M4 ${H - 40} L30 ${H - 40} L30 ${H + 40} L4 ${H + 40} Z`, hi: `M-19 ${H - 28} L-13 ${H - 28} L-13 ${H + 28} L-19 ${H + 28} Z` })
+     + `<circle cx="0" cy="${H}" r="10" fill="${EDGE}" stroke="${OL}" stroke-width="3.5"/><circle cx="-3" cy="${H - 3}" r="3.5" fill="#fff"/>`;
+  return s + sparkle(96, H - 20, 9) + sparkle(-90, H + 50, 7) + `</g>`;
+}
 function shield(kind) {
   const S = 'M178 286 C214 286 230 312 230 342 C230 376 206 400 178 404 C150 400 126 376 126 342 C126 312 142 286 178 286 Z';
   const k = { les: ['#b07a50', '#6b4226'], zvezda: ['#2a6fb0', '#f1c40f'], brihta: ['#f08c2e', '#f4c542'] }[kind];
@@ -822,6 +853,7 @@ const ITEMS = {
   buzdovan:     { slot: 'v-roki', char: 'vitez', season: 1, name: 'Buzdovan', acc: 'Buzdovan', rarity: 'redek', price: 200, crop: '244 150 250 250', draw: flail },
   'zlati-mec':  { slot: 'v-roki', char: 'vitez', season: 1, name: 'Zlati meč', rarity: 'epski', price: 350, draw: () => sword('#f7dc7a', '#c0392b', '#ffe27a') },
   'mec-matjaz': { slot: 'v-roki', char: 'vitez', season: 1, name: 'Meč kralja Matjaža', rarity: 'epski', price: 400, pose: 'obraz', crop: '96 6 320 320', draw: () => matjazSword(POSES.obraz) },
+  sekira:       { slot: 'v-roki', char: 'vitez', season: 1, name: 'Ogromna sekira', acc: 'Ogromno sekiro', rarity: 'epski', price: 450, pose: 'obraz', crop: '92 56 424 424', draw: () => giantAxe(POSES.obraz) },
   'ledeni-mec': { slot: 'v-roki', char: 'vitez', season: 2, name: 'Ledeni meč', rarity: 'nagrada', reward: [2, 'tek'], draw: () => sword('#cdeeff', '#7fb4e6', '#bfe9ff') },
   'scit-les':   { slot: 'scit', char: 'vitez', season: 1, name: 'Lesen ščit', rarity: 'navaden', price: 60, draw: () => shield('les') },
   'scit-zvezda':{ slot: 'scit', char: 'vitez', season: 1, name: 'Ščit z zvezdo', rarity: 'redek', price: 150, draw: () => shield('zvezda') },
