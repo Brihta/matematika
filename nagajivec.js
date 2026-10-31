@@ -768,7 +768,7 @@
   function stageLine(win) {
     const sg = st.stage || 1, nx = win ? Math.min(8, sg + 1) : Math.max(1, sg - 1);
     if (!win && sg <= 1) return '';
-    return `<div class="ng-stage">${win ? (sg >= 8 ? '👑 Najvišja stopnja premagana!' : `💪 Naslednji bo močnejši: ${nx}. stopnja`)
+    return `<div class="ng-stage">${win ? (sg >= 8 ? '👑 Najvišja stopnja premagana!' : `💪 Naslednji boj bo težji: ${nx}. stopnja`)
       : `Naslednji boj: ${nx}. stopnja`}</div>`;
   }
   function resultButtons() {
