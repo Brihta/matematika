@@ -319,7 +319,7 @@ alter table pet_shop enable row level security;
 insert into pet_shop (id, slot, price) values
   ('pentlja',   'glava', 15), ('rozica', 'glava', 20), ('kapa', 'glava', 35), ('celada', 'glava', 40), ('cilinder', 'glava', 50),
   ('baretka',   'glava', 40),
-  ('ovratnica', 'vrat',  15), ('sal',    'vrat',  25), ('metuljcek', 'vrat', 30),
+  ('ovratnica', 'vrat',  15), ('sal',    'vrat',  25), ('metuljcek', 'vrat', 30), ('bandana', 'vrat', 30),
   ('ocala',     'obraz', 30), ('soncna', 'obraz', 45)
 on conflict (id) do update set slot = excluded.slot, price = excluded.price;
 

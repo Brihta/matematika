@@ -233,6 +233,7 @@
     ovratnica: { slot: 'vrat',  name: 'Ovratnica' },
     sal:       { slot: 'vrat',  name: 'Šal' },
     metuljcek: { slot: 'vrat',  name: 'Metuljček' },
+    bandana:   { slot: 'vrat',  name: 'Bandana' },
     ocala:     { slot: 'obraz', name: 'Očala' },
     soncna:    { slot: 'obraz', name: 'Sončna očala' }
   };
@@ -288,6 +289,17 @@
       + shape('M114 128 L126 128 L130 160 L116 160 Z', '#e0874a', `<path d="M110 146 L134 146 L134 150 L110 150 Z" fill="#fdfcf3" opacity=".7"/>`, 3);
     if (id === 'metuljcek') return shape('M100 124 L82 114 L82 134 Z', '#6a4fc0', '', 3) + shape('M100 124 L118 114 L118 134 Z', '#6a4fc0', '', 3)
       + `<circle cx="100" cy="124" r="5" fill="#8a6fe0" stroke="${OL}" stroke-width="2.5"/>`;
+    // rdeča bandana: trak okoli vratu in trikotnik z belim robom in vzorcem
+    if (id === 'bandana') {
+      const W = '#fdfcf3', dots = (pts, r) => pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${W}"/>`).join('');
+      return shape('M66 113 C86 127 114 127 134 113 L135 121 C114 135 86 135 65 121 Z', '#d0342c',
+          dots([[72, 119], [82, 124], [92, 127], [108, 127], [118, 124], [128, 119]], 1.6), 3)
+        + shape('M68 120 C88 132 112 132 132 120 C126 138 112 154 100 166 C88 154 74 138 68 120 Z', '#d0342c',
+            line('M76 127 C88 135 112 135 124 127', 1.8, W) + line('M77 129 C84 144 92 152 100 159 C108 152 116 144 123 129', 1.8, W)
+          + `<path d="M93 138 C86 136 86 146 94 146 C99 146 99 141 96 140" fill="none" stroke="${W}" stroke-width="2" stroke-linecap="round"/>`
+          + `<path d="M107 138 C114 136 114 146 106 146 C101 146 101 141 104 140" fill="none" stroke="${W}" stroke-width="2" stroke-linecap="round"/>`
+          + dots([[100, 140], [100, 151], [87, 133], [113, 133]], 1.8), 3);
+    }
     return '';
   }
 
