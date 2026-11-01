@@ -1471,6 +1471,7 @@ body.competition {
 .ps-table th.ps-num { text-align: right; }
 .ps-table .ps-mode { padding-left: 7mm; }
 .ps-boxes { white-space: nowrap; }
+.ps-do20 .ps-boxes { text-align: center; width: 14%; }
 .ps-box {
   display: inline-block; width: 5.2mm; height: 5.2mm; line-height: 5.2mm;
   margin-right: 0.8mm; text-align: center; font-size: 7.5pt;

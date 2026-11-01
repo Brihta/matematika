@@ -254,8 +254,10 @@ Zasnova, računica in vse odločitve so v lokalni mapi `gamifikacija/`
 
 ### Izpis za razred (A4)
 
-Gumb **🖨️ Natisni za razred** v učiteljskem pregledu natisne en list za
-izbrani razred in obdobje (danes / zadnja 2 tedna / ves čas). Za vsakega
+Gumb **🖨️ Natisni (A4)** v učiteljskem pregledu natisne, kar je na zaslonu:
+izbrani razred (ali vse razrede) in obdobje (danes / zadnja 2 tedna / ves
+čas). Zavihek **Do 20** da list Do 20, zavihka Učenci in Poštevanke dasta
+list poštevank. Na vrhu lista piše, kateri je. Za vsakega
 otroka: pravilno, napačno, način, × ali ÷ in **kako zna posamezno
 poštevanko**. Tako se takoj vidi otroka, ki je nabral veliko odgovorov, a
 samo pri 1 in 10. Kdor ni vadil, je naštet spodaj v eni vrstici. Če se isto
@@ -272,6 +274,13 @@ shraniti.
 | ■ črn | pravilni − napačni **vsaj 12** | zna |
 | ▣ siv | vse vmes | še vadi |
 | □ bel | **manj kot 10** odgovorov, ali napačnih **vsaj toliko** kot pravilnih | ne zna ali ni vadil |
+
+#### List Do 20
+
+Za vsakega otroka: pravilno, napačno, + ali − in 6 kvadratkov: Do 10, Brez
+prehoda in S prehodom, vsak posebej za **+** in **−** (+ in − se ne
+seštejeta, ker otrok pogosto zna eno, drugo pa še ne). Pravila za črno, sivo
+in belo so ista kot pri poštevankah. Kdor Do 20 ni vadil, je naštet spodaj.
 
 Primeri:
 

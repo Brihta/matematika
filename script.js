@@ -2279,7 +2279,7 @@ async function openTeacherDashboard() {
       </div>
       <div class="td-hint">💡 Klikni na ime učenca, če želiš popraviti njegovo ime ali ponastaviti geslo.</div>
       <div class="td-footer">
-        <button class="overlay-btn overlay-btn-next" id="tdPrint">🖨️ Natisni za razred (A4)</button>
+        <button class="overlay-btn overlay-btn-next" id="tdPrint">🖨️ Natisni (A4)</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdBattles">⚔️ Bitke v živo</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdNamesPrint">📋 Seznam uporabniških imen</button>
         <button class="overlay-btn overlay-btn-ghost" id="tdPass">🔑 Spremeni svoje geslo</button>
@@ -2827,7 +2827,11 @@ async function openTeacherDashboard() {
   const PRINT_KNOWS = 12;
   const PRINT_MIN   = 10;
   const WIN_LABEL = { today: 'Danes', recent: 'Zadnja 2 tedna', all: 'Ves čas' };
+  /* Natisne se, kar je na zaslonu: zavihek Do 20 da list Do 20, Učenci in
+     Poštevanke dasta list poštevank. Razredi so lahko mešani, zato gumb ne
+     obljublja "za razred". */
   function printSheet() {
+    const do20 = curView === 'do20';
     const slot = curWin === 'all' ? 'all' : 'recent';
     const ime = s => (s.display_name || s.username || '');
     /* Isto ime večkrat je skoraj vedno isti otrok z več računi (pozabljeno
@@ -2837,17 +2841,44 @@ async function openTeacherDashboard() {
     const imeIzpis = s => esc(ime(s)) + (seen[ime(s).toLowerCase()] > 1 && s.display_name
       ? ` <span class="ps-uname">${esc(s.username)}</span>` : '');
     const rows = baseList()
-      .map(s => Object.assign({ s }, summarise(s, slot)))
+      .map(s => Object.assign({ s }, do20 ? summariseDo20(s, slot) : summarise(s, slot)))
       .sort((a, b) => ime(a.s).localeCompare(ime(b.s), 'sl', { sensitivity: 'base' }));
     const active = rows.filter(r => r.answers > 0);
     const idle = rows.filter(r => !r.answers);
 
     const p = sloveniaParts();
     const datum = `${+p.day}. ${+p.month}. ${p.year}`;
-    const title = `${razredLabel(curRazred) || 'Vsi razredi'} · ${WIN_LABEL[curWin]}`;
+    const title = `${do20 ? 'Do 20' : 'Poštevanke'} · ${razredLabel(curRazred) || 'Vsi razredi'} · ${WIN_LABEL[curWin]}`;
     const withRazred = !curRazred;
 
-    const body = active.map(r => {
+    const body = active.map(r => do20 ? do20Row(r) : `<tr>${postevankaRow(r)}</tr>`).join('');
+    function nameCells(r) {
+      return `<td class="ps-name">${imeIzpis(r.s)}</td>
+        ${withRazred ? `<td>${esc(razredLabel(razredMap[r.s.username] || ''))}</td>` : ''}
+        <td class="ps-num">${r.correct}</td>
+        <td class="ps-num">${r.wrong}</td>`;
+    }
+    /* Do 20: kvadratek na skupino in operacijo posebej (+ in − se ne
+       seštejeta), ker otrok pogosto zna seštevati s prehodom, odštevati pa
+       še ne. Pravilo je isto kot pri poštevanki. */
+    function do20Row(r) {
+      let p = 0, m = 0, boxes = '';
+      for (const g of DO20_GROUPS) {
+        boxes += '<td class="ps-boxes">';
+        for (const [op, sign] of [['p', '+'], ['m', MINUS]]) {
+          const cell = r.s.do20 && r.s.do20[g.key + '_' + op];
+          const v = cell && cell[slot];
+          const n = v ? v.c + v.w : 0, neto = v ? v.c - v.w : 0;
+          if (op === 'p') p += n; else m += n;
+          const cls = neto >= PRINT_KNOWS ? ' on' : (n < PRINT_MIN || neto <= 0) ? '' : ' few';
+          boxes += `<span class="ps-box${cls}">${sign}</span>`;
+        }
+        boxes += '</td>';
+      }
+      const racun = p && m ? `+ ${MINUS}` : p ? '+' : m ? MINUS : '';
+      return `<tr>${nameCells(r)}<td class="ps-op">${racun}</td>${boxes}</tr>`;
+    }
+    function postevankaRow(r) {
       let x = 0, d = 0, boxes = '';
       for (let t = 1; t <= 10; t++) {
         const cx = r.s.cells[t + '_x'], cd = r.s.cells[t + '_d'];
@@ -2866,16 +2897,11 @@ async function openTeacherDashboard() {
          vrstnem redu (⌨️ 🎯 🏆), da se stolpec bere navpično. Vsota = ✔. */
       const nacin = r.byMode.map(m =>
         `<span class="ps-modechip">${m.icon}${m.c}</span>`).join('');
-      return `<tr>
-        <td class="ps-name">${imeIzpis(r.s)}</td>
-        ${withRazred ? `<td>${esc(razredLabel(razredMap[r.s.username] || ''))}</td>` : ''}
-        <td class="ps-num">${r.correct}</td>
-        <td class="ps-num">${r.wrong}</td>
+      return `${nameCells(r)}
         <td class="ps-mode">${nacin}</td>
         <td class="ps-op">${racun}</td>
-        <td class="ps-boxes">${boxes}</td>
-      </tr>`;
-    }).join('');
+        <td class="ps-boxes">${boxes}</td>`;
+    }
 
     const sheet = document.createElement('div');
     sheet.id = 'printSheet';
@@ -2884,21 +2910,24 @@ async function openTeacherDashboard() {
         <div class="ps-title">Brihta · ${esc(title)}</div>
         <div class="ps-date">${datum}</div>
       </div>
-      ${active.length ? `<table class="ps-table">
+      ${active.length ? `<table class="ps-table${do20 ? ' ps-do20' : ''}">
         <thead><tr>
           <th class="ps-name">Učenec</th>${withRazred ? '<th>Razred</th>' : ''}
           <th class="ps-num">✔</th><th class="ps-num">✘</th>
-          <th class="ps-mode">Način</th><th class="ps-op">Račun</th><th>Poštevanke</th>
+          ${do20 ? `<th class="ps-op">Račun</th>${DO20_GROUPS.map(g =>
+              `<th class="ps-boxes">${g.short}</th>`).join('')}`
+            : '<th class="ps-mode">Način</th><th class="ps-op">Račun</th><th>Poštevanke</th>'}
         </tr></thead>
         <tbody>${body}</tbody>
       </table>` : '<p>V tem obdobju ni nihče vadil.</p>'}
-      ${idle.length ? `<p class="ps-idle"><strong>Niso vadili (${idle.length}):</strong> ${
+      ${idle.length ? `<p class="ps-idle"><strong>${do20 ? 'Do 20 niso vadili' : 'Niso vadili'} (${idle.length}):</strong> ${
         idle.map(r => imeIzpis(r.s)).join(', ')}</p>` : ''}
       <p class="ps-legend">✔ pravilno · ✘ napačno ·
-        ⌨️ tipkovnica · 🎯 kviz · 🏆 tekmovanje · ⚔️ bitka (pravilni) ·
-        <span class="ps-box on">7</span> zna (pravilni − napačni ≥ ${PRINT_KNOWS}) ·
-        <span class="ps-box few">7</span> še vadi ·
-        <span class="ps-box">7</span> ne zna ali ni vadil
+        ${do20 ? `kvadratka v skupini: levo +, desno ${MINUS} ·`
+               : '⌨️ tipkovnica · 🎯 kviz · 🏆 tekmovanje · ⚔️ bitka (pravilni) ·'}
+        <span class="ps-box on">${do20 ? '+' : '7'}</span> zna (pravilni − napačni ≥ ${PRINT_KNOWS}) ·
+        <span class="ps-box few">${do20 ? '+' : '7'}</span> še vadi ·
+        <span class="ps-box">${do20 ? '+' : '7'}</span> ne zna ali ni vadil
         (manj kot ${PRINT_MIN} računov ali napačnih vsaj toliko kot pravilnih)</p>`;
     printNode(sheet);
   }
