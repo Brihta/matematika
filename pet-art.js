@@ -267,12 +267,12 @@
     if (id === 'cilinder') return `<g transform="rotate(-8 100 40)">`
       + shape('M80 40 L84 6 L116 6 L120 40 Z', '#2f2a36', `<path d="M80 30 L120 30 L120 36 L80 36 Z" fill="#c0392b"/>`, 3.5)
       + shape('M68 40 C80 34 120 34 132 40 C120 46 80 46 68 40 Z', '#2f2a36', '', 3.5) + `</g>`;
-    // francoska baretka: mehak, poševen disk s pecljem na vrhu
-    if (id === 'baretka') return `<g transform="rotate(-10 100 44)">`
-      + shape('M50 52 C40 34 68 16 104 16 C140 16 162 30 152 46 C142 54 70 58 50 52 Z', '#2f3a5c',
-          `<ellipse cx="80" cy="28" rx="18" ry="6" fill="#fff" opacity=".22" transform="rotate(-8 80 28)"/>`, 3.5)
-      + line('M56 50 C80 55 126 53 148 45', 2.4, '#1e2640')
-      + line('M104 17 L107 7', 3.6) + `</g>`;
+    // francoska baretka: mehka, napihnjena, nagnjena na stran, s kratkim čepkom
+    if (id === 'baretka') return `<g transform="rotate(9 100 40)">`
+      + shape('M58 52 C46 40 58 20 94 16 C130 12 158 22 156 40 C155 52 146 58 134 58 C116 54 86 54 58 52 Z', '#d63a3a',
+          `<path d="M40 50 C80 58 120 58 170 48 L170 70 L40 70 Z" fill="#9c2626" opacity=".45"/>`
+        + `<ellipse cx="84" cy="27" rx="17" ry="6" fill="#fff" opacity=".3" transform="rotate(-10 84 27)"/>`, 3.6)
+      + shape('M96 18 C95 10 97 5 101 5 C105 5 106 10 105 18 Z', '#d63a3a', '', 3) + `</g>`;
     return '';
   }
   function accFace(id, y, r) {
