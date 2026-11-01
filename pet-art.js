@@ -227,6 +227,7 @@
     rozica:    { slot: 'glava', name: 'Rožica' },
     kapa:      { slot: 'glava', name: 'Kapa' },
     cilinder:  { slot: 'glava', name: 'Cilinder' },
+    baretka:   { slot: 'glava', name: 'Francoska baretka' },
     // odprta motoristična čelada: obraz se vidi, ušesa in rogki so pod njo
     celada:    { slot: 'glava', name: 'Motoristična čelada', hidesEars: true },
     ovratnica: { slot: 'vrat',  name: 'Ovratnica' },
@@ -264,6 +265,12 @@
     if (id === 'cilinder') return `<g transform="rotate(-8 100 40)">`
       + shape('M80 40 L84 6 L116 6 L120 40 Z', '#2f2a36', `<path d="M80 30 L120 30 L120 36 L80 36 Z" fill="#c0392b"/>`, 3.5)
       + shape('M68 40 C80 34 120 34 132 40 C120 46 80 46 68 40 Z', '#2f2a36', '', 3.5) + `</g>`;
+    // francoska baretka: mehak, poševen disk s pecljem na vrhu
+    if (id === 'baretka') return `<g transform="rotate(-10 100 44)">`
+      + shape('M50 52 C40 34 68 16 104 16 C140 16 162 30 152 46 C142 54 70 58 50 52 Z', '#2f3a5c',
+          `<ellipse cx="80" cy="28" rx="18" ry="6" fill="#fff" opacity=".22" transform="rotate(-8 80 28)"/>`, 3.5)
+      + line('M56 50 C80 55 126 53 148 45', 2.4, '#1e2640')
+      + line('M104 17 L107 7', 3.6) + `</g>`;
     return '';
   }
   function accFace(id, y, r) {
