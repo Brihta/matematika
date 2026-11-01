@@ -99,9 +99,11 @@
   .ng-scene svg { display: block; width: 100%; height: auto; }
   .ng-name { font: 800 20px system-ui, sans-serif; fill: #05270b; }
   .ng-pet.me .ng-name { fill: #d9465f; }
+  .ng-head-bg { fill: #fffef8; stroke: var(--g-sand-2, #ecd9bc); stroke-width: 8; }
+  .ng-pet.me .ng-head-bg { stroke: #f2647e; stroke-width: 12; }
   .ng-dizzy { display: none; }
   .ng-pet.dizzy .ng-dizzy { display: inline; }
-  .ng-pet.dizzy .ng-pet-in { animation: ngDizzy .5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 90%; }
+  .ng-pet.dizzy .ng-pet-in { animation: ngDizzy .5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 50%; }
   @keyframes ngDizzy { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
   .ng-pet.cheer .ng-pet-in { animation: ngCheer .5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
   @keyframes ngCheer { to { transform: translateY(-14px); } }
@@ -482,11 +484,13 @@
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
     return a;
   }
-  /* Kje stoji kateri ljubljenček: spredaj 4, zadaj do 4 (manjši). */
+  /* V boju samo glave ljubljenčkov, v stolpcu ob levem robu (od 4 igralcev
+     naprej v dveh), da ima nagajivec čim več prostora. k: glava 200 enot. */
   function petPos(i, n) {
-    const back = n > 4 && i >= Math.ceil(n / 2);
-    const row = back ? i - Math.ceil(n / 2) : i, k = back ? .38 : .46;
-    return { x: (back ? 22 : 2) + row * 38, y: back ? 76 : 104, k };
+    const cols = n <= 3 ? 1 : 2, rows = Math.ceil(n / cols);
+    const h = Math.min(66, 178 / rows), s = h - 12;
+    const col = i % cols, row = Math.floor(i / cols);
+    return { x: 4 + col * (s + 4), y: 26 + (182 - rows * h) / 2 + row * h + 2, k: s / 200 };
   }
 
   function startGame() {
@@ -510,18 +514,17 @@
     const n = st.players.length;
     /* Rdeča črta tik desno od ljubljenčkov; nagajivec pride točno do nje,
        ko se izteče čas — da otroci vidijo, zakaj je izgubljeno. */
-    const lineX = Math.max(...st.players.map((p, i) => { const q = petPos(i, n); return q.x + 170 * q.k; })) + DANGER_PAD;
+    const lineX = Math.max(...st.players.map((p, i) => { const q = petPos(i, n); return q.x + 200 * q.k; })) + DANGER_PAD;
     G.lineX = lineX;
     G.x1 = lineX - BOSS_FRONT * G.k;
     const pets = st.players.map((p, i) => {
-      const q = petPos(i, n);
+      const q = petPos(i, n), fs = Math.min(10, (200 * q.k + 2) / (.72 * String(p.name).length)) / q.k;   // dolgo ime ne seže čez rob
       return `<g class="ng-pet${p.id === st.me ? ' me' : ''}" data-pid="${esc(p.id)}" transform="translate(${q.x} ${q.y}) scale(${q.k})">
-        <g class="ng-pet-in">${petSvg(p.pet, { inner: true })}</g>
-        <g class="ng-dizzy">${BossArt.stars(100, 30, 46)}</g>
-        <text x="100" y="212" text-anchor="middle" class="ng-name">${esc(p.name)}</text></g>`;
+        <circle cx="100" cy="100" r="98" class="ng-head-bg"/>
+        <g class="ng-pet-in"><svg width="200" height="200" viewBox="${PetArt.faceBox(p.pet && p.pet.stage)}">${petSvg(p.pet, { inner: true })}</svg></g>
+        <g class="ng-dizzy">${BossArt.stars(100, 22, 46)}</g>
+        <text x="100" y="${200 + 10 / q.k}" text-anchor="middle" class="ng-name" style="font-size:${fs.toFixed(1)}px">${esc(p.name)}</text></g>`;
     });
-    // zadnja vrsta prva, da je sprednja čez njo
-    const order = st.players.map((p, i) => i).sort((a, b) => petPos(b, n).y - petPos(a, n).y).reverse();
     area().innerHTML = `<div class="ng-game">
       <div class="ng-hud">
         <div class="ng-hp"><div class="ng-hp-top"><span>👾 ${bossName(st.boss)}${G.stage > 1 ? ` · ${G.stage}. st.` : ''}</span><span id="ngHpNum"></span></div>
@@ -537,7 +540,7 @@
           <path d="M${lineX} 44 L${lineX} 64" stroke="#4a2733" stroke-width="2.4" stroke-linecap="round"/>
           <path d="M${lineX} 44 L${lineX + 16} 49 L${lineX} 55 Z" fill="#e8435f" stroke="#4a2733" stroke-width="1.8" stroke-linejoin="round"/>
         </g>
-        <g>${order.map(i => pets[i]).join('')}</g>
+        <g>${pets.join('')}</g>
         <g id="ngBossG" transform="translate(${BOSS_X0} ${BOSS_Y}) scale(${G.k})">${G.v2 ? BossArt.anger(G.stage) : ''}<g id="ngBossIn" class="ng-boss-walk">${BossArt.draw(st.boss, 'walk', { inner: true })}</g>${G.shield ? shieldSvg() : ''}</g>
         <g id="ngBeams"></g>
       </svg></div>
