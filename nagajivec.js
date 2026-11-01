@@ -449,7 +449,7 @@
     view = 'countdown'; stop(); overlayOff();
     if (typeof collapseToolbar === 'function') collapseToolbar();
     document.body.insertAdjacentHTML('beforeend', `<div class="ng-overlay" id="ngOverlay"><div class="ng-card">
-      <div class="ng-res-art"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${st.v2 ? BossArt.anger(st.stage) : ''}${BossArt.draw(st.boss, 'walk', { inner: true })}</svg></div>
+      <div class="ng-res-art"><svg viewBox="0 -10 200 210" xmlns="http://www.w3.org/2000/svg">${BossArt.draw(st.boss, 'walk', { inner: true })}${st.v2 ? BossArt.anger(st.stage) : ''}</svg></div>
       <h2>Prihaja ${bossName(st.boss)}!</h2>
       ${st.v2 && st.stage > 1 ? `<span class="ng-stage">💢 ${st.stage}. stopnja</span>` : ''}
       ${st.v2 ? `<p class="ng-twist">${TWIST[st.boss] || ''}</p>` : ''}
@@ -532,16 +532,16 @@
         <div class="ng-hearts" id="ngHearts"></div>
         <div class="ng-time" id="ngTime">60</div>
       </div>
-      <div class="ng-scene"><svg viewBox="0 26 400 182" xmlns="http://www.w3.org/2000/svg">
+      <div class="ng-scene"><svg viewBox="0 16 400 192" xmlns="http://www.w3.org/2000/svg">
         <ellipse cx="200" cy="214" rx="260" ry="34" fill="#cfe7a6"/>
-        <rect x="0" y="26" width="${lineX}" height="182" fill="#e8435f" opacity=".06"/>
+        <rect x="0" y="16" width="${lineX}" height="192" fill="#e8435f" opacity=".06"/>
         <g class="ng-line" id="ngLine">
           <line x1="${lineX}" y1="62" x2="${lineX}" y2="200" stroke="#e8435f" stroke-width="3.5" stroke-dasharray="9 6" stroke-linecap="round"/>
           <path d="M${lineX} 44 L${lineX} 64" stroke="#4a2733" stroke-width="2.4" stroke-linecap="round"/>
           <path d="M${lineX} 44 L${lineX + 16} 49 L${lineX} 55 Z" fill="#e8435f" stroke="#4a2733" stroke-width="1.8" stroke-linejoin="round"/>
         </g>
         <g>${pets.join('')}</g>
-        <g id="ngBossG" transform="translate(${BOSS_X0} ${BOSS_Y}) scale(${G.k})">${G.v2 ? BossArt.anger(G.stage) : ''}<g id="ngBossIn" class="ng-boss-walk">${BossArt.draw(st.boss, 'walk', { inner: true })}</g>${G.shield ? shieldSvg() : ''}</g>
+        <g id="ngBossG" transform="translate(${BOSS_X0} ${BOSS_Y}) scale(${G.k})"><g id="ngBossIn" class="ng-boss-walk">${BossArt.draw(st.boss, 'walk', { inner: true })}</g>${G.shield ? shieldSvg() : ''}${G.v2 ? BossArt.anger(G.stage) : ''}</g>
         <g id="ngBeams"></g>
       </svg></div>
       <div class="ng-tag" id="ngTag"></div>

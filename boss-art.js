@@ -376,13 +376,20 @@
 
   /* Jeza po stopnjah (nadgradnja 31. 10. 2026): od 2. stopnje 💢 ob glavi
      (do tri), od 5. rdeč sij za nagajivcem. Riše se v prostor 0 0 200 200. */
+  /* Stopnja nad glavo nagajivca: 4 zvezdice, vsaka stopnja (1–8) je pol
+     zvezdice. Od 5. stopnje dalje še rdeč sij. */
+  const STAR = 'M0.0 -10.0 L2.5 -3.5 L9.5 -3.1 L4.1 1.3 L5.9 8.1 L0.0 4.3 L-5.9 8.1 L-4.1 1.3 L-9.5 -3.1 L-2.5 -3.5 Z';
   function anger(stage) {
-    if (!stage || stage < 2) return '';
-    const mark = (x, y, k) => `<g transform="translate(${x} ${y}) scale(${k})" stroke="#e8435f" stroke-width="4.2" fill="none" stroke-linecap="round">`
-      + `<path d="M-9 -3 Q-3 -3 -3 -9 M3 -9 Q3 -3 9 -3 M9 3 Q3 3 3 9 M-3 9 Q-3 3 -9 3"/></g>`;
-    const at = [[160, 26, 1], [40, 30, .85], [176, 60, .75]];
-    return (stage >= 5 ? `<ellipse cx="100" cy="110" rx="96" ry="88" fill="#e8435f" opacity=".13"/>` : '')
-      + at.slice(0, Math.min(3, stage - 1)).map(([x, y, k]) => mark(x, y, k)).join('');
+    if (!stage) return '';
+    const n = Math.max(0, Math.min(8, stage)), x0 = 100 - 1.5 * 24, y = 4;
+    const one = (i) => {
+      const x = x0 + i * 24, fill = Math.max(0, Math.min(2, n - 2 * i)) / 2;
+      return `<g transform="translate(${x} ${y})"><path d="${STAR}" fill="#fffef8" stroke="#4a2733" stroke-width="2" stroke-linejoin="round"/>`
+        + (fill ? `<svg x="-11" y="-11" width="${22 * fill}" height="22" viewBox="-11 -11 ${22 * fill} 22"><path d="${STAR}" fill="#ffc531" stroke="#4a2733" stroke-width="2" stroke-linejoin="round"/></svg>` : '')
+        + '</g>';
+    };
+    return (n >= 5 ? `<ellipse cx="100" cy="110" rx="96" ry="88" fill="#e8435f" opacity=".13"/>` : '')
+      + `<g class="ba-stage">${[0, 1, 2, 3].map(one).join('')}</g>`;
   }
   /* Zbirka premaganih nagajivcev (boss_trophies): za vsakega nagajivca
      največja stopnja in število zmag po ravneh. */
