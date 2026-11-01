@@ -159,14 +159,12 @@
   .home-tiles .home-tile.t-nag > span.home-boss { grid-row: 2; grid-column: 1 / -1; align-self: end; justify-self: end; position: relative;
     width: 176px; max-width: calc(100% + 19px); height: auto; aspect-ratio: 176 / 93; margin: 0 -19px -19px 0; pointer-events: none; z-index: 2; }
   .home-boss svg { width: 100%; height: 100%; display: block; }
-  /* s ploščico je ploščic pet: na računalniku pet stolpcev, na telefonu gre
-     Bitka (zadnja) čez celo širino. Brez nje ostane mreža kot prej. */
-  @media (max-width: 899px) { .home-tiles.has-nag .t-bit { grid-column: 1 / -1; min-height: 120px; } }
+  /* s ploščico (in Navodili) je ploščic šest: na računalniku dve vrsti po
+     tri, na telefonu tri vrste po dve. Brez nje jih je pet (style.css). */
   @media (min-width: 900px) {
-    .home-tiles.has-nag { grid-template-columns: repeat(5, 1fr); }
-    /* pet ožjih ploščic: lik in ljubljenček manjša, da ne segata v naslov */
-    .home-tiles.has-nag .home-hero { width: 64px; height: 92px; }
-    .home-tiles.has-nag .home-pet { width: 80px; height: 80px; }
+    .home-tiles.has-nag { grid-template-columns: repeat(3, 1fr); }
+    .home-tiles.has-nag .home-hero { width: 86px; height: 120px; }
+    .home-tiles.has-nag .home-pet { width: 96px; height: 96px; }
   }
   </style>`);
 

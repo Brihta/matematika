@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-title" content="Brihta-MAT">
+<title>Navodila · Brihta</title>
+<!-- Videoteka: video navodila za vsako igro na Brihti. Odpre se s
+     ploščice Navodila na začetnem zaslonu, deluje tudi brez prijave.
+     Videi so v navodila/ (stisnjene kopije iz video/, gl. video/*.mjs).
+     Povezava na en video: navodila.html#06-nagajivec -->
+<style>
+html { touch-action: manipulation; }
+:root {
+  --cream: #fdfcf3; --sand: #f6e5cd; --sand-2: #ecd9bc;
+  --leaf: #9ac334; --forest: #05270b; --muted: #5d6b52;
+  --grad: linear-gradient(135deg, #a9cf45, #8ab52c);
+  --nav: linear-gradient(135deg, #5cc3d6, #2f8fb8);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, sans-serif; color: var(--forest);
+  background: radial-gradient(900px 500px at 30% -10%, rgba(92,195,214,0.16), transparent 65%), var(--cream);
+  min-height: 100vh;
+}
+.wrap { max-width: 1100px; margin: 0 auto; padding: 18px 16px 48px; }
+.top { display: flex; align-items: center; gap: 12px; }
+.back { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--forest); font-weight: 800;
+  background: #fffef8; border-radius: 999px; padding: 8px 16px 8px 10px; box-shadow: inset 0 0 0 1px var(--sand-2); }
+.back img { width: 28px; height: 28px; }
+.back:hover { background: var(--sand); }
+.hero { margin-top: 16px; background: var(--nav); color: #fff; border-radius: 26px; padding: 22px 24px;
+  box-shadow: 0 8px 24px rgba(47,143,184,.28); }
+.hero h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 900; }
+.hero p { font-weight: 700; opacity: .92; margin-top: 4px; }
+.list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 18px; }
+.vid { display: block; width: 100%; text-align: left; border: 0; font: inherit; color: inherit; cursor: pointer;
+  background: #fffef8; border-radius: 22px; overflow: hidden;
+  box-shadow: 0 2px 14px rgba(5,39,11,.07), inset 0 0 0 1px var(--sand-2); transition: transform .12s, box-shadow .12s; }
+.vid:hover, .vid:focus-visible { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(5,39,11,.12), inset 0 0 0 1px var(--sand-2); outline: none; }
+.thumb { position: relative; aspect-ratio: 16 / 9; background: var(--sand) center / cover no-repeat; }
+.thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 55%, rgba(5,39,11,.35)); }
+.play { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; z-index: 1;
+  background: rgba(255,255,255,.94); box-shadow: 0 6px 18px rgba(0,0,0,.25); display: grid; place-items: center; transition: transform .12s; }
+.play::before { content: ''; margin-left: 6px; border-style: solid; border-width: 13px 0 13px 21px; border-color: transparent transparent transparent #2f8fb8; }
+.vid:hover .play { transform: scale(1.08); }
+.len { position: absolute; right: 10px; bottom: 9px; z-index: 1; color: #fff; font-weight: 800; font-size: .82rem;
+  background: rgba(5,39,11,.7); border-radius: 8px; padding: 2px 8px; }
+.num { position: absolute; left: 10px; top: 10px; z-index: 1; width: 34px; height: 34px; border-radius: 12px; background: var(--grad);
+  display: grid; place-items: center; font-weight: 900; color: var(--forest); box-shadow: 0 3px 10px rgba(0,0,0,.18); }
+.seen { position: absolute; left: 50px; top: 14px; z-index: 1; font-size: .74rem; font-weight: 800; color: #fff;
+  background: rgba(5,39,11,.7); border-radius: 8px; padding: 3px 8px; display: none; }
+.vid.done .seen { display: block; }
+.info { padding: 12px 16px 16px; }
+.info b { display: block; font-size: 1.15rem; font-weight: 900; }
+.info span { display: block; color: var(--muted); font-weight: 600; font-size: .9rem; line-height: 1.4; margin-top: 3px; }
+
+/* predvajalnik čez celo stran */
+.player { position: fixed; inset: 0; z-index: 50; background: rgba(5,39,11,.88); display: none;
+  flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 12px; }
+.player.on { display: flex; }
+.player video { width: 100%; max-width: 1200px; max-height: calc(100vh - 150px); border-radius: 16px; background: #000; }
+.pbar { width: 100%; max-width: 1200px; display: flex; align-items: center; gap: 10px; color: #fff; }
+.pbar h2 { flex: 1; min-width: 0; font-size: 1.15rem; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pbtn { border: 0; border-radius: 999px; padding: 10px 16px; font: 800 .95rem inherit; font-family: inherit; cursor: pointer;
+  background: rgba(255,255,255,.14); color: #fff; white-space: nowrap; }
+.pbtn:hover { background: rgba(255,255,255,.26); }
+.pbtn:disabled { opacity: .3; cursor: default; }
+.pbtn.x { width: 44px; height: 44px; padding: 0; font-size: 1.3rem; background: #fff; color: var(--forest); }
+.pnav { width: 100%; max-width: 1200px; display: flex; justify-content: space-between; gap: 10px; }
+@media (max-width: 599px) {
+  .hero { padding: 18px; }
+  .pbar h2 { font-size: 1rem; }
+  .pbtn { padding: 9px 12px; font-size: .85rem; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="./"><img src="Brihta.png" alt="">‹ Nazaj na Brihto</a></div>
+  <section class="hero">
+    <h1>🎬 Navodila</h1>
+    <p>Kratki videi pokažejo, kako se igra vsaka igra na Brihti. Klikni video in ga poglej.</p>
+  </section>
+  <div class="list" id="list"></div>
+</div>
+
+<div class="player" id="player" role="dialog" aria-modal="true" aria-labelledby="pTitle">
+  <div class="pbar"><h2 id="pTitle"></h2><button class="pbtn x" id="pClose" type="button" aria-label="Zapri">✕</button></div>
+  <video id="pVideo" controls playsinline preload="auto"></video>
+  <div class="pnav">
+    <button class="pbtn" id="pPrev" type="button">‹ Prejšnji</button>
+    <button class="pbtn" id="pNext" type="button">Naslednji ›</button>
+  </div>
+</div>
+
+<script>
+const VIDEI = [
+  { id: '01-prijava',     ime: 'Nov račun in prijava', opis: 'Kako si narediš svoj račun in se prijaviš.' },
+  { id: '02-ljubljencek', ime: 'Ljubljenček',          opis: 'Izberi ljubljenčka, nahrani ga s priboljški in mu kupi dodatke.' },
+  { id: '03-vitez',       ime: 'Vitez in cekini',      opis: 'Tvoj lik, sličice v albumu in oprema za cekine.' },
+  { id: '04-vaja',        ime: 'Vaja in tekmovanje',   opis: 'Vadi račune na tipkovnici in tekmuj 60 sekund.' },
+  { id: '05-bitka',       ime: 'Bitka s prijatelji',   opis: 'Pomeri se s sošolci v bitki poštevanke.' },
+  { id: '06-nagajivec',   ime: 'Odženi nagajivce!',    opis: 'Ljubljenčki skupaj premagajo nagajivca.' }
+];
+const SEEN = 'brihta_navodila_v1';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const seen = () => { try { return JSON.parse(localStorage.getItem(SEEN) || '[]'); } catch (e) { return []; } };
+const markSeen = id => { try { const s = seen(); if (!s.includes(id)) localStorage.setItem(SEEN, JSON.stringify([...s, id])); } catch (e) {} };
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+
+$('list').innerHTML = VIDEI.map((v, i) => `<button class="vid" type="button" data-i="${i}">
+  <div class="thumb" style="background-image:url(navodila/${v.id}.jpg)">
+    <span class="num">${i + 1}</span><span class="seen">✓ Ogledano</span><span class="play"></span><span class="len" id="len-${v.id}"></span></div>
+  <div class="info"><b>${esc(v.ime)}</b><span>${esc(v.opis)}</span></div></button>`).join('');
+document.querySelectorAll('.vid').forEach(b => b.addEventListener('click', () => open(+b.dataset.i)));
+function showSeen() { const s = seen(); document.querySelectorAll('.vid').forEach(b => b.classList.toggle('done', s.includes(VIDEI[+b.dataset.i].id))); }
+showSeen();
+
+// dolžina videa iz glave datoteke (preload=metadata ne prenese celega videa)
+VIDEI.forEach(v => {
+  const m = document.createElement('video');
+  m.preload = 'metadata';
+  m.addEventListener('loadedmetadata', () => { $('len-' + v.id).textContent = mmss(m.duration); m.removeAttribute('src'); m.load(); });
+  m.src = `navodila/${v.id}.mp4`;
+});
+
+let cur = -1;
+const video = $('pVideo');
+function open(i, push = true) {
+  cur = i;
+  const v = VIDEI[i];
+  $('pTitle').textContent = `${i + 1}. ${v.ime}`;
+  video.src = `navodila/${v.id}.mp4`;
+  $('pPrev').disabled = i === 0;
+  $('pNext').disabled = i === VIDEI.length - 1;
+  $('player').classList.add('on');
+  document.body.style.overflow = 'hidden';
+  // Prejšnji/Naslednji zamenja vnos, da gumb Nazaj v brskalniku vedno zapre video
+  if (push && location.hash !== '#' + v.id) history[location.hash ? 'replaceState' : 'pushState'](null, '', '#' + v.id);
+  video.play().catch(() => {});
+}
+function close(push = true) {
+  if (cur < 0) return;
+  cur = -1;
+  video.pause(); video.removeAttribute('src'); video.load();
+  $('player').classList.remove('on');
+  document.body.style.overflow = '';
+  showSeen();
+  if (push && location.hash) history.pushState(null, '', location.pathname + location.search);
+}
+video.addEventListener('ended', () => { if (cur >= 0) markSeen(VIDEI[cur].id); });
+$('pClose').addEventListener('click', () => close());
+$('pPrev').addEventListener('click', () => { if (cur > 0) open(cur - 1); });
+$('pNext').addEventListener('click', () => { if (cur < VIDEI.length - 1) open(cur + 1); });
+$('player').addEventListener('click', e => { if (e.target === $('player')) close(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+// gumb Nazaj v brskalniku zapre video; povezava z #id ga odpre
+function fromHash() {
+  const i = VIDEI.findIndex(v => '#' + v.id === location.hash);
+  if (i >= 0) open(i, false); else close(false);
+}
+window.addEventListener('popstate', fromHash);
+fromHash();
+</script>
+</body>
+</html>

@@ -2123,7 +2123,16 @@ body.home .toolbar { box-shadow: none; }
 @keyframes hiBob { 50% { transform: translateY(-6px) rotate(2deg); } }
 @media (max-width: 599px) { .home-hi { gap: 6px; padding: 20px 16px 20px 20px; } .hi-owl { width: 112px; height: 112px; margin: -14px -12px -14px -8px; } }
 .home-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
-@media (min-width: 900px) { .home-tiles { grid-template-columns: repeat(4, 1fr); gap: 16px; } .home-tile { min-height: 200px; } }
+/* pet ploščic (brez Odženi nagajivce!): na računalniku pet ožjih stolpcev,
+   na telefonu gredo Navodila (zadnja) čez celo širino. S šesto ploščico
+   mrežo prilagodi nagajivec.js (has-nag). */
+@media (min-width: 900px) {
+  .home-tiles { grid-template-columns: repeat(5, 1fr); gap: 16px; } .home-tile { min-height: 200px; }
+  /* ožje ploščice: lik in ljubljenček manjša, da ne segata v naslov */
+  .home-tiles .home-hero { width: 64px; height: 92px; }
+  .home-tiles .home-pet { width: 80px; height: 80px; }
+}
+@media (max-width: 899px) { .home-tiles:not(.has-nag) .t-nav { grid-column: 1 / -1; min-height: 120px; } }
 .home-tile {
   position: relative; overflow: hidden; min-height: 156px; border: 0; border-radius: 22px;
   padding: 15px; text-align: left; font-family: inherit; cursor: pointer;
@@ -2146,6 +2155,7 @@ body.home .toolbar { box-shadow: none; }
 .t-post .big { color: #f0a500; }
 .t-tek { background: linear-gradient(145deg, #4a2a7a, #2d1b4e); color: #fff; box-shadow: 0 6px 20px rgba(45,27,78,.3); }
 .t-bit { background: linear-gradient(135deg, #ffb23f, #ff7a1a); color: #2b1406; box-shadow: 0 6px 20px rgba(255,122,26,.3); }
+.t-nav { background: linear-gradient(135deg, #5cc3d6, #2f8fb8); color: #fff; box-shadow: 0 6px 20px rgba(47,143,184,.3); text-decoration: none; }
 /* Vzorci na ploščicah (vzorci/*.svg): nežna plast pod besedilom, vsaka s
    svojo zgodbo — kocke za štetje (Do 20), zvezde in zobniki z × in ÷
    (poštevanka), hitrostne črte, lovor in zastava (tekmovanje), zmajeve
