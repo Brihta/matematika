@@ -98,3 +98,25 @@ def spark(cx, cy, r):
             f'Q{f(cx)} {f(cy)} {f(cx-r)} {f(cy)} Q{f(cx)} {f(cy)} {f(cx)} {f(cy-r)} Z" fill="#fff" fill-opacity=".35"/>')
 N = 56
 save('sluz.svg', blob(14, 16, 9) + blob(42, 40, 6) + blob(44, 8, 3.5) + blob(10, 46, 4) + spark(34, 22, 5) + spark(22, 36, 3.5), f'0 0 {N} {N}')
+
+# 6. Navodila: filmski trak čez ploščico (poševno, desno) in drobni gumbi
+#    za predvajanje (ploščica se ponavlja)
+def play(cx, cy, r, o):
+    return (f'<circle cx="{f(cx)}" cy="{f(cy)}" r="{f(r)}" fill="none" stroke="#fff" stroke-opacity="{o}" stroke-width="1.6"/>'
+            f'<path d="M{f(cx-r*.3)} {f(cy-r*.45)} L{f(cx+r*.5)} {f(cy)} L{f(cx-r*.3)} {f(cy+r*.45)} Z" fill="#fff" fill-opacity="{o}"/>')
+N = 64
+save('predvajaj.svg', play(16, 18, 8, .22) + play(46, 46, 5.5, .16)
+     + '<circle cx="48" cy="14" r="1.6" fill="#fff" fill-opacity=".3"/><circle cx="14" cy="50" r="1.2" fill="#fff" fill-opacity=".3"/>',
+     f'0 0 {N} {N}')
+# trak: navpičen v svojem okviru, zasukan za -16°; luknjice ob robovih, vmes sličice
+W, L = 58, 280
+trak = f'<rect x="0" y="0" width="{W}" height="{L}" rx="4" fill="#0b3550" fill-opacity=".22"/>'
+for y in range(6, L, 14):
+    trak += (f'<rect x="4" y="{y}" width="7" height="8" rx="1.5" fill="#fff" fill-opacity=".35"/>'
+             f'<rect x="{W-11}" y="{y}" width="7" height="8" rx="1.5" fill="#fff" fill-opacity=".35"/>')
+for i, y in enumerate(range(8, L - 30, 46)):
+    trak += f'<rect x="15" y="{y}" width="{W-30}" height="38" rx="3" fill="#fff" fill-opacity="{.14 if i % 2 else .22}"/>'
+    if i % 2 == 0:
+        cx, cy = W / 2, y + 19
+        trak += f'<path d="M{f(cx-5)} {f(cy-7)} L{f(cx+7)} {f(cy)} L{f(cx-5)} {f(cy+7)} Z" fill="#fff" fill-opacity=".55"/>'
+save('filmtrak.svg', f'<g transform="translate(20 34) rotate(-16)">{trak}</g>', '0 0 160 300')
