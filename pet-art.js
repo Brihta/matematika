@@ -102,14 +102,17 @@
   const heart = (x, y, r, c) => `<path d="M${x} ${y + r} C${x - r * 1.6} ${y - r * .2} ${x - r * .9} ${y - r * 1.4} ${x} ${y - r * .5} C${x + r * .9} ${y - r * 1.4} ${x + r * 1.6} ${y - r * .2} ${x} ${y + r} Z" fill="${c}"/>`;
 
   /* Vzorec na telesu (risan v območju telesa, obrezan nanj). */
-  function patternFill(p, body, cx, cy, r) {
+  function patternFill(p, body, cx, cy, r, head) {
     const L = light(body), D = shade(body);
     if (p === 'pike') return [[-.5, -.35, .16], [.35, -.5, .12], [.55, .1, .15], [-.2, .2, .1], [-.6, .35, .12], [.15, .55, .11]]
       .map(([a, b, k]) => `<circle cx="${cx + a * r}" cy="${cy + b * r}" r="${k * r}" fill="${L}" opacity=".85"/>`).join('');
     if (p === 'proge') return [-.6, -.25, .1, .45].map(t =>
       `<path d="M${cx - r * 1.2} ${cy + t * r} Q${cx} ${cy + t * r - r * .25} ${cx + r * 1.2} ${cy + t * r}" fill="none" stroke="${D}" stroke-width="${r * .14}" stroke-linecap="round" opacity=".7"/>`).join('');
-    if (p === 'srcki') return [[-.5, -.3, .13], [.45, -.4, .11], [.5, .3, .12], [-.45, .45, .1]]
-      .map(([a, b, k]) => heart(cx + a * r, cy + b * r, k * r, L)).join('');
+    // srčki so rdeči in posejani po celem območju, da se vidijo na vsaki barvi
+    // na glavi ostanejo oči, nos in usta prosti (srčki samo na čelu in ob robu)
+    if (p === 'srcki') return [[-.6, -.5, .2], [.1, -.72, .18], [.66, -.34, .2]]
+        .concat(head ? [[-1.25, .1, .17], [1.25, .25, .17]] : [[-.78, .3, .18], [.82, .52, .18], [-.3, .86, .18], [.36, .96, .17]])
+      .map(([a, b, k]) => heart(cx + a * r, cy + b * r, k * r, '#e0475a')).join('');
     if (p === 'mavrica') return ['#e86a6a', '#f2a24a', '#f2d24a', '#7cc06a', '#5fa0d8', '#9a7ad0'].map((c, i) =>
       `<path d="M${cx - r * 1.3} ${cy - r * .55 + i * r * .2} Q${cx} ${cy - r * .95 + i * r * .2} ${cx + r * 1.3} ${cy - r * .55 + i * r * .2}" fill="none" stroke="${c}" stroke-width="${r * .2}" opacity=".55"/>`).join('');
     return '';
@@ -185,18 +188,21 @@
         face: `<ellipse cx="100" cy="90" rx="4.6" ry="3.4" fill="${OL}"/>` + mouthW(95)
       };
     },
-    sova(c, b) {
+    sova(c, b, p) {
       const belly = mix(c, b, .62), F = '#f2a24e';
+      // trebuh in obraz sta svetla, zato je vzorec na krilih in na vrhu glave
+      const wing = 'M62 112 C42 122 34 150 42 176 C47 170 50 177 55 172 C58 178 63 176 66 170 C68 150 70 128 62 112 Z';
       const foot = x => shape(`M${x - 11} 186 C${x - 12} 178 ${x - 6} 174 ${x} 174 C${x + 6} 174 ${x + 12} 178 ${x + 11} 186 C${x + 6} 189 ${x + 2} 186 ${x} 189 C${x - 2} 186 ${x - 6} 189 ${x - 11} 186 Z`, F, '', 3.6);
       return {
         bodyD: 'M60 104 C46 122 44 152 56 172 C64 184 82 190 100 190 C118 190 136 184 144 172 C156 152 154 122 140 104 Z',
         bodyC: belly,
         bodyIn: [[88, 140], [112, 140], [76, 154], [100, 154], [124, 154], [88, 168], [112, 168]]
           .map(([x, y]) => line(`M${x - 6} ${y} Q${x} ${y + 6} ${x + 6} ${y}`, 2.6)).join(''),
-        over: both('M62 112 C42 122 34 150 42 176 C47 170 50 177 55 172 C58 178 63 176 66 170 C68 150 70 128 62 112 Z', d => shape(d, c, '', 4))
+        over: shape(wing, c, patternFill(p, c, 53, 140, 22), 4) + shape(mir(wing), c, patternFill(p, c, 147, 140, 22), 4)
             + foot(84) + foot(116),
         legs: false,
         headD: 'M50 80 C48 60 50 40 54 24 C62 32 72 36 82 34 C92 32 108 32 118 34 C128 36 138 32 146 24 C150 40 152 60 150 80 C150 104 130 116 100 116 C70 116 50 104 50 80 Z',
+        headIn: patternFill(p, c, 100, 30, 46),
         face: shape('M100 60 C88 44 60 46 60 74 C60 98 82 108 100 108 C118 108 140 98 140 74 C140 46 112 44 100 60 Z', b, '', 3.6)
             + shape('M95 86 C95 83 105 83 105 86 C105 90 102 95 100 97 C98 95 95 90 95 86 Z', F, '', 2.8),
         eyeX: [81, 119], eyeY: 78, eyeR: 9
@@ -308,7 +314,7 @@
   const EYE_X = [76, 124];
   function creature(pet, head) {
     const c = (BODY[pet.body] || BODY.gozd).c, b = (BELLY[pet.belly] || BELLY.krema).c;
-    const sp = (SP[pet.species] || SP.zmaj)(c, b);
+    const sp = (SP[pet.species] || SP.zmaj)(c, b, pet.pattern);
     const body = shape(sp.bodyD || SIT, sp.bodyC || c, (sp.bodyC ? '' : patternFill(pet.pattern, c, 100, 150, 34)) + (sp.bodyIn || ''), 4.4);
     // noge: stegna zadnjih nog, zunanja rob sprednjih nog in sredinska črta
     const legs = sp.legs === false ? '' : both('M64 156 C70 162 73 172 74 186', d => line(d, 3))
@@ -316,7 +322,7 @@
     const eyeX = sp.eyeX || EYE_X, eyeY = sp.eyeY || 80, eyeR = sp.eyeR || 8;
     const eq = pet.equip || {}, noEars = ACC[eq.glava] && ACC[eq.glava].hidesEars;
     // pod čelado, kapo in baretko ima sova okroglo glavo (čopki bi štrleli skozi)
-    const headS = shape(noEars && pet.species === 'sova' ? HEAD : sp.headD || HEAD, c, patternFill(pet.pattern, c, 100, 66, 34) + (sp.headIn || ''), 4.4);
+    const headS = shape(noEars && pet.species === 'sova' ? HEAD : sp.headD || HEAD, c, patternFill(pet.pattern, c, 100, 66, 34, true) + (sp.headIn || ''), 4.4);
     const cheeks = eyeX.map((x, i) => `<ellipse cx="${x + (i ? 12 : -12)}" cy="${eyeY + 12}" rx="8.5" ry="5" fill="#f7a1b2" opacity=".85"/>`).join('');
     const headAll = (noEars ? '' : sp.ears || '') + headS + cheeks + sp.face + eyes(pet.eyes, eyeX[0], eyeX[1], eyeY, eyeR)
       + accFace(eq.obraz, eyeY, 8) + accHead(eq.glava);
