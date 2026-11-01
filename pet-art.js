@@ -225,9 +225,10 @@
   const ACC = {
     pentlja:   { slot: 'glava', name: 'Pentljica' },
     rozica:    { slot: 'glava', name: 'Rožica' },
-    kapa:      { slot: 'glava', name: 'Kapa' },
+    // kapa in baretka pokrijeta vrh glave: sovini čopki so pod njima
+    kapa:      { slot: 'glava', name: 'Kapa', hidesTufts: true },
     cilinder:  { slot: 'glava', name: 'Cilinder' },
-    baretka:   { slot: 'glava', name: 'Francoska baretka' },
+    baretka:   { slot: 'glava', name: 'Francoska baretka', hidesTufts: true },
     // odprta motoristična čelada: obraz se vidi, ušesa in rogki so pod njo
     celada:    { slot: 'glava', name: 'Motoristična čelada', hidesEars: true },
     ovratnica: { slot: 'vrat',  name: 'Ovratnica' },
@@ -313,9 +314,9 @@
     const legs = sp.legs === false ? '' : both('M64 156 C70 162 73 172 74 186', d => line(d, 3))
       + both('M84 134 C84 152 84 170 84 186', d => line(d, 3)) + line(`M100 ${sp.legs} L100 186`, 3);
     const eyeX = sp.eyeX || EYE_X, eyeY = sp.eyeY || 80, eyeR = sp.eyeR || 8;
-    const eq = pet.equip || {}, noEars = ACC[eq.glava] && ACC[eq.glava].hidesEars;
-    // pod čelado ima sova okroglo glavo (čopki bi štrleli skozi)
-    const headS = shape(noEars && pet.species === 'sova' ? HEAD : sp.headD || HEAD, c, patternFill(pet.pattern, c, 100, 66, 34) + (sp.headIn || ''), 4.4);
+    const eq = pet.equip || {}, hat = ACC[eq.glava] || {}, noEars = hat.hidesEars;
+    // pod čelado, kapo in baretko ima sova okroglo glavo (čopki bi štrleli skozi)
+    const headS = shape((noEars || hat.hidesTufts) && pet.species === 'sova' ? HEAD : sp.headD || HEAD, c, patternFill(pet.pattern, c, 100, 66, 34) + (sp.headIn || ''), 4.4);
     const cheeks = eyeX.map((x, i) => `<ellipse cx="${x + (i ? 12 : -12)}" cy="${eyeY + 12}" rx="8.5" ry="5" fill="#f7a1b2" opacity=".85"/>`).join('');
     const headAll = (noEars ? '' : sp.ears || '') + headS + cheeks + sp.face + eyes(pet.eyes, eyeX[0], eyeX[1], eyeY, eyeR)
       + accFace(eq.obraz, eyeY, 8) + accHead(eq.glava);
