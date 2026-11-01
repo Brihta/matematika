@@ -97,6 +97,8 @@ alter table boss_players add column if not exists weak  json;
 alter table boss_wins    add column if not exists boss  text;
 alter table boss_wins    add column if not exists stage int;
 alter table boss_wins    add column if not exists level text;
+-- pripravljen na naslednji boj (gumb na zaslonu z rezultatom, 1. 11. 2026)
+alter table boss_players add column if not exists ready boolean not null default false;
 
 alter table boss_games   enable row level security;
 alter table boss_players enable row level security;
@@ -194,7 +196,7 @@ returns json language sql security definer set search_path = public as $$
                'target', _boss_target(p.level),
                'weak', case when p.id = p_me then p.weak end,
                'late', g.status <> 'lobby' and p.joined_at > g.starts_at,
-               'correct', p.correct, 'wrong', p.wrong, 'dmg', p.dmg)
+               'correct', p.correct, 'wrong', p.wrong, 'dmg', p.dmg, 'ready', p.ready)
              order by p.joined_at)
         from boss_players p where p.game_id = g.id), '[]'::json))
   from boss_games g where g.id = p_game;
@@ -226,14 +228,15 @@ begin
   end if;
 end; $$;
 
--- V čakalnici odstrani odsotne (20 s), preda vlogo gostitelja, med bojem
--- preveri konec.
+-- V čakalnici odstrani odsotne (20 s; kdor je pritisnil »pripravljen/a«,
+-- 2 min — telefon z zaklenjenim zaslonom za hip utihne), preda vlogo
+-- gostitelja, med bojem preveri konec.
 create or replace function public._boss_tidy(p_game uuid)
 returns void language plpgsql security definer set search_path = public as $$
 begin
   delete from boss_players p using boss_games g
    where g.id = p_game and p.game_id = g.id and g.status = 'lobby'
-     and p.last_seen < now() - interval '20 seconds';
+     and p.last_seen < now() - case when p.ready then interval '2 minutes' else interval '20 seconds' end;
   update boss_games g
      set host_player = (select p.id from boss_players p where p.game_id = g.id order by p.joined_at limit 1)
    where g.id = p_game
@@ -400,7 +403,7 @@ begin
                   when g.result = 'lose' then greatest(1, g.stage - 1)
                   else g.stage end;
 
-  update boss_players set correct = 0, wrong = 0, dmg = 0,
+  update boss_players set correct = 0, wrong = 0, dmg = 0, ready = false,
          weak = case when g.v2 then _boss_weak(student_id, level) end
    where game_id = g.id;
   update boss_games
@@ -431,6 +434,22 @@ begin
     update boss_games set status = 'lobby', starts_at = null, ends_at = null where id = g.id;
   end if;
   return _boss_state(g.id, v_me);
+end; $$;
+
+-- ── 7b. Pripravljen/a (po boju) ──────────────────────────────────────────
+-- Igralec po koncu boja pove, da gre še enkrat. Gostitelj vidi, kdo je
+-- pripravljen; ko začne nov boj, je igralec zraven.
+create or replace function public.boss_ready(p_code text, p_token uuid)
+returns json language plpgsql security definer set search_path = public as $$
+declare v boss_players;
+begin
+  select p.* into v from boss_players p join boss_games g on g.id = p.game_id
+   where p.token = p_token and g.code = trim(p_code);
+  if not found then return json_build_object('error', 'gone'); end if;
+  update boss_players p set ready = true, last_seen = now()
+    from boss_games g where p.id = v.id and g.id = p.game_id and g.status <> 'running';
+  perform _boss_tidy(v.game_id);
+  return _boss_state(v.game_id, v.id);
 end; $$;
 
 -- ── 8. Zapusti ────────────────────────────────────────────────────────────

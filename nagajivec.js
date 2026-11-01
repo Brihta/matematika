@@ -374,7 +374,7 @@
       if (!resT) resT = setTimeout(() => { resT = null; result(); }, 1600);
     } else if (me() && me().late) { if (view !== 'late' || (prev && prev.status !== s.status)) lateScreen(); }
     else if (view !== 'result' && view !== 'game') result();
-    else if (prev && prev.host !== s.host) resultButtons();
+    else if (prev && (prev.host !== s.host || readyKey(prev) !== readyKey(s))) resultButtons();
     schedule(POLL_END);
   }
 
@@ -767,6 +767,7 @@
       <div id="ngResAct"></div></div></div>`);
     (win ? SFX.victory : SFX.click)();
     resultButtons();
+    schedule(POLL_END);                     // stop() je ustavil poizvedbe; brez njih nov boj ne pride do te naprave
     showTreats(win, G && G.treatsBefore);
   }
   /* Samo svoji zadetki — brez lestvice, boj je skupinski. */
@@ -781,11 +782,25 @@
     return `<div class="ng-stage">${win ? (sg >= 8 ? '👑 Najvišja stopnja premagana!' : `💪 Naslednji boj bo težji: ${nx}. stopnja`)
       : `Naslednji boj: ${nx}. stopnja`}</div>`;
   }
+  const readyKey = s => s.players.filter(p => p.ready).map(p => p.id).join();
   function resultButtons() {
     const box = $('ngResAct'); if (!box) return;
-    box.innerHTML = (isHost() ? '<button class="ng-btn" id="ngAgain">👾 Še enkrat</button>'
-      : `<div class="ng-wait">Za nov boj čakamo na ${hostName()} …</div>`)
+    const rd = st.players.filter(p => p.ready && p.id !== st.me), m = me();
+    box.innerHTML = (isHost()
+        ? (rd.length ? `<div class="ng-wait">✋ Pripravljeni: ${rd.map(p => esc(p.name)).join(', ')}</div>` : '')
+          + '<button class="ng-btn" id="ngAgain" style="margin-top:8px">👾 Še enkrat</button>'
+        : m && m.ready ? `<div class="ng-wait">✅ Pripravljen/a si! Ko ${hostName()} začne nov boj, si zraven.</div>`
+        : '<button class="ng-btn" id="ngReady">✋ Sem pripravljen/a</button>'
+          + `<div class="ng-wait">Za nov boj čakamo na ${hostName()} …</div>`)
       + '<button class="ng-btn ghost" id="ngOut" style="margin-top:8px">Zapusti boj</button>';
+    const ready = $('ngReady');
+    if (ready) ready.addEventListener('click', async () => {
+      ready.disabled = true; SFX.click();
+      const r = await call('boss_ready', { p_code: ng.code, p_token: ng.token });
+      if (!r || r === RPC_UNREACHABLE || r.error) { ready.disabled = false; return; }
+      apply(r);
+      if (view === 'result') resultButtons();
+    });
     const again = $('ngAgain');
     if (again) again.addEventListener('click', async () => {
       again.disabled = true; again.textContent = 'Pripravljam …';
