@@ -3715,6 +3715,7 @@ async function openLeaderboard(highlightName, highlightScore) {
    Šteje samo igra prijavljenega učenca (comp_rounds), ki jo preveri baza.
 ══════════════════════════════════════════ */
 const HALL_CLUBS = [
+  { min: 140, name: 'Klub 140+', medal: '🏆' },
   { min: 120, name: 'Klub 120+', medal: '🥇' },
   { min: 100, name: 'Klub 100+', medal: '🥈' },
   { min: 80,  name: 'Klub 80+',  medal: '🥉' },
