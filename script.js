@@ -1875,6 +1875,12 @@ function renderAuthView(view) {
       else {
         btn.disabled = false; btn.textContent = 'Prijava ✓';
         msg.textContent = '❌ Napačno uporabniško ime ali geslo.';
+        /* Po 5 napačnih poskusih baza račun za 10 minut zaklene
+           (supabase_varnost_prijave.sql) — otrok mora vedeti, da čaka. */
+        const mins = await supabaseRPC('login_locked_minutes', { p_username: user.toLowerCase() });
+        if (typeof mins === 'number' && mins > 0) {
+          msg.textContent = `🔒 Preveč napačnih poskusov. Počakaj ${mins} min in poskusi znova.`;
+        }
         /* The old screen answered a forgotten password with "create an
            account", which is how one child ended up with four. */
         const help = box.querySelector('#authHelpSlot');
@@ -2073,6 +2079,98 @@ function renderAuthView(view) {
   });
 }
 
+/* ── Učenec si sam spremeni geslo ──
+   Sošolci so ugibali gesla (imena so javna, veliko otrok ima 4 enake živali).
+   Kdor želi, se zavaruje sam. Staro geslo je potrebno, da ga ne spremeni
+   sošolec na pozabljeni prijavi. Lahkega gesla ne zavrnemo — otroci gesla
+   težko zapomnijo — samo opozorimo. */
+function openStudentPinChange() {
+  if (!profile) return;
+  removeOverlay();
+  const div = document.createElement('div');
+  div.className = 'timed-overlay';
+  div.innerHTML = `<div class="timed-overlay-box auth-box"></div>`;
+  document.body.appendChild(div);
+  activeOverlay = div;
+  const box = div.querySelector('.auth-box');
+  let oldSeq = null, newSeq = null;
+
+  const STEPS = {
+    old:    { label: 'Najprej poklikaj svoje <strong>sedanje</strong> geslo', btn: 'Naprej ➡️' },
+    new:    { label: 'Zdaj izberi <strong>novo</strong> geslo', btn: 'Naprej ➡️' },
+    repeat: { label: 'Še enkrat poklikaj <strong>novo</strong> geslo', btn: 'Shrani ✓' }
+  };
+  function show(step) {
+    box.innerHTML = `
+      <div class="overlay-title" style="color:#f0a500">🔑 Spremeni svoje geslo</div>
+      <div class="overlay-divider"></div>
+      <div class="reset-student pin-who">${esc(profile.emoji || '🦉')} <strong>${esc(profile.username)}</strong></div>
+      ${step === 'new' ? `<div class="auth-note">💡 Izberi <strong>različne</strong> živali,
+        da ga sošolci ne uganejo. In si ga zapiši!</div>` : ''}
+      <label class="auth-label">${STEPS[step].label}</label>
+      <div id="cpPicker"></div>
+      <button class="overlay-btn overlay-btn-next" id="cpNext">${STEPS[step].btn}</button>
+      <div class="auth-msg" id="cpMsg"></div>
+      <button class="auth-switch auth-close" id="cpBack">← Nazaj</button>`;
+    const picker = buildAnimalPicker();
+    box.querySelector('#cpPicker').appendChild(picker);
+    box.querySelector('#cpBack').addEventListener('click', openStatsOverlay);
+    const msg = box.querySelector('#cpMsg');
+    const btn = box.querySelector('#cpNext');
+    btn.addEventListener('click', async () => {
+      const seq = picker.getSeq();
+      if (!seq) { msg.textContent = 'Izberi vse 4 živali.'; return; }
+      if (step === 'old') { oldSeq = seq; show('new'); return; }
+      if (step === 'new') {
+        // 4 enake ali 2 + 2 je lahko uganiti: opozori enkrat, potem pusti
+        const weak = new Set(seq.split(',')).size < 3;
+        if (weak && btn.dataset.warned !== seq) {
+          btn.dataset.warned = seq;
+          msg.classList.add('pin-warn');
+          msg.textContent = '⚠️ Tako geslo sošolci hitro uganejo. Izberi drugo '
+                          + 'ali klikni še enkrat, če ga vseeno želiš.';
+          return;
+        }
+        newSeq = seq; show('repeat'); return;
+      }
+      if (seq !== newSeq) {
+        msg.textContent = '❌ Gesli se ne ujemata. Izberi novo geslo še enkrat.';
+        setTimeout(() => show('new'), 1500);
+        return;
+      }
+      btn.disabled = true; btn.textContent = 'Shranjujem …';
+      const res = await supabaseRPC('change_student_pin', {
+        p_username: profile.username, p_old: oldSeq, p_new: newSeq
+      });
+      if (res === 'OK') {
+        const animals = newSeq.split(',').map(i => ANIMALS[+i]).join(' ');
+        box.innerHTML = `
+          <div class="overlay-title" style="color:#4caf50">✅ Geslo spremenjeno</div>
+          <div class="overlay-divider"></div>
+          <label class="auth-label">Tvoje novo geslo:</label>
+          <div class="reset-animals">${animals}</div>
+          <div class="auth-note">📌 Zapiši si ga ali ga dobro zapomni —
+            od zdaj se prijavljaš z njim.</div>
+          <button class="overlay-btn overlay-btn-next" id="cpDone">V redu ✓</button>`;
+        box.querySelector('#cpDone').addEventListener('click', openStatsOverlay);
+        return;
+      }
+      if (res === 'BAD_LOGIN') {
+        box.innerHTML = '';
+        show('old');
+        box.querySelector('#cpMsg').textContent = '❌ Sedanje geslo ni pravilno. Poskusi znova.';
+        return;
+      }
+      btn.disabled = false; btn.textContent = STEPS.repeat.btn;
+      msg.textContent = res === 'ZAKLENJENO'
+        ? '🔒 Preveč napačnih poskusov. Počakaj 10 min in poskusi znova.'
+        : res === RPC_UNREACHABLE ? OFFLINE_MSG
+        : '❌ Geslo ni spremenjeno. Poskusi znova.';
+    });
+  }
+  show('old');
+}
+
 /* ── Stats dashboard ── */
 async function openStatsOverlay() {
   if (!profile) { openAuthOverlay('login'); return; }
@@ -2090,25 +2188,26 @@ async function openStatsOverlay() {
         </div>
         <button class="stats-logout" id="statsLogout">🚪 Odjava</button>
       </div>
+      <button class="stats-pin-btn" id="statsPin">🔑 Spremeni svoje geslo</button>
       <div class="stats-section-title">📚 Poštevanke</div>
       <div class="ptable-toggle" id="ptableToggle">
         <button class="ptable-tog-btn active" data-w="recent">Zadnja 2 tedna</button>
         <button class="ptable-tog-btn" data-w="all">Ves čas</button>
       </div>
-      <div class="ptable-list" id="ptableList">
+      <div class="ptable-list pt-grid" id="ptableList">
         <div class="comp-board-empty">Nalagam …</div>
       </div>
-      <div class="ptable-legend">
-        <span><span class="ptable-chip m-good"></span> pravilno in hitro</span>
-        <span><span class="ptable-chip m-mid"></span> še vadi</span>
-        <span><span class="ptable-chip m-bad"></span> veliko napak</span>
-        <span>🐢 pravilno, a počasi</span>
-      </div>
-      <div class="ptable-tip" id="ptableTip"></div>
       <div id="do20Section" style="display:none">
         <div class="stats-section-title">➕ Računi do 20</div>
-        <div class="ptable-list" id="do20List"></div>
+        <div class="ptable-list pt-grid pt-grid-3" id="do20List"></div>
       </div>
+      <div class="ptable-legend">
+        <span><span class="ptable-chip m-good"></span> obvlada</span>
+        <span><span class="ptable-chip m-mid"></span> še vadi</span>
+        <span><span class="ptable-chip m-bad"></span> napake</span>
+        <span>🐢 počasi</span>
+      </div>
+      <div class="ptable-tip" id="ptableTip"></div>
     </div>`;
   document.body.appendChild(div);
   activeOverlay = div;
@@ -2118,6 +2217,7 @@ async function openStatsOverlay() {
     logoutStudent();
     removeOverlay();
   });
+  div.querySelector('#statsPin').addEventListener('click', openStudentPinChange);
 
   await flushStats();           // make sure latest answers are counted
   /* ── Poštevanke section ── */
@@ -2147,14 +2247,16 @@ async function openStatsOverlay() {
     }
     return agg;
   }
-  function chip(cell) {
+  /* Kvadratek z znakom računa (× ÷ + −). Odstotek je samo v namigu ob
+     dotiku: otroci so gledali barve, številke so okence le podaljšale. */
+  function chip(cell, sign) {
     const c = cell ? cell.c : 0, w = cell ? cell.w : 0;
     const pct = masteryPct(c, w);
     const cls = masteryClass(c, w, cell && cell.n, cell && cell.f);
     // rumeno pri visoki točnosti pomeni "pravilno, a prepočasi" — želva to pove brez legende
     const slow = pct !== null && pct >= 85 && cls === 'm-mid';
-    const txt = pct === null ? '—' : pct + '%' + (slow ? ' 🐢' : '');
-    return `<span class="ptable-chip ${cls}">${txt}</span>`;
+    const title = pct === null ? 'še ni vadeno' : pct + ' % pravilno' + (slow ? ', a počasi' : '');
+    return `<span class="pt-dot ${cls}" title="${sign} ${title}">${slow ? '🐢' : sign}</span>`;
   }
   function renderPtable(window) {
     const agg = aggTables(window);
@@ -2174,12 +2276,9 @@ async function openStatsOverlay() {
         }
       });
       list.insertAdjacentHTML('beforeend', `
-        <div class="ptable-row">
+        <div class="pt-tile">
           <span class="ptable-num">${t}</span>
-          <span class="ptable-ops">
-            <span class="ptable-op">× ${chip(x)}</span>
-            <span class="ptable-op">÷ ${chip(d)}</span>
-          </span>
+          <span class="pt-pair">${chip(x, '×')}${chip(d, '÷')}</span>
         </div>`);
     }
     renderDo20(window);
@@ -2209,12 +2308,9 @@ async function openStatsOverlay() {
       a.n += r.timed || 0;   a.f += r.fast || 0;
     }
     div.querySelector('#do20List').innerHTML = DO20_GROUPS.map(g => `
-      <div class="ptable-row">
-        <span class="ptable-num ptable-grp">${g.label}</span>
-        <span class="ptable-ops">
-          <span class="ptable-op">+ ${chip(agg[g.key + '_p'])}</span>
-          <span class="ptable-op">${MINUS} ${chip(agg[g.key + '_m'])}</span>
-        </span>
+      <div class="pt-tile">
+        <span class="pt-grp">${g.short}</span>
+        <span class="pt-pair">${chip(agg[g.key + '_p'], '+')}${chip(agg[g.key + '_m'], MINUS)}</span>
       </div>`).join('');
   }
   renderPtable('recent');

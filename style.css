@@ -859,6 +859,33 @@ body.competition {
   font-size: 0.8rem; color: rgba(255,255,255,0.75);
   text-align: center; min-height: 1.1em; margin-top: 2px;
 }
+/* Okence učenca: mreža ploščic namesto vrstice na poštevanko. Prej je bilo
+   okence dolgo za tri zaslone, zdaj gre vse skupaj na enega. */
+.pt-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.pt-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.pt-grid .comp-board-empty { grid-column: 1 / -1; }
+.pt-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: rgba(0,0,0,0.28); border-radius: 8px; padding: 5px 2px;
+}
+.pt-tile .ptable-num { font-size: 1.05rem; min-width: 0; line-height: 1.1; }
+.pt-grp { font-size: 0.75rem; font-weight: 700; color: #f0a500; white-space: nowrap; }
+.pt-pair { display: flex; gap: 3px; }
+.pt-dot {
+  width: 22px; height: 22px; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 800; line-height: 1;
+}
+.stats-pin-btn {
+  align-self: flex-start;
+  background: rgba(255,255,255,0.08); color: #e8e8e8;
+  border: 1px solid rgba(255,255,255,0.35); border-radius: 8px;
+  padding: 6px 12px; font-size: 0.82rem; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+}
+.stats-pin-btn:hover { background: rgba(255,255,255,0.16); }
+.pin-warn { color: #e6b84a !important; }
+.pin-who strong { color: #f0a500; }
 
 /* ── Teacher dashboard ── */
 /* The teacher view is a working screen, not a notice. It used the same box
