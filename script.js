@@ -2383,6 +2383,20 @@ async function openStatsOverlay() {
 /* ══════════════════════════
    TEACHER DASHBOARD
 ══════════════════════════ */
+/* Enobarvne ikone za orodno vrstico pregleda (barvo vzamejo od gumba). */
+const TD_SVG = d => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"`
+  + ` stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const TD_ICON = {
+  eye: TD_SVG('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+  eyeOff: TD_SVG('<path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a17.8 17.8 0 0 1-2.6 3.5'
+    + 'M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/>'),
+  print: TD_SVG('<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5'
+    + 'a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/>'),
+  more: TD_SVG('<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>'),
+  close: TD_SVG('<path d="M6 6l12 12M18 6L6 18"/>'),
+  warn: TD_SVG('<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>')
+};
+
 async function openTeacherDashboard() {
   if (!teacherSession) { openAuthOverlay('teacher'); return; }
   // Also covers a reload: the session comes back from localStorage, so the
@@ -2391,28 +2405,45 @@ async function openTeacherDashboard() {
   removeOverlay();
   const div = document.createElement('div');
   div.className = 'timed-overlay';
+  /* Vse kontrole v eni tanki vrstici: prej so naslov, dve vrsti velikih
+     gumbov in pet gumbov spodaj vzeli dve tretjini zaslona, za otroke je
+     ostala tretjina. Redko rabljeno je v meniju ⋯. */
   div.innerHTML = `
     <div class="timed-overlay-box teacher-box">
-      <button class="medal-modal-close" id="tdClose" title="Zapri">✕</button>
-      <div class="overlay-title" style="color:#f0a500">👨‍🏫 Učiteljski pregled</div>
-      <div class="td-controls">
-        <div class="ptable-toggle" id="tdWinToggle">
+      <div class="td-toolbar">
+        <div class="td-title">Pregled</div>
+        <div class="ptable-toggle td-seg" id="tdWinToggle">
           <button class="ptable-tog-btn active" data-w="today">Danes</button>
-          <button class="ptable-tog-btn" data-w="recent">Zadnja 2 tedna</button>
+          <button class="ptable-tog-btn" data-w="recent">2 tedna</button>
           <button class="ptable-tog-btn" data-w="all">Ves čas</button>
         </div>
-      </div>
-      <div class="td-controls">
-        <div class="ptable-toggle" id="tdViewToggle">
-          <button class="ptable-tog-btn active" data-v="lesson">👥 Učenci</button>
-          <button class="ptable-tog-btn" data-v="matrix">📚 Poštevanke</button>
-          <button class="ptable-tog-btn" data-v="do20">➕ Do 20</button>
+        <div class="ptable-toggle td-seg" id="tdViewToggle">
+          <button class="ptable-tog-btn active" data-v="lesson">Učenci</button>
+          <button class="ptable-tog-btn" data-v="matrix">Poštevanke</button>
+          <button class="ptable-tog-btn" data-v="do20">Do 20</button>
         </div>
         <select class="td-razred-select" id="tdRazredSelect" title="Filtriraj po razredu">
           <option value="">Vsi razredi</option>
         </select>
-        <button class="td-names-btn" id="tdNames"
-                title="Pokaži ali skrij imena učencev">🙈 Imena skrita</button>
+        <div class="td-tools">
+          <button class="td-tool td-tool-warn" id="tdDupBadge" style="display:none"
+                  title="Enako ime v razredu"></button>
+          <button class="td-tool" id="tdNames"
+                  title="Imena so skrita — klikni, da jih pokažeš">${TD_ICON.eyeOff}</button>
+          <button class="td-tool td-tool-label" id="tdPrint" title="Natisni pregled ure (A4)">${
+            TD_ICON.print}<span>Natisni</span></button>
+          <div class="td-more">
+            <button class="td-tool" id="tdMore" title="Več">${TD_ICON.more}</button>
+            <div class="td-menu" id="tdMenu" hidden>
+              <button id="tdBattles">⚔️ Bitke v živo</button>
+              <button id="tdNamesPrint">📋 Seznam uporabniških imen</button>
+              <button id="tdPass">🔑 Spremeni svoje geslo</button>
+              <hr>
+              <button id="tdLogout" class="td-menu-danger">Odjava</button>
+            </div>
+          </div>
+          <button class="td-tool" id="tdClose" title="Zapri">${TD_ICON.close}</button>
+        </div>
       </div>
       <div class="td-statusline">
         <span class="td-live" id="tdLive"></span>
@@ -2426,23 +2457,26 @@ async function openTeacherDashboard() {
         <span><span class="ptable-chip m-early"></span> premalo odgovorov</span>
         <span><span class="ptable-chip m-none"></span> ni podatkov</span>
         <span class="td-legend-ops" id="tdLegendOps">zgoraj × · spodaj ÷</span>
+        <span class="td-legend-ops">klik na ime: ime, razred, novo geslo</span>
       </div>
       <div class="td-grid-wrap" id="tdGridWrap">
         <div class="comp-board-empty">Nalagam …</div>
-      </div>
-      <div class="td-hint">💡 Klikni na ime učenca, če želiš popraviti njegovo ime ali ponastaviti geslo.</div>
-      <div class="td-footer">
-        <button class="overlay-btn overlay-btn-next" id="tdPrint">🖨️ Natisni (A4)</button>
-        <button class="overlay-btn overlay-btn-ghost" id="tdBattles">⚔️ Bitke v živo</button>
-        <button class="overlay-btn overlay-btn-ghost" id="tdNamesPrint">📋 Seznam uporabniških imen</button>
-        <button class="overlay-btn overlay-btn-ghost" id="tdPass">🔑 Spremeni svoje geslo</button>
-        <button class="overlay-btn overlay-btn-ghost" id="tdLogout">Odjava</button>
       </div>
     </div>`;
   document.body.appendChild(div);
   activeOverlay = div;
   div.addEventListener('click', e => { if (e.target === div) removeOverlay(); });
   div.querySelector('#tdClose').addEventListener('click', removeOverlay);
+
+  /* Meni ⋯: zapre se ob izbiri ali ob kliku kamor koli drugam. */
+  const menu = div.querySelector('#tdMenu');
+  div.querySelector('#tdMore').addEventListener('click', e => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+  });
+  div.addEventListener('click', e => {
+    if (!menu.hidden && !e.target.closest('#tdMore')) menu.hidden = true;
+  });
   div.querySelector('#tdLogout').addEventListener('click', () => {
     logoutTeacher();
     removeOverlay();
@@ -2458,6 +2492,7 @@ async function openTeacherDashboard() {
   let curRazred = '';
   let curView = 'lesson';
   let showIdle = false;
+  let dupOpen = false;
   /* Namenoma se NE shrani in ob vsakem odprtju začne skrito: pregled se
      projicira na tablo, in če bi si nastavitev zapomnil, bi se imena
      pokazala razredu, preden bi učiteljica sploh utegnila reagirati. */
@@ -2673,19 +2708,22 @@ async function openTeacherDashboard() {
     };
   }
 
-  /* "63 / ✔34" — koliko odgovorov in koliko od tega pravilnih. Napačni se
-     nikjer ne seštevajo v dosežek; vidni so samo kot razlika med številkama
-     in kot barva, ki takoj izda otroka, ki zgolj klika. */
+  /* Odgovori in točnost sta ločena stolpca: "63 / ✔34" je bilo treba
+     preračunati v glavi, rdeča "54 %" pa takoj izda otroka, ki zgolj klika. */
   function ansCell(r) {
-    if (!r.answers) return '<span class="tl-ans tl-ans-none">—</span>';
-    const chips = r.byMode.map(m =>
+    return `<span class="tl-num tl-ans" title="${r.answers} odgovorov, ${r.correct} pravilnih">${
+      r.answers || '—'}</span>`;
+  }
+  function pctCell(r) {
+    if (!r.answers) return '<span class="tl-num tl-pct m-none">—</span>';
+    return `<span class="tl-num tl-pct ${cellClass(r.correct, r.wrong)}"`
+      + ` title="${r.correct} pravilnih od ${r.answers}">${r.pct} %</span>`;
+  }
+  /* Načini igre v eni vrstici, brez okvirčkov. Na ozkem zaslonu stolpca ni. */
+  function modesCell(r) {
+    return `<span class="tl-modes">${r.byMode.map(m =>
       `<span class="tl-mode" title="${m.label}: ${m.c} pravilnih od ${m.c + m.w}">`
-      + `${m.icon}&#8202;${m.c}</span>`).join('');
-    return `<span class="tl-ans" title="${r.answers} odgovorov, ${r.correct} pravilnih (${r.pct}%)">
-        <span class="tl-ans-line">${r.answers}<span class="tl-ans-sep">/</span>`
-      + `<span class="tl-ans-ok ${cellClass(r.correct, r.wrong)}">✔${r.correct}</span></span>`
-      + (chips ? `<span class="tl-modes">${chips}</span>` : '')
-      + `</span>`;
+      + `${m.icon}&#8202;${m.c}</span>`).join('')}</span>`;
   }
 
   /* Brihtometer: koliko od 20 predalov učenec obvlada (≥5 odgovorov in
@@ -2693,16 +2731,14 @@ async function openTeacherDashboard() {
      napihniti: 300× poštevanka 10 prinese natanko 1/20. */
   function bmCell(n) {
     const pct = Math.round(n / BUCKETS * 100);
-    /* Preliv mora biti raztegnjen čez CELO črtico, ne čez napolnjeni del —
-       sicer se pri 2/20 stisne vanj in je tudi tak otrok videti zelen.
-       background-size ga poveča nazaj na širino črtice, zato je barva
-       odvisna od tega, kako daleč si, ne od tega, kako dolg je kos. */
-    const bg = n ? `;background-size:${Math.round(BUCKETS / n * 100)}% 100%` : '';
+    /* Ena barva za vso črtico, odvisna od tega, kako daleč je otrok —
+       ne preliv, ki bi se pri 2/20 stisnil v kratek kos in bil videti zelen. */
+    const lvl = n >= 16 ? 'hi' : n >= 8 ? 'mid' : 'lo';
     return `<span class="tl-bm" title="Brihtometer: ${n} od ${BUCKETS} obvladanih poštevank`
       + ` (vsaj 5 odgovorov, vsaj 85 % pravilnih in pravilni večinoma hitreje kot v ${FAST_SECONDS} s).`
       + ` Šteje ves čas, ne glede na izbrano obdobje.">`
-      + `<span class="tl-bm-val">${n}<span class="tl-bm-max">/${BUCKETS}</span></span>`
-      + `<span class="tl-bm-bar"><span class="tl-bm-fill" style="width:${pct}%${bg}"></span></span>`
+      + `<span class="tl-bm-bar"><span class="tl-bm-fill bm-${lvl}" style="width:${pct}%"></span></span>`
+      + `<span class="tl-bm-val">${n}</span>`
       + `</span>`;
   }
 
@@ -2746,16 +2782,18 @@ async function openTeacherDashboard() {
     const folded = !showIdle && idleCount > 8;
     const shown = folded ? started : rows;
 
-    /* "ODGOVORI", "BRIHTOMETER" and "NAJŠIBKEJŠA" are single unbreakable
-       words — on a phone no column width or wrapping saves them, so use
-       short labels there. */
+    /* Ena tabela, vrstica na otroka, brez kartic. Stolpca Razred ni, kadar
+       je razred izbran (vsi so iz istega), Načinov pa ne na telefonu —
+       za to poskrbi CSS (.tl-rz, .tl-modes). */
     const narrow = window.matchMedia('(max-width: 600px)').matches;
     const H = narrow
-      ? ['Učenec', 'Odg.', 'Brihta', 'Šibka']
-      : ['Učenec', 'Odgovori', 'Brihtometer', 'Najšibkejša'];
+      ? ['Učenec', 'Razred', 'Načini', 'Odg.', 'Točnost', 'Brihta', 'Šibka']
+      : ['Učenec', 'Razred', 'Načini', 'Odgovori', 'Točnost', 'Brihtometer', 'Najšibkejša'];
     const head = `<div class="tl-row tl-head">
-        <span>${H[0]}</span><span class="tl-num">${H[1]}</span>
-        <span class="tl-num">${H[2]}</span><span class="tl-weak">${H[3]}</span>
+        <span>${H[0]}</span><span class="tl-rz">${H[1]}</span>
+        <span class="tl-modes">${H[2]}</span><span class="tl-num">${H[3]}</span>
+        <span class="tl-num">${H[4]}</span><span>${H[5]}</span>
+        <span class="tl-weak">${H[6]}</span>
       </div>`;
     const body = shown.map(r => {
       const rz = razredMap[r.s.username];
@@ -2765,12 +2803,15 @@ async function openTeacherDashboard() {
         : '—';
       return `<div class="tl-row${idle ? ' tl-idle' : ''}">
         <span class="tl-name" data-username="${esc(r.s.username)}"
-              title="Klikni za ponastavitev gesla">
+              title="Klikni za ime, razred ali novo geslo">
           <span class="tl-dot ${idle ? 'off' : 'on'}"></span>
-          ${esc(r.s.emoji || '🦉')} ${imeUcenca(r.s)}${
-            !curRazred && rz ? `<span class="td-razred">${razredLabel(rz)}</span>` : ''}
+          <span class="tl-emoji">${esc(r.s.emoji || '🦉')}</span>
+          <span class="tl-who">${imeUcenca(r.s)}</span>
         </span>
+        <span class="tl-rz">${rz ? razredLabel(rz) : ''}</span>
+        ${modesCell(r)}
         ${ansCell(r)}
+        ${pctCell(r)}
         ${bmCell(r.mastered)}
         <span class="tl-weak">${weakTxt}</span>
       </div>`;
@@ -2784,8 +2825,9 @@ async function openTeacherDashboard() {
     const legend = `<div class="tl-legend">${
       anyModes ? MODES.map(m =>
         `<span>${m.icon} ${m.label.toLowerCase()}</span>`).join('') : ''
-      }<span class="tl-legend-note">Brihtometer = obvladane poštevanke od ${BUCKETS}</span></div>`;
-    wrap.innerHTML = `<div class="td-lesson">${head}${body}${emptyNote}${
+      }<span class="tl-legend-note">Brihtometer = obvladane poštevanke od ${BUCKETS}</span>`
+      + `<span class="tl-legend-note">Klik na ime: ime, razred, novo geslo</span></div>`;
+    wrap.innerHTML = `<div class="td-lesson${curRazred ? ' one-rz' : ''}">${head}${body}${emptyNote}${
       folded ? foldButton(idleCount) : ''}${legend}</div>`;
     wireFold();
   }
@@ -2796,8 +2838,10 @@ async function openTeacherDashboard() {
     const active = rows.filter(r => r.answers > 0).length;
     const total = rows.reduce((a, r) => a + r.answers, 0);
     const correct = rows.reduce((a, r) => a + r.correct, 0);
-    el.textContent = rows.length
-      ? `${rows.length} učencev · ${active} vadi · ${total} odgovorov, ${correct} pravilnih`
+    el.innerHTML = rows.length
+      ? `<span><b>${active}</b> / ${rows.length} vadi</span>`
+        + `<span><b>${total}</b> odgovorov</span>`
+        + (total ? `<span><b class="td-sum-pct">${Math.round(correct / total * 100)} %</b> pravilnih</span>` : '')
       : '';
   }
 
@@ -2818,21 +2862,28 @@ async function openTeacherDashboard() {
     }
     const dups = Object.values(groups).filter(g => g.n > 1)
       .sort((a, b) => (a.rz + a.name).localeCompare(b.rz + b.name, 'sl'));
-    if (!dups.length) { el.style.display = 'none'; return; }
-    el.style.display = '';
+    /* Na zaslonu je samo značka ⚠ s številom; opis se pokaže ob kliku nanjo.
+       Prej je opozorilo stalno zasedalo celo vrstico nad seznamom. */
+    const badge = div.querySelector('#tdDupBadge');
+    if (!dups.length) { el.style.display = badge.style.display = 'none'; return; }
+    badge.style.display = '';
+    badge.innerHTML = `${TD_ICON.warn}<span>${dups.length}</span>`;
+    badge.classList.toggle('on', dupOpen);
+    el.style.display = dupOpen ? '' : 'none';
     const what = showNames
       ? dups.map(g => `<strong>${esc(g.name)}</strong>${
           !curRazred && g.rz ? ` (${esc(g.rz)})` : ''} ${g.n}×`).join(', ')
       : `${dups.length} ${[, 'ime se ponovi', 'imeni se ponovita', 'imena se ponovijo',
           'imena se ponovijo'][dups.length] || 'imen se ponovi'}`
         + ` — pokaži imena za podrobnosti`;
-    /* Zložljivo: na telefonu je navodilo zasedlo pol zaslona nad seznamom.
-       Odprto/zaprto ostane med osveževanjem (vsakih nekaj sekund). */
-    const open = el.querySelector('details')?.open ? ' open' : '';
-    el.innerHTML = `<details${open}><summary>⚠️ Enako ime v razredu: ${what}.</summary>`
+    el.innerHTML = `<b>Enako ime v razredu:</b> ${what}.`
       + `<span class="td-dupwarn-how">Klikni ime: <b>dva otroka</b> → dodaj začetnico priimka `
-      + `(Eva K.) · <b>en otrok, več računov</b> → 🔗 Združi.</span></details>`;
+      + `(Eva K.) · <b>en otrok, več računov</b> → 🔗 Združi.</span>`;
   }
+  div.querySelector('#tdDupBadge').addEventListener('click', () => {
+    dupOpen = !dupOpen;
+    updateDupWarn();
+  });
 
   function renderGrid() {
     div.querySelector('#tdLegend').style.display = curView === 'lesson' ? 'none' : '';
@@ -3211,7 +3262,9 @@ async function openTeacherDashboard() {
   const namesBtn = div.querySelector('#tdNames');
   namesBtn.addEventListener('click', () => {
     showNames = !showNames;
-    namesBtn.textContent = showNames ? '👁 Imena vidna' : '🙈 Imena skrita';
+    namesBtn.innerHTML = showNames ? TD_ICON.eye : TD_ICON.eyeOff;
+    namesBtn.title = showNames ? 'Imena so vidna — klikni, da jih skriješ'
+                               : 'Imena so skrita — klikni, da jih pokažeš';
     namesBtn.classList.toggle('on', showNames);
     renderGrid();
   });

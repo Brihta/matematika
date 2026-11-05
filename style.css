@@ -900,49 +900,133 @@ body.competition {
 .pin-who strong { color: #f0a500; }
 
 /* ── Teacher dashboard ── */
-/* The teacher view is a working screen, not a notice. It used the same box
-   as "Nova medalja!", so on a classroom monitor a whole class sat in a small
-   square with black all around it. It now takes the entire screen: header and
-   footer stay put, the list scrolls inside. */
+/* Delovni zaslon čez cel monitor. Po vzoru Applovih programov: črna
+   podlaga, ena tanka orodna vrstica, podatki otrok v gosti tabeli čez vso
+   širino. Barva pomeni samo stanje (zelena obvlada, rumena vadi, rdeča
+   potrebuje pomoč) — gumbi so sivi, da ne tekmujejo s podatki. */
 .teacher-box {
+  --td-bg: #000;
+  --td-bar: #1c1c1e;
+  --td-fill: #2c2c2e;
+  --td-fill-hi: #3a3a3c;
+  --td-sep: #38383a;
+  --td-row-sep: rgba(84,84,88,0.45);
+  --td-label: #f5f5f7;
+  --td-sec: #98989d;
+  --td-ter: #636366;
+  --td-green: #30d158;
+  --td-yellow: #ffd60a;
+  --td-orange: #ff9f0a;
+  --td-red: #ff453a;
+  --td-blue: #0a84ff;
   width: 100vw; max-width: 100vw;
   height: 100dvh; max-height: 100dvh;
-  border-radius: 0; border: none;
-  padding: 14px clamp(14px, 3vw, 44px);
-  gap: 10px;
+  border-radius: 0; border: none; box-shadow: none;
+  background: var(--td-bg);
+  color: var(--td-label);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  text-align: left;
+  padding: 0; gap: 0;
   overflow: hidden;
   position: relative; align-items: stretch !important;
   animation: none;          /* no zoom-in for something this size */
 }
 .teacher-box .td-grid-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
-.td-footer {
-  display: flex; gap: 10px; justify-content: center;
-  width: 100%; flex-wrap: wrap;
+
+/* ── Orodna vrstica ── */
+.td-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px clamp(12px, 2vw, 24px);
+  background: var(--td-bar);
+  border-bottom: 0.5px solid var(--td-sep);
+  position: relative; z-index: 3;
 }
-.td-footer .overlay-btn { flex: 0 1 240px; margin: 0; }
-/* Telefon: učitelj med uro hodi po razredu s telefonom v roki. Glava,
-   opozorilo in pet velikih gumbov so zasedli ves zaslon, za seznam učencev
-   je ostala ena vrstica. Na ozkem zaslonu se zato pomika cel pregled kot ena
-   stran (seznam ima svojo polno višino), gumbi so manjši in pod seznamom. */
+.td-title {
+  font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em;
+  margin-right: 6px; white-space: nowrap;
+}
+/* Segmentirana izbira (obdobje, pogled). Gumbi ostanejo .ptable-tog-btn,
+   ker jih tako poišče koda — slog je le tu drugačen kot v okencu otroka. */
+.teacher-box .td-seg {
+  display: inline-flex; width: auto; flex: 0 0 auto; gap: 0;
+  background: var(--td-fill); border-radius: 9px; padding: 2px;
+}
+.teacher-box .td-seg .ptable-tog-btn {
+  flex: 0 0 auto;
+  background: transparent; border: none; box-shadow: none;
+  border-radius: 7px; padding: 5px 13px;
+  font-size: 0.82rem; font-weight: 500; color: var(--td-label);
+}
+.teacher-box .td-seg .ptable-tog-btn:hover:not(.active) { background: rgba(255,255,255,0.06); }
+.teacher-box .td-seg .ptable-tog-btn.active {
+  background: #636366; color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.45);
+}
+.td-toolbar .td-razred-select {
+  flex: 0 0 auto; min-width: 120px; height: 32px;
+  -webkit-appearance: none; appearance: none;
+  background: var(--td-fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2398989d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+  border: none; border-radius: 8px;
+  padding: 0 28px 0 11px;
+  font-size: 0.82rem; font-weight: 500; color: var(--td-label);
+}
+.td-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.td-tool {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; min-width: 32px; padding: 0 8px;
+  background: var(--td-fill); color: var(--td-label);
+  border: none; border-radius: 8px;
+  font-family: inherit; font-size: 0.82rem; font-weight: 500;
+  cursor: pointer; white-space: nowrap;
+  transition: background .12s;
+}
+.td-tool:hover { background: var(--td-fill-hi); }
+.td-tool-label { padding: 0 12px 0 10px; }
+.td-tool-warn { color: var(--td-orange); font-variant-numeric: tabular-nums; }
+/* Imena prikazana / opozorilo odprto: modro, da je stanje vidno od daleč. */
+.td-tool.on { background: var(--td-blue); color: #fff; }
+.td-more { position: relative; }
+.td-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 10;
+  display: flex; flex-direction: column; min-width: 250px;
+  background: rgba(44,44,46,0.97);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  border: 0.5px solid var(--td-sep); border-radius: 12px; padding: 5px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.55);
+}
+.td-menu[hidden] { display: none; }
+.td-menu button {
+  background: none; border: none; border-radius: 7px;
+  padding: 8px 12px; text-align: left;
+  font-family: inherit; font-size: 0.88rem; color: var(--td-label);
+  cursor: pointer;
+}
+.td-menu button:hover { background: var(--td-blue); color: #fff; }
+.td-menu hr { border: none; border-top: 0.5px solid var(--td-sep); margin: 4px 8px; }
+.td-menu .td-menu-danger { color: var(--td-red); }
+
+/* Telefon: učitelj med uro hodi po razredu s telefonom v roki. Pomika se
+   cel pregled kot ena stran, orodna vrstica pa ostane pripeta na vrhu, da
+   sta ✕ in razred vedno pri roki. */
 @media (max-width: 700px) {
-  .teacher-box { overflow-y: auto; padding: 12px 12px 20px; gap: 8px; }
+  .teacher-box { overflow-y: auto; }
   .teacher-box > * { flex-shrink: 0; }
   .teacher-box .td-grid-wrap { flex: 0 0 auto; overflow-y: visible; }
-  .teacher-box .overlay-title { font-size: 1.15rem; padding-right: 46px; align-self: flex-start; text-align: left; }
-  .td-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-  .td-footer .overlay-btn { font-size: 0.85rem; padding: 10px 8px; }
-  .td-footer #tdPrint { grid-column: 1 / -1; }
-  .teacher-box .medal-modal-close { position: fixed; z-index: 2; background: rgba(40,30,60,0.95); }   /* ostane viden med pomikanjem */
+  .td-toolbar { position: sticky; top: 0; gap: 8px; padding: 8px 12px; }
+  .td-title { flex: 1 1 auto; }
+  .td-tools { order: 1; }
+  /* pogled čez vso širino (najdaljše besede), obdobje in razred pod njim */
+  .teacher-box #tdViewToggle { order: 2; flex: 1 1 100%; }
+  .teacher-box #tdWinToggle { order: 3; flex: 1 1 0; min-width: 0; }
+  .td-toolbar .td-razred-select { order: 3; min-width: 0; width: 112px; }
+  .teacher-box .td-seg .ptable-tog-btn {
+    flex: 1 1 0; padding: 5px 2px; min-width: 0;
+    font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis;
+  }
+  .td-tool-label span { display: none; }
+  .td-tool-label { padding: 0 8px; }
 }
-.td-controls { display: flex; gap: 8px; width: 100%; flex-wrap: wrap; align-items: stretch; }
-.td-controls .ptable-toggle { flex: 1; min-width: 150px; }
-/* Telefon: trije pogledi zasedejo celo vrstico; razred in imena gresta pod
-   njih. Prej se je izbirnik razreda prekril z gumbom "Do 20". Mora stati za
-   zgornjim pravilom, sicer ga to povozi. */
-@media (max-width: 700px) {
-  .td-controls .ptable-toggle { flex: 1 1 100%; min-width: 0; }
-  .td-controls .td-razred-select, .td-controls .td-names-btn { flex: 1 1 0; min-width: 0; padding: 8px 10px; }
-}
+
 .td-razred-select {
   flex: 0 0 auto; min-width: 130px;
   background: rgba(0,0,0,0.25); color: #eee;
@@ -950,143 +1034,124 @@ body.competition {
   padding: 6px 10px; font-size: 0.78rem; font-weight: 600;
   font-family: inherit; cursor: pointer;
 }
-.td-razred-select option { background: #2a2342; color: #eee; }
-.td-refresh {
-  flex: 0 0 auto;
-  background: rgba(255,255,255,0.06); color: #eee;
-  border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
-  padding: 6px 12px; font-size: 0.78rem; font-weight: 600;
-  font-family: inherit; cursor: pointer;
-}
-.td-refresh:hover { background: rgba(255,255,255,0.12); }
-.td-refresh:disabled { opacity: 0.5; cursor: default; }
+.td-razred-select option { background: #2c2c2e; color: #eee; }
 .td-statusline {
   display: flex; align-items: center; justify-content: space-between;
-  width: 100%; gap: 8px;
-  font-size: 0.7rem; color: rgba(255,255,255,0.5);
+  flex-wrap: wrap; gap: 4px 16px;
+  padding: 8px clamp(12px, 2vw, 24px);
+  border-bottom: 0.5px solid var(--td-row-sep);
+  font-size: 0.78rem; color: var(--td-sec);
 }
-.td-live { display: flex; align-items: center; gap: 6px; }
-.td-classsum { color: rgba(255,255,255,0.45); }
+.td-live { display: flex; align-items: center; gap: 7px; }
+.td-classsum { display: flex; gap: 16px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.td-classsum b { color: var(--td-label); font-weight: 600; }
+.td-classsum .td-sum-pct { color: var(--td-green); }
 
-/* ── Lesson view: one row per student ── */
+/* ── Seznam učencev: gosta tabela, vrstica na otroka ── */
 .td-lesson {
-  display: flex; flex-direction: column; gap: 4px;
-  width: 100%; max-width: 760px; margin-inline: auto;
+  /* Učenec · Razred · Načini · Odgovori · Točnost · Brihtometer · Šibka */
+  --tl-cols: minmax(0,1.5fr) 64px minmax(0,1.3fr) 82px 78px minmax(120px,1fr) 96px;
+  display: flex; flex-direction: column;
+  width: 100%;
 }
+.td-lesson.one-rz { --tl-cols: minmax(0,1.5fr) minmax(0,1.3fr) 82px 78px minmax(120px,1fr) 96px; }
+.td-lesson.one-rz .tl-rz { display: none; }
 .tl-row {
-  /* Measured: the headers need 83 / 111 / 103px. The answers column also
-     carries up to three mode chips under the number, so it gets the widest
-     share; the name column had 500px it never used. */
-  display: grid; grid-template-columns: minmax(0,1fr) 148px 116px 122px;
-  gap: 10px; align-items: center;
-  padding: 8px 14px; border-radius: 9px;
-  background: rgba(255,255,255,0.04);
+  display: grid; grid-template-columns: var(--tl-cols);
+  gap: 14px; align-items: center;
+  min-height: 40px; padding: 0 clamp(12px, 2vw, 24px);
+  border-bottom: 0.5px solid var(--td-row-sep);
+  font-size: 0.92rem;
 }
+.tl-row:not(.tl-head):hover { background: rgba(255,255,255,0.04); }
 .tl-row > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Glava ostane vidna, ko se pomikaš po seznamu. */
 .tl-head {
-  background: transparent; padding-top: 0; padding-bottom: 0;
-  font-size: 0.6rem; text-transform: uppercase;
-  color: rgba(255,255,255,0.4); font-weight: 700;
+  position: sticky; top: 0; z-index: 2;
+  min-height: 30px; background: var(--td-bg);
+  font-size: 0.72rem; font-weight: 500; color: var(--td-sec);
 }
-/* the modal centres its text; this one header must line up with the names */
 .tl-head > :first-child { text-align: left; }
-/* Phones: the desktop columns (108+100+130 plus gaps) are wider than the
-   modal, so tighten them and let the headers wrap instead of truncating. */
+.tl-row.tl-head > * { color: var(--td-sec); }
+/* Ozko: ni prostora za načine; od 600px navzdol tudi ne za razred. */
+@media (max-width: 900px) {
+  .td-lesson { --tl-cols: minmax(0,1.5fr) 56px 64px 62px minmax(90px,1fr) 70px; }
+  .td-lesson.one-rz { --tl-cols: minmax(0,1.5fr) 64px 62px minmax(90px,1fr) 70px; }
+  .tl-row .tl-modes { display: none; }
+}
 @media (max-width: 600px) {
-  .tl-row {
-    /* Odgovori dobijo 92px, da gredo ikone načinov v eno vrstico. Uporabniška
-       imena so kratka, zato jim ostane dovolj prostora tudi na 375px. */
-    grid-template-columns: minmax(0,1fr) 92px 50px 44px;
-    gap: 6px; padding: 8px 10px;
-  }
-  .tl-head { font-size: 0.55rem; }
-  /* Naslovi stolpcev se raje prelomijo, kot da jih odreže na "BRIH…". */
+  .td-lesson, .td-lesson.one-rz { --tl-cols: minmax(0,1fr) 40px 50px 66px 40px; }
+  .tl-row .tl-rz { display: none; }
+  .tl-row { gap: 8px; padding: 0 12px; min-height: 38px; font-size: 0.82rem; }
+  /* Na telefonu se pomika cela stran, glava stolpcev zato ni pripeta. */
+  .tl-head { position: static; font-size: 0.66rem; }
   .tl-head > * { white-space: normal; overflow: visible; }
-  .tl-num, .tl-weak { font-size: 0.76rem; }
-  .tl-name { font-size: 0.78rem; }
-  .tl-bm-val { font-size: 0.76rem; }
-  /* Ozko: pri oknu "ves čas" je skupno število lahko štirimestno, zato mora
-     "1024/✔987" ostati znotraj 62px in ne zlesti v sosednji stolpec. */
-  .tl-ans-line { font-size: 0.7rem; }
-  /* Tako majhne, da gredo tri ikone v vrstico — prej sta šli le dve in je
-     vrstica z vsemi načini zrasla na štiri vrstice. Četrta se prelomi. */
-  .tl-mode { font-size: 0.58rem; padding: 0 3px; }
-  .tl-modes { gap: 3px; }
-  .tl-bm-max { font-size: 0.6rem; }
-  .tl-legend { font-size: 0.62rem; gap: 8px; }
+  .tl-emoji { display: none; }
+  .tl-legend { font-size: 0.66rem; gap: 8px; }
 }
 .tl-name {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 0.85rem; font-weight: 600; color: #eee;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 7px;
+  font-weight: 500; color: var(--td-label);
   cursor: pointer;
 }
-.tl-name:hover { color: #f0a500; }
-.tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.tl-dot.on   { background: #4caf50; box-shadow: 0 0 6px rgba(76,175,80,0.7); }
-.tl-dot.off  { background: rgba(255,255,255,0.18); }
-.tl-dot.warn { background: #e6a817; box-shadow: 0 0 6px rgba(230,168,23,0.7); }
+.tl-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tl-name:hover .tl-who { color: var(--td-blue); }
+.tl-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.tl-dot.on   { background: var(--td-green, #30d158); }
+.tl-dot.off  { background: var(--td-ter, #636366); }
+.tl-dot.warn { background: var(--td-orange, #ff9f0a); }
+.tl-rz { color: var(--td-sec); font-size: 0.85em; }
 .tl-num, .tl-weak {
-  text-align: right; font-weight: 700; font-size: 0.84rem;
-  font-variant-numeric: tabular-nums;
+  text-align: right; font-variant-numeric: tabular-nums;
 }
-.tl-weak { color: rgba(255,255,255,0.75); }
-/* accuracy reads as coloured text, not as a filled chip */
-.tl-num.m-good,  .tl-ans-ok.m-good  { background: transparent; color: #5fd97a; }
-.tl-num.m-mid,   .tl-ans-ok.m-mid   { background: transparent; color: #e6b84a; }
-.tl-num.m-bad,   .tl-ans-ok.m-bad   { background: transparent; color: #ff7a7a; }
-.tl-num.m-early, .tl-ans-ok.m-early { background: transparent; box-shadow: none; color: rgba(255,255,255,0.6); }
-.tl-num.m-none,  .tl-ans-ok.m-none  { background: transparent; color: rgba(255,255,255,0.35); }
-.tl-idle { opacity: 0.5; }
+.tl-ans { color: var(--td-label); }
+.tl-weak { color: var(--td-label); }
+/* točnost: obarvana številka, ne obarvano polje */
+.teacher-box .tl-num.m-good  { background: transparent; color: var(--td-green); }
+.teacher-box .tl-num.m-mid   { background: transparent; color: var(--td-yellow); }
+.teacher-box .tl-num.m-bad   { background: transparent; color: var(--td-red); }
+.teacher-box .tl-num.m-early { background: transparent; box-shadow: none; color: var(--td-sec); }
+.teacher-box .tl-num.m-none  { background: transparent; color: var(--td-ter); }
+.tl-idle { opacity: 0.45; }
 
-/* ── Odgovori: "63 / ✔34" in pod tem načini igre ──
-   Dve vrstici v eni celici, zato tu ne velja nowrap iz .tl-row > *. */
-.tl-ans, .tl-bm {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
-  overflow: visible; white-space: normal;
-}
-.tl-ans-line {
-  font-weight: 700; font-size: 0.84rem; white-space: nowrap;
-  font-variant-numeric: tabular-nums; color: rgba(255,255,255,0.5);
-}
-.tl-ans-sep { color: rgba(255,255,255,0.22); margin: 0 3px; }
-.tl-ans-ok  { font-weight: 800; }
-.tl-ans-none {
-  display: block; text-align: right; font-weight: 700; font-size: 0.84rem;
-  color: rgba(255,255,255,0.35);
-}
-.tl-modes {
-  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px;
-}
-.tl-mode {
-  background: rgba(255,255,255,0.07); border-radius: 5px; padding: 1px 5px;
-  font-size: 0.66rem; font-weight: 700; white-space: nowrap;
-  color: rgba(255,255,255,0.65); font-variant-numeric: tabular-nums;
-}
+/* ── Načini igre: v eni vrstici, brez okvirčkov ── */
+.tl-modes { display: flex; gap: 12px; color: var(--td-sec); font-size: 0.85em; }
+.tl-mode { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* ── Brihtometer: obvladani predali od 20 ── */
+.tl-bm { display: flex; align-items: center; gap: 10px; }
 .tl-bm-val {
-  font-weight: 800; font-size: 0.84rem; color: #eee;
-  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto; min-width: 1.4em; text-align: right;
+  font-variant-numeric: tabular-nums; color: var(--td-label);
 }
-.tl-bm-max { font-weight: 700; font-size: 0.68rem; color: rgba(255,255,255,0.35); }
 .tl-bm-bar {
-  width: 100%; height: 6px; border-radius: 3px;
-  background: rgba(255,255,255,0.09); overflow: hidden;
+  flex: 1 1 auto; height: 6px; border-radius: 3px;
+  background: var(--td-fill); overflow: hidden;
 }
-.tl-bm-fill {
-  display: block; height: 100%; border-radius: 3px;
-  background: linear-gradient(90deg, #f0a500, #5fd97a);
-  background-repeat: no-repeat;   /* širino preliva nastavi bmCell() */
-}
+.tl-bm-fill { display: block; height: 100%; border-radius: 3px; }
+.tl-bm-fill.bm-hi  { background: var(--td-green); }
+.tl-bm-fill.bm-mid { background: var(--td-yellow); }
+.tl-bm-fill.bm-lo  { background: var(--td-orange); }
 
 /* Pomen ikon — v vrsticah samih namenoma ni besed. */
 .tl-legend {
-  display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
-  padding-top: 8px;
-  font-size: 0.68rem; color: rgba(255,255,255,0.45);
+  display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+  padding: 12px 16px 16px;
+  font-size: 0.74rem; color: var(--td-sec);
 }
-.tl-legend-note { font-style: italic; }
+.tl-legend-note { color: var(--td-ter); }
+
+/* Mreža poštevank v pregledu: obarvan odtenek in svetla številka namesto
+   polnih starinskih polj. Velja samo tu, okence otroka ostane po starem. */
+.teacher-box .m-good  { background: rgba(48,209,88,0.26);  color: #4ee07a; }
+.teacher-box .m-mid   { background: rgba(255,214,10,0.22); color: #ffe04d; }
+.teacher-box .m-bad   { background: rgba(255,69,58,0.28);  color: #ff7b72; }
+.teacher-box .m-early { background: rgba(255,255,255,0.10); color: #d1d1d6; box-shadow: none; }
+.teacher-box .m-none  { background: rgba(255,255,255,0.04); color: var(--td-ter); }
+.teacher-box .td-legend { padding: 8px 16px 0; }
+.teacher-box .td-grid-wrap > .td-row { padding-inline: clamp(12px, 2vw, 24px); }
+.teacher-box .td-head { position: sticky; top: 0; z-index: 2; background: var(--td-bg); padding-top: 6px; }
+
 .td-legend {
   display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
   font-size: 0.7rem; color: rgba(255,255,255,0.6);
@@ -1151,20 +1216,6 @@ body.competition {
 }
 .td-ops-head { visibility: hidden; }
 
-/* Gumb za prikaz imen. Privzeto skrito — glej komentar v script.js. */
-.td-names-btn {
-  flex: 0 0 auto;
-  background: rgba(255,255,255,0.06); color: #ddd;
-  border: 1px solid rgba(255,255,255,0.28); border-radius: 8px;
-  padding: 6px 12px; font-size: 0.78rem; font-weight: 600;
-  font-family: inherit; cursor: pointer; white-space: nowrap;
-  transition: background .12s, border-color .12s, color .12s;
-}
-.td-names-btn:hover { background: rgba(255,255,255,0.12); }
-.td-names-btn.on {
-  background: rgba(240,165,0,0.18); border-color: rgba(240,165,0,0.6);
-  color: #ffd97a;
-}
 /* ob prikazanih imenih postane uporabniško ime drugotno */
 .td-uname {
   font-weight: 500; font-size: 0.86em;
@@ -1173,10 +1224,10 @@ body.competition {
 
 .td-name[data-username] { cursor: pointer; }
 .td-name[data-username]:hover { color: #f0a500; text-decoration: underline; }
-.td-hint {
-  font-size: 0.72rem; color: rgba(255,255,255,0.5);
-  text-align: center; margin-top: 2px;
-}
+.teacher-box .td-name { color: var(--td-label); font-weight: 500; }
+.teacher-box .td-name[data-username]:hover { color: var(--td-blue); text-decoration: none; }
+.teacher-box .td-razred { background: var(--td-fill); color: var(--td-sec); font-weight: 500; }
+.teacher-box .td-uname { color: var(--td-sec); font-weight: 400; }
 
 /* ── Student class (razred) prompt ── */
 .razred-box { max-width: 92vw; width: 420px; }
@@ -1434,21 +1485,12 @@ body.competition {
   .td-th { font-size: 0.95rem; }
   .td-razred { font-size: 0.72rem; }
 
-  /* seznam učencev */
-  .td-lesson { max-width: 980px; }
-  .tl-row {
-    grid-template-columns: minmax(0,1fr) 180px 140px 140px;
-    padding: 11px 18px;
-  }
-  .tl-name { font-size: 1.05rem; }
-  .tl-num, .tl-weak { font-size: 1.05rem; }
-  .tl-ans-line, .tl-bm-val { font-size: 1.05rem; }
-  .tl-mode { font-size: 0.78rem; padding: 2px 7px; }
-  .tl-bm-max { font-size: 0.82rem; }
-  .tl-bm-bar { height: 8px; }
+  /* seznam učencev: malo večja pisava za branje od daleč, vrstica pa
+     ostane nizka, da jih gre na zaslon čim več */
+  .tl-row { min-height: 44px; font-size: 1.02rem; }
+  .tl-head { min-height: 32px; font-size: 0.78rem; }
+  .tl-bm-bar { height: 7px; }
   .tl-legend { font-size: 0.8rem; }
-  .tl-head { font-size: 0.68rem; }
-  .tl-dot { width: 10px; height: 10px; }
 }
 
 /* ══════════════════════════
@@ -1535,13 +1577,12 @@ body.competition {
 
 /* Opozorilo: enako ime v razredu */
 .td-dupwarn {
-  width: 100%; font-size: 0.8rem; line-height: 1.45;
-  background: rgba(240,165,0,0.12); border: 1px solid rgba(240,165,0,0.4);
-  border-radius: 8px; padding: 7px 10px; color: #ffd27a;
+  font-size: 0.82rem; line-height: 1.45;
+  background: rgba(255,159,10,0.12); border-bottom: 0.5px solid var(--td-row-sep);
+  padding: 8px clamp(12px, 2vw, 24px); color: #ffc56b;
 }
-.td-dupwarn-how { display: block; margin-top: 4px; opacity: 0.85; font-size: 0.75rem; }
-.td-dupwarn summary { cursor: pointer; }
-@media (max-width: 700px) { .td-dupwarn { font-size: 0.74rem; padding: 6px 10px; } }
+.td-dupwarn-how { display: block; margin-top: 2px; color: var(--td-sec); font-size: 0.78rem; }
+@media (max-width: 700px) { .td-dupwarn { font-size: 0.76rem; } }
 
 /* Tekmovanje: samodejno ime prijavljenega učenca, opomba pod lestvico */
 .comp-name-auto { font-size: 1.3rem; font-weight: 800; color: #fff; margin: 4px 0 12px; }
