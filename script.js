@@ -2005,78 +2005,135 @@ function renderAuthView(view) {
     return;
   }
 
-  /* register */
+  /* register — po korakih. Prej je bilo vse na enem dolgem zaslonu in otroci
+     so se v njem izgubili. Geslo vpišejo dvakrat, da si ga res zapomnijo, na
+     koncu pa vidijo ime IN živali, da si oboje prepišejo. Lahkega gesla ne
+     prepovemo, samo opozorimo (kot pri spremembi gesla). */
   box.className = 'timed-overlay-box auth-box is-register';
-  box.innerHTML = `
-    <div class="overlay-title">✨ Nov račun</div>
-    <div class="overlay-divider"></div>
-    <div class="auth-warn">⚠️ Nov račun ustvari <strong>samo, če ga še nimaš</strong>.<br>
-      Če si geslo pozabil_a, ti ga učiteljica ponastavi — tvoje točke ostanejo.</div>
-    <label class="auth-label">Tvoje ime</label>
-    <input id="regName" class="auth-input" autocomplete="off" maxlength="20"
-           placeholder="npr. Nino" />
-    <label class="auth-label">Tvoja najljubša številka</label>
-    <input id="regNumber" class="auth-input" inputmode="numeric"
-           autocomplete="off" placeholder="npr. 4" />
-    <label class="auth-label">Izberi svoj emoji</label>
-    <div class="emoji-grid" id="regEmojiGrid"></div>
-    <label class="auth-label">Geslo — izberi 4 živali (zapomni si vrstni red!)</label>
-    <div id="regPickerSlot"></div>
-    <button class="overlay-btn overlay-btn-next" id="regBtn">Ustvari račun ✓</button>
-    <div class="auth-msg" id="regMsg"></div>
-    <button class="auth-switch" id="regToLogin">Že imaš račun? Prijavi se</button>
-    <button class="auth-switch auth-close" id="regClose">Zapri</button>`;
+  const reg = { name: '', number: '', emoji: PROFILE_EMOJIS[0], seq: null };
+  const REG_STEPS = ['who', 'emoji', 'pin', 'repeat'];
 
-  let chosenEmoji = PROFILE_EMOJIS[0];
-  const eg = box.querySelector('#regEmojiGrid');
-  PROFILE_EMOJIS.forEach((em, i) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'emoji-btn' + (i === 0 ? ' active' : '');
-    b.textContent = em;
-    b.addEventListener('click', () => {
-      eg.querySelectorAll('.emoji-btn').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      chosenEmoji = em;
-    });
-    eg.appendChild(b);
-  });
-  const picker = buildAnimalPicker();
-  box.querySelector('#regPickerSlot').appendChild(picker);
-  box.querySelector('#regClose').addEventListener('click', removeOverlay);
-  box.querySelector('#regToLogin').addEventListener('click', () => renderAuthView('login'));
-  box.querySelector('#regBtn').addEventListener('click', async () => {
-    const name = box.querySelector('#regName').value.trim().slice(0, 20);
-    const number = box.querySelector('#regNumber').value.replace(/[^0-9]/g, '').slice(0, 3);
-    const seq = picker.getSeq();
+  function regStep(step) {
+    const n = REG_STEPS.indexOf(step) + 1;
+    const back = n === 1
+      ? '<button class="auth-switch" id="regToLogin">Že imaš račun? Prijavi se</button>'
+      : '<button class="auth-switch" id="regBack">← Nazaj</button>';
+    const body = {
+      who: `
+        <div class="auth-warn">⚠️ Nov račun ustvari <strong>samo, če ga še nimaš</strong>.<br>
+          Pozabljeno geslo ti ponastavi učiteljica.</div>
+        <label class="auth-label">Tvoje ime</label>
+        <input id="regName" class="auth-input" autocomplete="off" maxlength="20"
+               placeholder="npr. Nino" value="${esc(reg.name)}" />
+        <label class="auth-label">Tvoja najljubša številka</label>
+        <input id="regNumber" class="auth-input" inputmode="numeric"
+               autocomplete="off" placeholder="npr. 4" value="${esc(reg.number)}" />`,
+      emoji: `
+        <label class="auth-label">Izberi svoj emoji</label>
+        <div class="emoji-grid" id="regEmojiGrid"></div>`,
+      pin: `
+        <label class="auth-label">Geslo — izberi 4 živali</label>
+        <div class="auth-note">💡 Izberi <strong>različne</strong> živali
+          in si zapomni vrstni red.</div>
+        <div id="regPickerSlot"></div>`,
+      repeat: `
+        <label class="auth-label">Še enkrat poklikaj svoje geslo</label>
+        <div id="regPickerSlot"></div>`
+    }[step];
+    box.innerHTML = `
+      <div class="overlay-title">✨ Nov račun</div>
+      <div class="reg-step">Korak ${n} / ${REG_STEPS.length}</div>
+      <div class="overlay-divider"></div>
+      ${body}
+      <button class="overlay-btn overlay-btn-next" id="regBtn">${
+        step === 'repeat' ? 'Ustvari račun ✓' : 'Naprej ➡️'}</button>
+      <div class="auth-msg" id="regMsg"></div>
+      ${back}
+      <button class="auth-switch auth-close" id="regClose">Zapri</button>`;
+    box.querySelector('#regClose').addEventListener('click', removeOverlay);
+    if (n === 1) box.querySelector('#regToLogin').addEventListener('click', () => renderAuthView('login'));
+    else box.querySelector('#regBack').addEventListener('click', () => regStep(REG_STEPS[n - 2]));
+
     const msg = box.querySelector('#regMsg');
-    if (name.length < 1)   { msg.textContent = 'Vpiši svoje ime.'; return; }
-    if (!number)           { msg.textContent = 'Vpiši svojo najljubšo številko.'; return; }
-    if (!seq)              { msg.textContent = 'Izberi vse 4 živali za geslo.'; return; }
     const btn = box.querySelector('#regBtn');
-    btn.disabled = true; btn.textContent = 'Ustvarjam …';
-    const ok = await registerStudent(name, number, chosenEmoji, seq);
-    if (ok === RPC_UNREACHABLE) {
-      btn.disabled = false; btn.textContent = 'Ustvari račun ✓';
-      msg.textContent = OFFLINE_MSG;
-    } else if (ok) {
-      box.innerHTML = `
-        <div class="overlay-title" style="color:#4caf50">✅ Račun ustvarjen!</div>
-        <div class="overlay-divider"></div>
-        <div class="reg-done-emoji">${esc(ok.emoji)}</div>
-        <div class="reg-done-label">Tvoje uporabniško ime je</div>
-        <div class="reg-done-user">${esc(ok.username)}</div>
-        <div class="auth-msg">📌 Dobro si ga zapomni — rabil ga boš za prijavo!</div>
-        <button class="overlay-btn overlay-btn-next" id="regDoneBtn">Naprej ➡️</button>`;
-      box.querySelector('#regDoneBtn').addEventListener('click', () => {
-        removeOverlay();
-        ensureRazred();
+    let picker = null;
+    if (step === 'emoji') {
+      const eg = box.querySelector('#regEmojiGrid');
+      PROFILE_EMOJIS.forEach(em => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'emoji-btn' + (em === reg.emoji ? ' active' : '');
+        b.textContent = em;
+        b.addEventListener('click', () => {
+          eg.querySelectorAll('.emoji-btn').forEach(x => x.classList.remove('active'));
+          b.classList.add('active');
+          reg.emoji = em;
+        });
+        eg.appendChild(b);
       });
-    } else {
-      btn.disabled = false; btn.textContent = 'Ustvari račun ✓';
-      msg.textContent = '❌ Napaka pri ustvarjanju računa. Poskusi znova.';
     }
-  });
+    if (step === 'pin' || step === 'repeat') {
+      picker = buildAnimalPicker();
+      box.querySelector('#regPickerSlot').appendChild(picker);
+    }
+
+    btn.addEventListener('click', async () => {
+      if (step === 'who') {
+        reg.name = box.querySelector('#regName').value.trim().slice(0, 20);
+        reg.number = box.querySelector('#regNumber').value.replace(/[^0-9]/g, '').slice(0, 3);
+        if (reg.name.length < 1) { msg.textContent = 'Vpiši svoje ime.'; return; }
+        if (!reg.number)         { msg.textContent = 'Vpiši svojo najljubšo številko.'; return; }
+        regStep('emoji'); return;
+      }
+      if (step === 'emoji') { regStep('pin'); return; }
+      const seq = picker.getSeq();
+      if (!seq) { msg.textContent = 'Izberi vse 4 živali.'; return; }
+      if (step === 'pin') {
+        // 4 enake ali 2 + 2 je lahko uganiti: opozori enkrat, potem pusti
+        if (new Set(seq.split(',')).size < 3 && btn.dataset.warned !== seq) {
+          btn.dataset.warned = seq;
+          msg.classList.add('pin-warn');
+          msg.textContent = '⚠️ Tako geslo sošolci hitro uganejo. Izberi drugo '
+                          + 'ali klikni še enkrat, če ga vseeno želiš.';
+          return;
+        }
+        reg.seq = seq; regStep('repeat'); return;
+      }
+      if (seq !== reg.seq) {
+        msg.textContent = '❌ Gesli se ne ujemata. Izberi geslo še enkrat.';
+        setTimeout(() => regStep('pin'), 1500);
+        return;
+      }
+      btn.disabled = true; btn.textContent = 'Ustvarjam …';
+      const ok = await registerStudent(reg.name, reg.number, reg.emoji, reg.seq);
+      if (ok === RPC_UNREACHABLE) {
+        btn.disabled = false; btn.textContent = 'Ustvari račun ✓';
+        msg.textContent = OFFLINE_MSG;
+      } else if (ok) {
+        const animals = reg.seq.split(',').map(i => ANIMALS[+i]).join(' ');
+        box.innerHTML = `
+          <div class="overlay-title" style="color:#4caf50">✅ Račun ustvarjen!</div>
+          <div class="overlay-divider"></div>
+          <div class="reg-done-card">
+            <div class="reg-done-label">Uporabniško ime</div>
+            <div class="reg-done-user">${esc(ok.emoji)} ${esc(ok.username)}</div>
+            <div class="reg-done-label">Geslo</div>
+            <div class="reg-done-pin">${animals}</div>
+          </div>
+          <div class="auth-note">📌 <strong>Prepiši si ime in živali</strong> v zvezek,
+            preden klikneš Naprej. Rabil_a ju boš za prijavo.</div>
+          <button class="overlay-btn overlay-btn-next" id="regDoneBtn">Naprej ➡️</button>`;
+        box.querySelector('#regDoneBtn').addEventListener('click', () => {
+          removeOverlay();
+          ensureRazred();
+        });
+      } else {
+        btn.disabled = false; btn.textContent = 'Ustvari račun ✓';
+        msg.textContent = '❌ Napaka pri ustvarjanju računa. Poskusi znova.';
+      }
+    });
+  }
+  regStep('who');
 }
 
 /* ── Učenec si sam spremeni geslo ──

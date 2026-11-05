@@ -769,6 +769,18 @@ body.competition {
 .reg-done-user {
   font-size: 2.4rem; font-weight: 800; color: #f0a500; letter-spacing: 0.06em;
 }
+/* Zadnji zaslon je listek: ime in geslo skupaj, da si otrok prepiše oboje. */
+.reg-done-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: rgba(0,0,0,0.35); border: 2px solid #f0a500;
+  border-radius: 14px; padding: 12px 16px;
+}
+.reg-done-card .reg-done-user { font-size: 2rem; margin-bottom: 6px; }
+.reg-done-pin { font-size: 2.2rem; letter-spacing: 0.12em; }
+.reg-step {
+  font-size: 0.78rem; font-weight: 700; color: rgba(255,255,255,0.55);
+  text-align: center; margin-top: -6px;
+}
 
 /* Stats dashboard */
 .stats-box { position: relative; align-items: stretch !important; text-align: left !important; }
