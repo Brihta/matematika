@@ -1558,11 +1558,30 @@ function vojskaIntroOnce() {
 const voSeen = () => { try { localStorage.setItem(voKey(), '1'); } catch (e) {} };
 
 /* Ob odprtju: baza preveri pogoje (nove sličice v ovojnico, zlate) in vrne stanje. */
+/* Če album_sync ne uspe (časovna meja, omrežje, 5xx), preberemo samo stanje
+   (album_state, brez preverjanja sličic), da cekini in lik ostanejo vidni,
+   album_sync pa čez 30 s enkrat poskusimo znova v ozadju. Vsak nov load()
+   prekliče star ponovni poskus, da starejši odgovor ne povozi novejšega. */
+const SYNC_RETRY_MS = 30000;
+let loadGen = 0, syncRetry = null;
+const failed = st => !st || st.unreachable;
 async function load() {
+  const gen = ++loadGen;
+  clearTimeout(syncRetry); syncRetry = null;
   render();
-  const [st, pet] = await Promise.all([rpc('album_sync'), rpc('pet_state')]);
+  let [st, pet] = await Promise.all([rpc('album_sync'), rpc('pet_state')]);
   // ljubljenček (če ga baza učencu pokaže in je izbran za spremljevalca)
   PET_COMP = pet && !pet.unreachable && pet.companion && pet.companion.stage !== 'jajce' ? pet.companion : null;
+  if (failed(st) && api() && api().profile()) {
+    const fb = await rpc('album_state');
+    if (gen !== loadGen) return;   // medtem je začel novejši load()
+    if (!failed(fb)) st = fb;
+    syncRetry = setTimeout(async () => {
+      syncRetry = null;
+      const again = await rpc('album_sync');
+      if (gen === loadGen && !failed(again)) apply(again);
+    }, SYNC_RETRY_MS);
+  }
   apply(st);
   askFormOnce();
 }
