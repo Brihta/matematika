@@ -530,22 +530,35 @@ $$;
 -- točnost med poštevankami, ki jih je učenec v sezoni že vadil in jih še
 -- nima v albumu (najprej tiste z vsaj 10 odgovori; pri enaki točnosti
 -- počasnejša). Če vadi samo že obvladane, izbire še ni.
+-- Hitrost (12. 11. 2026): fact_stats preberemo enkrat in seštejemo po
+-- poštevanki; »obvladano« je izračunano iz istih vsot (enaki pogoji kot
+-- _album_mastered), sličice pa preverimo enkrat na skupino. Prej je HAVING
+-- klical _album_mastered za vsako skupino, kar je pomenilo do 20 dodatnih
+-- branj fact_stats (3,2 s pri pridnih učencih brez izbire).
 create or replace function public._album_pogum_choose(p_student uuid, p_season smallint, p_from date, p_to date)
 returns void language sql security definer set search_path = public as $$
   insert into student_pogum (student_id, season, t, op, base_n, base_c, chosen_on)
-  select p_student, p_season, f.table_n, f.op, sum(f.correct + f.wrong), sum(f.correct), _album_today()
-    from fact_stats f
-   where f.student_id = p_student and f.day between p_from and p_to
-     -- izbira je enkrat na sezono: če že obstaja, iskanja ne poganjaj (prej 3 s pri pridnih učencih)
-     and not exists (select 1 from student_pogum g where g.student_id = p_student and g.season = p_season)
+  select p_student, p_season, a.table_n, a.op, a.n, a.c, _album_today()
+    from (select f.table_n, f.op,
+                 sum(f.correct + f.wrong) as n,
+                 sum(f.correct)           as c,
+                 sum(f.timed)             as tm,
+                 sum(f.fast)              as fs,
+                 count(distinct f.factor) filter (where f.correct > 0) as fac
+            from fact_stats f
+           where f.student_id = p_student and f.day between p_from and p_to
+             -- izbira je enkrat na sezono: če že obstaja, iskanja ne poganjaj
+             and not exists (select 1 from student_pogum g where g.student_id = p_student and g.season = p_season)
+           group by f.table_n, f.op) a
+   where a.n > 0
      and not exists (select 1 from student_stickers ss
-                      where ss.student_id = p_student and ss.season = p_season and ss.sticker_id = f.op || f.table_n)
-   group by f.table_n, f.op
-  having sum(f.correct + f.wrong) > 0 and not _album_mastered(p_student, f.table_n, f.op, p_from, p_to)
-   order by (sum(f.correct + f.wrong) >= 10) desc,
-            sum(f.correct)::numeric / sum(f.correct + f.wrong),
-            coalesce(sum(f.fast)::numeric / nullif(sum(f.timed), 0), 0),
-            f.table_n desc
+                      where ss.student_id = p_student and ss.season = p_season and ss.sticker_id = a.op || a.table_n)
+     -- ni obvladana (isto kot not _album_mastered(p_student, a.table_n, a.op, p_from, p_to))
+     and not (a.fac = 10 and a.n >= 20 and a.c >= 0.9 * a.n and a.tm > 0 and a.fs >= 0.8 * a.tm)
+   order by (a.n >= 10) desc,
+            a.c::numeric / a.n,
+            coalesce(a.fs::numeric / nullif(a.tm, 0), 0),
+            a.table_n desc
    limit 1
   on conflict do nothing;
 $$;
