@@ -1140,7 +1140,9 @@ function apply(st) {
   S.active = a.active_char || S.seasonChar;
   const got = {}; (st.stickers || []).forEach(x => { got[x.id] = x.gold ? 'gold' : x.state; });
   const tbl = {}; (st.tables || []).forEach(x => { tbl[x.op + x.t] = x; });
-  const streak = (st.streak && st.streak.best) || 0, days = st.practice_days || 0, comp = st.comp || {}, bat = st.battle || {};
+  /* Niz: vrstica kaže TRENUTNI niz (sličica pride, ko ga doseže nov niz),
+     rekord samo zraven. Prej je kazala rekord in otrok je dneve gledal 9 / 10. */
+  const streak = (st.streak && st.streak.current) || 0, streakBest = (st.streak && st.streak.best) || 0, days = st.practice_days || 0, comp = st.comp || {}, bat = st.battle || {};
   ALL().forEach(s => {
     s.state = got[s.id] || 'none';
     if (s.t) {
@@ -1148,7 +1150,12 @@ function apply(st) {
       /* natančni odstotki — zaokroži se samo za prikaz (89,7 % ni 90 %, kot pravi baza) */
       s.prog = x ? [+x.n, x.n ? x.c / x.n * 100 : 0, x.timed ? x.fast / x.timed * 100 : 0, +x.cover] : null;
     }
-    if (s.streak) s.step = [Math.min(streak, s.streak), s.streak, 'dni zapored'];
+    if (s.streak) {
+      s.step = [Math.min(streak, s.streak), s.streak, streakBest > streak ? `dni zapored zdaj · rekord ${streakBest}` : 'dni zapored'];
+      s.tip = streakBest > streak && streak < s.streak
+        ? `Tvoj niz se je prekinil, zato šteješ znova. Dan šteje, ko rešiš vsaj 10 pravilnih računov poštevanke. Računi do 20 se ne štejejo.`
+        : null;
+    }
     if (s.days) s.step = [Math.min(days, s.days), s.days, 'dni'];
     if (s.best) s.step = [Math.min(comp.best || 0, s.best), s.best, 'točk (tvoj rekord v sezoni)'];
     if (s.records) s.step = [Math.min(comp.records || 0, s.records), s.records, 'izboljšav'];
@@ -1432,6 +1439,7 @@ function stickerDetail(s) {
   const [a, b, unit] = s.step || [0, 1, ''];
   openModal(`<div class="art">${emptyArt(pad(s.no), s.step ? a / b : null)}</div><h3>${s.label}</h3><p>${s.cond}</p>
     ${s.step ? `<div class="checks"><div class="check"><span class="ic n"></span><div><b>${a} / ${b}</b> ${unit}<div class="bar"><i style="width:${a / b * 100}%"></i></div></div></div></div>` : ''}
+    ${s.tip ? `<div class="tip">${s.tip}</div>` : ''}
     <div class="btns"><button class="btn btn-soft" data-do="close">V redu</button></div>`);
 }
 
