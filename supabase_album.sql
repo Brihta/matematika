@@ -536,6 +536,8 @@ returns void language sql security definer set search_path = public as $$
   select p_student, p_season, f.table_n, f.op, sum(f.correct + f.wrong), sum(f.correct), _album_today()
     from fact_stats f
    where f.student_id = p_student and f.day between p_from and p_to
+     -- izbira je enkrat na sezono: če že obstaja, iskanja ne poganjaj (prej 3 s pri pridnih učencih)
+     and not exists (select 1 from student_pogum g where g.student_id = p_student and g.season = p_season)
      and not exists (select 1 from student_stickers ss
                       where ss.student_id = p_student and ss.season = p_season and ss.sticker_id = f.op || f.table_n)
    group by f.table_n, f.op
