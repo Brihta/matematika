@@ -30,8 +30,10 @@ Vsi trije uporabljajo isto bazo Supabase (`ldczgbajbarlgwqzcggh`) in iste račun
 ## Samo na Macu (ni na GitHubu)
 - **Tajnik**: priprave ur (`~/Documents/Shared_documents/Tajnik`, ima svoj CLAUDE.md).
 - **Kvizi** v datotekah: `~/Documents/Brihta-kvizi/` (z odgovori, zato niso v javnem repozitoriju).
+- **Video navodila** (snemalnica): `~/Documents/Brihta-video/` (README, skill `video-navodila`). Nino reče »Pripravi video: …«,
+  Claude posname zaslon, Nino samo glas (⬇ Izvozi glas), nato »sestavi«.
 
-V oblaku (claude.ai/code) te dve mapi nista dostopni.
+V oblaku (claude.ai/code) te mape niso dostopne.
 
 ## Kako Nino dela
 - Doma na Macu dela v aplikaciji Claude → zavihek Code. S telefona ali iz šole dela v claude.ai/code
