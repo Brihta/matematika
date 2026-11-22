@@ -36,8 +36,9 @@ Vsi trije uporabljajo isto bazo Supabase (`ldczgbajbarlgwqzcggh`) in iste račun
 V oblaku (claude.ai/code) te mape niso dostopne.
 
 ## Agenti: Claudio in njegova ekipa
-**Claudio** je Claude, s katerim Nino govori v klepetih (aplikacija Claude, telefon, Code). Tako ga Nino kliče.
-Claudio dela po pravilih v CLAUDE.md posameznega programa. Pod njim so načrtovana opravila (agenti), ki tečejo sama,
+**Claudio** (»Klavdijo, moja desna roka«) je Claude, s katerim Nino govori: na Macu v Code v mapi `Desna-roka`
+(`~/Documents/Desna-roka`, CLAUDE.md in ZAPISKI.md), sicer v kateremkoli klepetu. Dela po pravilih v CLAUDE.md posameznega programa.
+Ninovo pripeto kazalo na claude.ai (artefakt »Moji projekti«) ima isti seznam agentov; ob spremembi posodobi oboje. Pod njim so načrtovana opravila (agenti), ki tečejo sama,
 v oblaku, in ob koncu Ninu pošljejo obvestilo na telefon. Urejaš jih v aplikaciji Claude pod načrtovanimi opravili.
 
 | Agent | Kdaj | Kaj dela | Potrebuje | Nikoli |
