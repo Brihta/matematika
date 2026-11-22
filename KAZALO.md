@@ -35,6 +35,21 @@ Vsi trije uporabljajo isto bazo Supabase (`ldczgbajbarlgwqzcggh`) in iste račun
 
 V oblaku (claude.ai/code) te mape niso dostopne.
 
+## Agenti: Claudio in njegova ekipa
+**Claudio** je Claude, s katerim Nino govori v klepetih (aplikacija Claude, telefon, Code). Tako ga Nino kliče.
+Claudio dela po pravilih v CLAUDE.md posameznega programa. Pod njim so načrtovana opravila (agenti), ki tečejo sama,
+v oblaku, in ob koncu Ninu pošljejo obvestilo na telefon. Urejaš jih v aplikaciji Claude pod načrtovanimi opravili.
+
+| Agent | Kdaj | Kaj dela | Potrebuje | Nikoli |
+|---|---|---|---|---|
+| **Max** (»Claudio › Max (Fleksi English)«) | sobota 8.49 | Pripravi ponedeljkovo uro Fleksi angleščine (5/3): Teaching, Our lessons, test spellinga, vse SKRITO; iz kljukic »Done in class« prenese neopravljeno | Mac prižgan (bere `~/Brihta-max/kljukice.json`), repo Brihta/sola | ne objavlja, ne bere `~/.config/brihta-sola`, ne zapisuje imen in točk |
+| **Dnevni planer** | delavniki 4.47 | Dnevni načrt (nadomeščanja, obvestila, ure dneva) kot stran + mail | Gmail, Drive, koledar, Mac (priprave RAP) | ne ureja datotek, ne odgovarja na maile |
+| **Tedenski EVIO vpisi** | petek 15.10 | Osnutek vpisov v EVIO za naslednji teden (txt v OneDrive) | Mac (OneDrive), Gmail, repo Brihta/sola (branje) | ne piše drugam, ne pošilja mailov |
+
+Pravila za objavo gradiva iz katerega koli klepeta (»objavi …«, »skrij …«) so v `sola/CLAUDE.md`
+(razdelek »Objava gradiva brez prijave«). Tedenski postopek Fleksi angleščine: `sola/CLAUDE.md` (Fleksi Spelling,
+Teaching in Our lessons, Assessment, Max).
+
 ## Kako Nino dela
 - Doma na Macu dela v aplikaciji Claude → zavihek Code. S telefona ali iz šole dela v claude.ai/code
   (izbere repozitorij); tam ni Macovega odložišča, zato SQL vedno pokaži v ```sql bloku.
